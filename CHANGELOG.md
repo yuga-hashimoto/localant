@@ -4,6 +4,36 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/) and this project adheres to
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+- **Dashboard CSRF / DNS-rebinding protection**: `/api/*` now requires a
+  per-process token embedded only in the served HTML, and rejects non-local
+  `Host` headers. Closes a hole where a malicious web page could drive the
+  local dashboard (including approving pending risk-3 actions).
+- **Vault key separated from the auth token**: secrets are encrypted with a
+  dedicated random key (`vault.key`), so rotating the auth token no longer makes
+  stored secrets undecryptable. Legacy token-derived secrets are migrated
+  transparently on startup.
+- **Rate limiting** added to the public `/mcp` endpoint.
+
+### Added
+- `localant token rotate` / `localant token show` — re-issue the auth token
+  without losing stored secrets.
+- `test:coverage` script and v8 coverage provider.
+- Centralized `APP_VERSION` (replaces hardcoded `1.0.0` strings).
+- Community health files: CONTRIBUTING, CODE_OF_CONDUCT, issue/PR templates,
+  Dependabot, ROADMAP, Japanese README, and README badges.
+
+### Changed
+- Minimum Node lowered to **20.10** (from 22); CI now runs Linux/macOS/Windows
+  on Node 20 and 22.
+- Releases are **tag-driven** with npm **provenance**; pushing to `main` no
+  longer publishes (this was the cause of red CI on merges).
+- Expanded test suite: secret vault (encryption/migration), approval store
+  (single/double/session/consume), redaction, and HTTP auth (401/dashboard
+  token/Host check) — 33 → 65 tests.
+
 ## [1.0.0] - 2026-06-10
 
 ### Added

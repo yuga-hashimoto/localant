@@ -1,0 +1,57 @@
+name: Bug report
+description: Report a problem with LocalAnt
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug! For **security vulnerabilities**, do not use this
+        form — see [SECURITY.md](../blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+      placeholder: When I run `localant ...`, I expected X but got Y.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `localant setup`
+        2. Ask ChatGPT to ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs / output
+      description: Output of `localant doctor` and any error messages. Redact secrets and tokens.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: LocalAnt version
+      placeholder: "1.0.2 (run `localant --version`)"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: "v22.x (run `node --version`)"
+    validations:
+      required: true

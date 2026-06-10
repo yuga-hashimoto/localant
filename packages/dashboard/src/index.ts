@@ -6,7 +6,7 @@
  * dependency-free version ships in v1.0 so the dashboard works with zero build
  * steps and no CDN requirement.)
  */
-export function dashboardHtml(): string {
+export function dashboardHtml(token = ""): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -57,7 +57,12 @@ export function dashboardHtml(): string {
 <script>
 const TABS = ["Home","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
 let current = "Home";
-const api = (p, opts) => fetch("/api/"+p, opts).then(r => r.json());
+const DASH_TOKEN = ${JSON.stringify(token)};
+const api = (p, opts) => {
+  const o = Object.assign({}, opts);
+  o.headers = Object.assign({}, o.headers, { "x-dashboard-token": DASH_TOKEN });
+  return fetch("/api/"+p, o).then(r => r.json());
+};
 const el = (h) => { const d=document.createElement('div'); d.innerHTML=h; return d.firstElementChild; };
 function riskClass(r){ return "risk"+r; }
 function esc(s){ return String(s??"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }

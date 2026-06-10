@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Batch low-risk dev/tooling updates into a single PR.
+      dev-dependencies:
+        dependency-type: development
+      types:
+        patterns:
+          - "@types/*"
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci

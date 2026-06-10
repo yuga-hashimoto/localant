@@ -88,7 +88,11 @@ export class Gateway {
     this.cfg = this.configStore.load();
     const token = this.configStore.getToken();
 
-    this.vault = new SecretVault(this.paths, token);
+    // Encrypt secrets with a dedicated key (independent of the auth token), but
+    // pass the current token as the legacy key so secrets written by older
+    // versions are still readable and can be migrated forward.
+    this.vault = new SecretVault(this.paths, this.configStore.getVaultKey(), token);
+    this.vault.migrate();
     this.audit = new AuditLog(this.paths);
     this.audit.setSecretsProvider(() => this.vault.allValues());
     this.approvals = new ApprovalStore(this.paths);
