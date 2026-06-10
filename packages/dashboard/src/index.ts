@@ -297,6 +297,14 @@ const VIEWS = {
     const hc=el('<div class="card"><h2>Health check</h2><button class="btn ghost" id="hcBtn">Run</button><pre id="hcOut" style="display:none"></pre></div>');
     m.appendChild(hc);
     document.getElementById('hcBtn').onclick=action(document.getElementById('hcBtn'),async()=>{ const o=document.getElementById('hcOut'); o.style.display='block'; o.textContent=JSON.stringify(await api('health'),null,2); });
+
+    const env=el('<div class="card"><h2>Environment</h2><div id="envOut" class="muted">Checking…</div></div>');
+    m.appendChild(env);
+    try {
+      const d=await api('doctor');
+      const chips=d.tools.map(function(t){ return '<span class="tag" style="margin:2px;'+(t.available?'':'opacity:.5')+'">'+(t.available?'✓':'✗')+' '+esc(t.name)+'</span>'; }).join(' ');
+      document.getElementById('envOut').innerHTML='<p>node '+esc(d.node)+' · '+esc(d.platform)+(d.skillExecOk?'':' <span class="risk2">(Node 22+ recommended for skills)</span>')+'</p><div class="row">'+chips+'</div><p class="muted" style="font-size:12px;margin-top:8px">✓ = on PATH. Install <code>cloudflared</code>/<code>ngrok</code> for tunnels, <code>claude</code>/<code>codex</code> for agents.</p>';
+    } catch(e){ document.getElementById('envOut').textContent='Could not load environment.'; }
   },
 
   async Security(m){
@@ -363,7 +371,12 @@ const VIEWS = {
           +'<input type="text" id="skDesc" placeholder="description" style="flex:1;min-width:200px" />'
           +'<select id="skRisk" style="width:90px"><option value="0">risk 0</option><option value="1" selected>risk 1</option><option value="2">risk 2</option><option value="3">risk 3</option><option value="4">risk 4</option></select>'
           +'<button class="btn" id="skCreate">Create</button>'
-        +'</div><p class="muted" style="margin-top:8px;">The generated skill is saved <b>disabled</b>. Review its permissions, then enable it.</p></div>';
+        +'</div><p class="muted" style="margin-top:8px;">The generated skill is saved <b>disabled</b>. Review its permissions, then enable it.</p></div>'
+      +'<div class="card"><h2>Install from Git</h2>'
+        +'<div class="row" style="gap:12px;">'
+          +'<input type="text" id="skUrl" placeholder="https://github.com/user/my-skill.git" style="flex:1;min-width:240px" />'
+          +'<button class="btn" id="skInstall">Clone</button>'
+        +'</div><p class="muted" style="margin-top:8px;">Clones the repo into the skills directory <b>disabled</b>. Only install skills you trust — review permissions before enabling.</p></div>';
     const tb=document.getElementById('sk');
     if(!skills.length){ tb.appendChild(el('<tr><td colspan=6 class="muted">No skills found.</td></tr>')); }
     for(const s of skills){
@@ -391,6 +404,13 @@ const VIEWS = {
       toast('Skill "'+name+'" created (disabled)');
       render();
     },'Creating');
+    document.getElementById('skInstall').onclick=action(document.getElementById('skInstall'),async()=>{
+      const url=document.getElementById('skUrl').value.trim();
+      if(!url){ toast('Git URL is required.','err'); return; }
+      const r=await api('skills/install',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({url})});
+      toast('Installed "'+r.installed+'" (disabled)');
+      render();
+    },'Cloning');
   },
 
   async Projects(m){
@@ -743,7 +763,30 @@ async function showSkillDetail(name){
       +row('Permissions','<pre style="margin:0">'+esc(JSON.stringify(perms,null,2))+'</pre>')
       +row('Validation',validHtml)
       +'</table>';
-    openModal('Skill: '+s.manifest.name, html);
+    let runHtml='';
+    if(s.enabled && (s.manifest.tools||[]).length){
+      const toolOpts=(s.manifest.tools||[]).map(function(t){return '<option value="'+esc(t.name)+'">'+esc(t.name)+'</option>';}).join('');
+      runHtml='<h3 style="margin-top:16px;font-size:13px">Run a tool</h3>'
+        +'<div class="row" style="gap:8px;margin-bottom:8px"><select id="skRunTool">'+toolOpts+'</select><button class="btn sm" id="skRunBtn">Run</button></div>'
+        +'<textarea id="skRunInput" rows="3" placeholder="JSON input (e.g. an object)">{}</textarea>'
+        +'<pre id="skRunOut" style="display:none;margin-top:8px"></pre>';
+    } else if(!s.enabled){
+      runHtml='<p class="muted" style="margin-top:12px;font-size:12px">Enable the skill to run its tools.</p>';
+    }
+    openModal('Skill: '+s.manifest.name, html+runHtml);
+    const runBtn=document.getElementById('skRunBtn');
+    if(runBtn){
+      runBtn.onclick=action(runBtn,async()=>{
+        const tool=document.getElementById('skRunTool').value;
+        let input;
+        try { input=JSON.parse(document.getElementById('skRunInput').value||'{}'); }
+        catch(e){ toast('Input must be valid JSON: '+e.message,'err'); return; }
+        const out=document.getElementById('skRunOut');
+        const r=await api('skills/'+encodeURIComponent(s.manifest.name)+'/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tool,input})});
+        out.style.display='block';
+        out.textContent=JSON.stringify(r.result,null,2);
+      },'Running');
+    }
   } catch(e){ toast(e.message,'err'); }
 }
 

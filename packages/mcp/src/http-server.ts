@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema } from "@localant/shared";
-import type { Gateway } from "@localant/gateway";
+import { commandExists, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
 
@@ -267,6 +267,20 @@ function mountDashboardApi(
 
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
   r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
+  r.get("/doctor", async (_q, s) => {
+    const tools = ["git", "node", "pnpm", "npm", "npx", "claude", "codex", "cloudflared", "ngrok", "adb", "docker"];
+    const checks = await Promise.all(
+      tools.map(async (name) => ({ name, available: await commandExists(name) })),
+    );
+    const nodeMajor = Number(process.versions.node.split(".")[0]);
+    s.json({
+      node: process.version,
+      nodeOk: nodeMajor >= 20,
+      skillExecOk: nodeMajor >= 22,
+      platform: process.platform,
+      tools: checks,
+    });
+  });
   r.get("/config", (_q, s) => s.json(gw.config()));
   r.get("/mcp-endpoint", (_q, s) => {
     const t = gw.tunnel.current();
@@ -329,6 +343,32 @@ function mountDashboardApi(
       }
       const sk = gw.skills.generate({ name, description, riskLevel, requirements });
       s.json({ ...sk, note: "Skill generated DISABLED. Review permissions, then enable it." });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/skills/install", async (q, s) => {
+    try {
+      const url = q.body?.url;
+      if (!url) {
+        s.status(400).json({ error: "url is required." });
+        return;
+      }
+      const res = await gw.skills.installFromGit(url);
+      s.json({ ...res, note: "Cloned DISABLED. Review permissions, then enable it." });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/skills/:name/run", async (q, s) => {
+    try {
+      const { tool, input } = q.body ?? {};
+      if (!tool) {
+        s.status(400).json({ error: "tool is required." });
+        return;
+      }
+      const result = await gw.skills.run(q.params.name, tool, input ?? {});
+      s.json({ result });
     } catch (e) {
       s.status(400).json({ error: (e as Error).message });
     }

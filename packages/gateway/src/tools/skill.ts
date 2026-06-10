@@ -178,12 +178,8 @@ export function registerSkillTools(gw: Gateway): void {
     inputSchema: z.object({ url: z.string().url() }),
     summarize: (i) => `install skill from ${i.url}`,
     handler: async (i) => {
-      const name = (i.url.split("/").pop() ?? "skill").replace(/\.git$/, "");
-      const dest = `${gw.paths.skillsDir}/${name}`;
-      const res = await execFileSafe("git", ["clone", "--depth", "1", i.url, dest], { timeoutMs: 120_000 });
-      if (res.code !== 0) throw new Error(`git clone failed: ${res.stderr}`);
-      const s = gw.skills.get(name);
-      return { installed: name, enabled: false, valid: s ? gw.skills.validate(name) : { valid: false, errors: ["manifest missing"] } };
+      const res = await gw.skills.installFromGit(i.url);
+      return { ...res, enabled: false };
     },
   });
 

@@ -258,6 +258,27 @@ describe("dashboard api routes", () => {
     expect(((await res.json()) as { reachable: boolean }).reachable).toBe(false);
   });
 
+  it("reports the environment via /doctor", async () => {
+    const res = await apiGet("doctor");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { node: string; tools: { name: string; available: boolean }[] };
+    expect(body.node).toMatch(/^v\d/);
+    expect(body.tools.find((t) => t.name === "node")!.available).toBe(true);
+  });
+
+  it("validates skill install and run inputs", async () => {
+    const noUrl = await apiSend("skills/install", "POST", {});
+    expect(noUrl.status).toBe(400);
+    const noTool = await apiSend("skills/hello-world/run", "POST", {});
+    expect(noTool.status).toBe(400);
+    // hello-world ships disabled; running it should error until enabled. (The
+    // actual subprocess run is exercised by the live dashboard, not here: under
+    // vitest the package resolves to TS src, whose skill-runner has no built
+    // .js for the child process to load.)
+    const disabled = await apiSend("skills/hello-world/run", "POST", { tool: "hello", input: {} });
+    expect(disabled.status).toBe(400);
+  });
+
   it("manages bridged MCP servers (add, toggle, remove)", async () => {
     const add = await apiSend("mcp-servers", "POST", { name: "demo-mcp", command: "echo", args: "hello world" });
     expect(add.status).toBe(200);
