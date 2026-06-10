@@ -1,6 +1,6 @@
 {
   "name": "localant",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": false,
   "description": "LocalAnt — Use ChatGPT as the brain and your local computer as the hands. A safe, permissioned local MCP Gateway for ChatGPT.",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "packages/*/package.json",
     "examples/skills/**",
     "assets/**",
+    "scripts/postinstall.mjs",
     "README.md",
     "SECURITY.md",
     "LICENSE"
@@ -30,7 +31,16 @@
     "test:watch": "vitest",
     "validate": "pnpm build && pnpm test",
     "start": "node packages/cli/dist/bin.js start",
-    "setup": "node packages/cli/dist/bin.js setup"
+    "setup": "node packages/cli/dist/bin.js setup",
+    "postinstall": "node scripts/postinstall.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "commander": "^12.1.0",
+    "express": "^5.0.1",
+    "nanoid": "^5.0.9",
+    "tsx": "^4.19.2",
+    "zod": "^3.24.1"
   },
   "keywords": [
     "chatgpt",
