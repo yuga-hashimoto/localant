@@ -436,6 +436,61 @@ function mountDashboardApi(
     }
   });
 
+  r.get("/mcp-servers", (_q, s) => {
+    const servers = gw.config().mcpServers;
+    s.json(
+      Object.entries(servers).map(([name, cfg]) => ({
+        name,
+        command: cfg.command,
+        args: cfg.args,
+        transport: cfg.transport,
+        enabled: cfg.enabled,
+      })),
+    );
+  });
+  r.post("/mcp-servers", (q, s) => {
+    try {
+      const { name, command, args, enabled } = q.body ?? {};
+      if (!name || !command) {
+        s.status(400).json({ error: "name and command are required." });
+        return;
+      }
+      const cfg = gw.config();
+      const argList = Array.isArray(args) ? args : typeof args === "string" && args.trim() ? args.trim().split(/\s+/) : [];
+      gw.saveConfig({
+        ...cfg,
+        mcpServers: {
+          ...cfg.mcpServers,
+          [name]: { command, args: argList, transport: "stdio", enabled: enabled !== false },
+        },
+      });
+      s.json({ ok: true });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/mcp-servers/:name", (q, s) => {
+    const cfg = gw.config();
+    if (!cfg.mcpServers[q.params.name]) {
+      s.status(404).json({ error: `Unknown MCP server: ${q.params.name}` });
+      return;
+    }
+    const next = { ...cfg.mcpServers };
+    delete next[q.params.name];
+    gw.saveConfig({ ...cfg, mcpServers: next });
+    s.json({ removed: true });
+  });
+  r.post("/mcp-servers/:name/enable", (q, s) => setMcpServerEnabled(gw, q.params.name, true, s));
+  r.post("/mcp-servers/:name/disable", (q, s) => setMcpServerEnabled(gw, q.params.name, false, s));
+  r.post("/mcp-servers/:name/test", async (q, s) => {
+    try {
+      const tools = await gw.bridge.listTools(q.params.name);
+      s.json({ ok: true, tools: tools.map((t) => t.name) });
+    } catch (e) {
+      s.json({ ok: false, reason: (e as Error).message });
+    }
+  });
+
   r.get("/tunnel", (_q, s) => s.json(gw.tunnel.current()));
   r.post("/tunnel/test", async (_q, s) => {
     const t = gw.tunnel.current();
@@ -490,6 +545,21 @@ async function setAgentEnabled(gw: Gateway, name: string, enabled: boolean, s: R
     codingAgents: { ...cfg.codingAgents, [name]: { ...agent, enabled } },
   });
   s.json(await gw.agents.list());
+}
+
+/** Toggle a downstream MCP server's `enabled` flag in config; 404 if unknown. */
+function setMcpServerEnabled(gw: Gateway, name: string, enabled: boolean, s: Response): void {
+  const cfg = gw.config();
+  const server = cfg.mcpServers[name];
+  if (!server) {
+    s.status(404).json({ error: `Unknown MCP server: ${name}` });
+    return;
+  }
+  gw.saveConfig({
+    ...cfg,
+    mcpServers: { ...cfg.mcpServers, [name]: { ...server, enabled } },
+  });
+  s.json({ ok: true, enabled });
 }
 
 function mergeConfig(current: any, update: any): any {

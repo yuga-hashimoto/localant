@@ -257,4 +257,20 @@ describe("dashboard api routes", () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as { reachable: boolean }).reachable).toBe(false);
   });
+
+  it("manages bridged MCP servers (add, toggle, remove)", async () => {
+    const add = await apiSend("mcp-servers", "POST", { name: "demo-mcp", command: "echo", args: "hello world" });
+    expect(add.status).toBe(200);
+    const list = (await (await apiGet("mcp-servers")).json()) as { name: string; args: string[]; enabled: boolean }[];
+    const found = list.find((x) => x.name === "demo-mcp")!;
+    expect(found.args).toEqual(["hello", "world"]);
+    expect(found.enabled).toBe(true);
+    const dis = await apiSend("mcp-servers/demo-mcp/disable", "POST");
+    expect(((await dis.json()) as { enabled: boolean }).enabled).toBe(false);
+    const missing = await apiSend("mcp-servers/nope/enable", "POST");
+    expect(missing.status).toBe(404);
+    const del = await apiSend("mcp-servers/demo-mcp", "DELETE");
+    expect(((await del.json()) as { removed: boolean }).removed).toBe(true);
+    expect(apiGw.config().mcpServers["demo-mcp"]).toBeUndefined();
+  });
 });

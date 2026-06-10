@@ -560,6 +560,17 @@ const VIEWS = {
       +'<button class="btn danger" id="authRotate" style="margin-top:4px">Rotate token</button>'
       +'</div>'
 
+      +'<div class="card"><h2>Bridged MCP servers</h2>'
+      +'<p class="muted" style="margin-top:0">Downstream stdio MCP servers the gateway can proxy (through the approval pipeline). Tools become available to ChatGPT.</p>'
+      +'<table><thead><tr><th>Name</th><th>Command</th><th>Enabled</th><th></th></tr></thead><tbody id="mcpList"></tbody></table>'
+      +'<h3>Add server</h3>'
+      +'<div class="row" style="gap:12px">'
+        +'<input type="text" id="mcpName" placeholder="name" style="width:140px" />'
+        +'<input type="text" id="mcpCmd" placeholder="command (e.g. npx)" style="width:150px" />'
+        +'<input type="text" id="mcpArgs" placeholder="args (space-separated)" style="flex:1;min-width:160px" />'
+        +'<button class="btn" id="mcpAdd">Add</button>'
+      +'</div></div>'
+
       +'<div class="card"><h2>Tunnel — fixed URL</h2>'
       +'<p class="muted" style="margin-top:0">A fixed URL means you never recreate the ChatGPT connector. Pick a provider and fill the matching field, then Save &amp; restart.</p>'
       +'<div class="field"><label>Provider</label>'
@@ -611,6 +622,34 @@ const VIEWS = {
       const r=await api('token/rotate',{method:'POST'});
       authTok.value=r.token; authTok.type='text'; document.getElementById('authReveal').textContent='Hide';
       toast('Token rotated — update the connector URL (see Home)');
+    });
+
+    // Bridged MCP servers
+    const mcpServers=await api('mcp-servers');
+    const mcpList=document.getElementById('mcpList');
+    if(!mcpServers.length) mcpList.appendChild(el('<tr><td colspan=4 class="muted">No MCP servers configured.</td></tr>'));
+    for(const sv of mcpServers){
+      const tr=el('<tr><td><b>'+esc(sv.name)+'</b></td><td class="muted"><code>'+esc(sv.command)+' '+esc((sv.args||[]).join(" "))+'</code></td><td>'+(sv.enabled?'<span class="risk0">yes</span>':'<span class="muted">no</span>')+'</td><td></td></tr>');
+      const cell=tr.lastElementChild;
+      const tog=el('<button class="btn ghost sm">'+(sv.enabled?'Disable':'Enable')+'</button>');
+      tog.onclick=action(tog,async()=>{ await api('mcp-servers/'+encodeURIComponent(sv.name)+'/'+(sv.enabled?'disable':'enable'),{method:'POST'}); render(); });
+      cell.appendChild(tog);
+      const test=el('<button class="btn ghost sm" style="margin-left:6px">Test</button>');
+      test.onclick=action(test,async()=>{ const r=await api('mcp-servers/'+encodeURIComponent(sv.name)+'/test',{method:'POST'}); if(r.ok){ toast(sv.name+': '+r.tools.length+' tools ('+r.tools.slice(0,5).join(', ')+')'); } else { toast(sv.name+': '+r.reason,'err'); } },'Testing');
+      cell.appendChild(test);
+      const rm=el('<button class="btn danger sm" style="margin-left:6px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>');
+      rm.onclick=action(rm,async()=>{ if(confirm('Remove MCP server "'+sv.name+'"?')){ await api('mcp-servers/'+encodeURIComponent(sv.name),{method:'DELETE'}); render(); } });
+      cell.appendChild(rm);
+      mcpList.appendChild(tr);
+    }
+    document.getElementById('mcpAdd').onclick=action(document.getElementById('mcpAdd'),async()=>{
+      const name=document.getElementById('mcpName').value.trim();
+      const command=document.getElementById('mcpCmd').value.trim();
+      const args=document.getElementById('mcpArgs').value.trim();
+      if(!name||!command){ toast('Name and command are required.','err'); return; }
+      await api('mcp-servers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,command,args,enabled:true})});
+      toast('MCP server added');
+      render();
     });
     document.getElementById('tunProvider').onchange=async(e)=>{ try{ await saveTun({provider:e.target.value}); toast('Provider → '+e.target.value); }catch(err){ toast(err.message,'err'); } };
 
