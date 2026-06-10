@@ -60,6 +60,24 @@ function createRateLimiter(limit: number, windowMs: number): (key: string) => bo
   };
 }
 
+/** Locate a bundled asset across the dev-tree and published-package layouts. */
+function findAsset(file: string): string | undefined {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(__dirname, "..", "..", "..", "assets", file),
+    path.join(__dirname, "..", "assets", file),
+    path.join(__dirname, "assets", file),
+    path.join(process.cwd(), "assets", file),
+  ];
+  return candidates.find((c) => fs.existsSync(c));
+}
+
+function serveAsset(file: string, res: Response): void {
+  const found = findAsset(file);
+  if (found) res.sendFile(found);
+  else res.status(404).end();
+}
+
 export interface Servers {
   gateway: http.Server;
   dashboard?: http.Server;
@@ -196,27 +214,8 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
     });
 
     mountDashboardApi(dash, gw, dashToken, pendingCodes);
-    dash.get("/favicon.png", (_req, res) => {
-      const __dirname = path.dirname(fileURLToPath(import.meta.url));
-      const candidates = [
-        path.join(__dirname, "..", "..", "..", "assets", "hero.png"),
-        path.join(__dirname, "..", "assets", "hero.png"),
-        path.join(__dirname, "assets", "hero.png"),
-        path.join(process.cwd(), "assets", "hero.png"),
-      ];
-      let found: string | undefined;
-      for (const c of candidates) {
-        if (fs.existsSync(c)) {
-          found = c;
-          break;
-        }
-      }
-      if (found) {
-        res.sendFile(found);
-      } else {
-        res.status(404).end();
-      }
-    });
+    dash.get("/favicon.png", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/icon.svg", (_req, res) => serveAsset("icon.svg", res));
     dash.get("/", (_req, res) => res.type("html").send(dashboardHtml(dashToken)));
     dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");
     log.info(`dashboard listening on http://127.0.0.1:${dashboardPort}`);
@@ -276,8 +275,9 @@ function mountDashboardApi(
   r.post("/approvals/:id/deny", (q, s) => s.json(gw.approvals.deny(q.params.id) ?? { error: "not found" }));
   r.get("/audit", (_q, s) => s.json(gw.audit.list(100)));
   r.get("/skills", (_q, s) =>
-    s.json(
-      gw.skills.list().map((sk) => ({
+    s.json({
+      skillsDir: gw.paths.skillsDir,
+      skills: gw.skills.list().map((sk) => ({
         name: sk.manifest.name,
         version: sk.manifest.version,
         description: sk.manifest.description,
@@ -285,10 +285,43 @@ function mountDashboardApi(
         generated: sk.generated,
         riskLevel: sk.manifest.riskLevel,
         valid: sk.valid,
+        bundled: !sk.dir.startsWith(gw.paths.skillsDir),
         tools: sk.manifest.tools.map((t) => t.name),
       })),
-    ),
+    }),
   );
+  r.get("/skills/:name", (q, s) => {
+    const sk = gw.skills.get(q.params.name);
+    if (!sk) {
+      s.status(404).json({ error: `Skill not found: ${q.params.name}` });
+      return;
+    }
+    s.json({
+      ...sk,
+      bundled: !sk.dir.startsWith(gw.paths.skillsDir),
+      validation: gw.skills.validate(q.params.name),
+    });
+  });
+  r.post("/skills", (q, s) => {
+    try {
+      const { name, description, riskLevel, requirements } = q.body ?? {};
+      if (!name || !description) {
+        s.status(400).json({ error: "name and description are required." });
+        return;
+      }
+      const sk = gw.skills.generate({ name, description, riskLevel, requirements });
+      s.json({ ...sk, note: "Skill generated DISABLED. Review permissions, then enable it." });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/skills/:name", (q, s) => {
+    try {
+      s.json({ removed: gw.skills.uninstall(q.params.name) });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.post("/skills/:name/enable", (q, s) => {
     try {
       s.json(gw.skills.setEnabled(q.params.name, true));
@@ -296,8 +329,27 @@ function mountDashboardApi(
       s.status(400).json({ error: (e as Error).message });
     }
   });
-  r.post("/skills/:name/disable", (q, s) => s.json(gw.skills.setEnabled(q.params.name, false)));
+  r.post("/skills/:name/disable", (q, s) => {
+    try {
+      s.json(gw.skills.setEnabled(q.params.name, false));
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.get("/projects", (_q, s) => s.json(gw.projects.list()));
+  r.post("/projects", (q, s) => {
+    try {
+      const { path: projectPath, name } = q.body ?? {};
+      if (!projectPath) {
+        s.status(400).json({ error: "path is required." });
+        return;
+      }
+      s.json(gw.projects.register(projectPath, name));
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/projects/:id", (q, s) => s.json({ removed: gw.projects.unregister(q.params.id) }));
   r.get("/secrets", (_q, s) => s.json({ names: gw.vault.list() }));
   r.post("/secrets", (q, s) => {
     try {
@@ -332,7 +384,60 @@ function mountDashboardApi(
     }
   });
   r.get("/agents", async (_q, s) => s.json(await gw.agents.list()));
+  r.post("/agents/:name/enable", async (q, s) => setAgentEnabled(gw, q.params.name, true, s));
+  r.post("/agents/:name/disable", async (q, s) => setAgentEnabled(gw, q.params.name, false, s));
+  r.get("/agents/tasks", (_q, s) => s.json(gw.agents.listTasks()));
+  r.get("/agents/tasks/:id/logs", (q, s) => {
+    try {
+      s.json({ logs: gw.agents.getLogs(q.params.id) });
+    } catch (e) {
+      s.status(404).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/agents/tasks/:id/stop", (q, s) => {
+    try {
+      s.json(gw.agents.stopTask(q.params.id));
+    } catch (e) {
+      s.status(404).json({ error: (e as Error).message });
+    }
+  });
+
+  r.get("/tunnel", (_q, s) => s.json(gw.tunnel.current()));
+  r.post("/tunnel/restart", async (_q, s) => {
+    try {
+      s.json(await gw.restartTunnel());
+    } catch (e) {
+      s.status(500).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/tunnel/stop", (_q, s) => {
+    gw.tunnel.stop();
+    s.json(gw.tunnel.current());
+  });
+  r.post("/tunnel/start", async (_q, s) => {
+    try {
+      s.json(await gw.tunnel.start(gw.gatewayPort()));
+    } catch (e) {
+      s.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   app.use("/api", r);
+}
+
+/** Toggle a coding agent's `enabled` flag in config; 404 if the agent is unknown. */
+async function setAgentEnabled(gw: Gateway, name: string, enabled: boolean, s: Response): Promise<void> {
+  const cfg = gw.config();
+  const agent = cfg.codingAgents[name];
+  if (!agent) {
+    s.status(404).json({ error: `Unknown coding agent: ${name}` });
+    return;
+  }
+  gw.saveConfig({
+    ...cfg,
+    codingAgents: { ...cfg.codingAgents, [name]: { ...agent, enabled } },
+  });
+  s.json(await gw.agents.list());
 }
 
 function mergeConfig(current: any, update: any): any {
