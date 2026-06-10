@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { nanoid } from "nanoid";
-import type { AppPaths, ApprovalRequest, RiskLevel } from "@chatgpt-local-app/shared";
+import type { AppPaths, ApprovalRequest, RiskLevel } from "@localant/shared";
 
 /**
  * Persistent approval queue. Approvals can be granted via the CLI, the

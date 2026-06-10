@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { nanoid } from "nanoid";
-import type { CodingAgentConfig, Config, ProjectRecord } from "@chatgpt-local-app/shared";
+import type { CodingAgentConfig, Config, ProjectRecord } from "@localant/shared";
 import { commandExists, execFileSafe } from "../util/exec.js";
 import type { GitManager } from "./git-manager.js";
 import type { ProjectRegistry } from "./project-registry.js";

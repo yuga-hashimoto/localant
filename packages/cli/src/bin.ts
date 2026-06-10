@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import { Command } from "commander";
-import { createGateway } from "@chatgpt-local-app/gateway";
+import { createGateway } from "@localant/gateway";
 import { c, ok, warn, fail, openBrowser } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
 
 const program = new Command();
-program.name("chatgpt-local-app").description("Use ChatGPT as the brain and your local computer as the hands.").version("1.0.0");
+program.name("LocalAnt").description("Use ChatGPT as the brain and your local computer as the hands.").version("1.0.0");
 
 function startOpts(o: Record<string, unknown>): StartOptions {
   // Commander stores `--no-tunnel` etc. as `tunnel: false` (default true), so we
@@ -27,7 +27,7 @@ program
   .option("--no-open", "do not open the dashboard in a browser")
   .option("--no-clipboard", "do not copy the MCP URL to the clipboard")
   .action(async (o) => {
-    console.log(c.bold("Setting up chatgpt-local-app…\n"));
+    console.log(c.bold("Setting up LocalAnt…\n"));
     await runDoctor();
     const gw = createGateway();
     console.log("");
@@ -112,7 +112,7 @@ program.command("doctor").description("Check the environment").action(async () =
 
 program.command("update").description("How to update").action(() => {
   console.log("Update with:");
-  console.log(c.cyan("  npm install -g chatgpt-local-app@latest"));
+  console.log(c.cyan("  npm install -g LocalAnt@latest"));
 });
 
 program
@@ -122,7 +122,7 @@ program
   .action((o) => {
     const gw = createGateway();
     console.log("To uninstall the package:");
-    console.log(c.cyan("  npm uninstall -g chatgpt-local-app"));
+    console.log(c.cyan("  npm uninstall -g LocalAnt"));
     if (o.purge) {
       fs.rmSync(gw.paths.root, { recursive: true, force: true });
       console.log(ok(`Deleted ${gw.paths.root}`));
@@ -154,7 +154,7 @@ tunnel.command("status").action(() => {
   console.log(rt?.tunnel ? JSON.stringify(rt.tunnel, null, 2) : warn("No tunnel info (gateway not started)."));
 });
 tunnel.command("start").action(() => console.log(warn("The tunnel is started automatically by `start`/`setup`. Restart the gateway to (re)start it.")));
-tunnel.command("stop").action(() => console.log(warn("Stop the tunnel by stopping the gateway (`chatgpt-local-app stop`).")));
+tunnel.command("stop").action(() => console.log(warn("Stop the tunnel by stopping the gateway (`localant stop`).")));
 
 // ---------- approvals ----------
 const approvals = program.command("approvals").description("Manage approval requests");

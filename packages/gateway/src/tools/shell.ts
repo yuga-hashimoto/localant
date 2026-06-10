@@ -67,7 +67,7 @@ export function registerShellTools(gw: Gateway): void {
       });
       return {
         approvalId: req.id,
-        message: `Approval requested. Approve with: chatgpt-local-app approvals approve ${req.id}, then call shell_run_approved_command.`,
+        message: `Approval requested. Approve with: localant approvals approve ${req.id}, then call shell_run_approved_command.`,
       };
     },
   });

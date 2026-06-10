@@ -1,5 +1,5 @@
 {
-  "name": "@chatgpt-local-app/mcp",
+  "name": "@localant/mcp",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -8,9 +8,9 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
-    "@chatgpt-local-app/gateway": "workspace:*",
-    "@chatgpt-local-app/dashboard": "workspace:*",
-    "@chatgpt-local-app/shared": "workspace:*",
+    "@localant/gateway": "workspace:*",
+    "@localant/dashboard": "workspace:*",
+    "@localant/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "express": "^5.0.1",
     "zod": "^3.24.1"

@@ -8,16 +8,16 @@ importers:
 
   .:
     devDependencies:
-      '@chatgpt-local-app/gateway':
+      '@localant/gateway':
         specifier: workspace:*
         version: link:packages/gateway
-      '@chatgpt-local-app/mcp':
+      '@localant/mcp':
         specifier: workspace:*
         version: link:packages/mcp
-      '@chatgpt-local-app/shared':
+      '@localant/shared':
         specifier: workspace:*
         version: link:packages/shared
-      '@chatgpt-local-app/skill-sdk':
+      '@localant/skill-sdk':
         specifier: workspace:*
         version: link:packages/skill-sdk
       '@types/express':
@@ -50,19 +50,19 @@ importers:
 
   examples/skills/hello-world:
     dependencies:
-      '@chatgpt-local-app/skill-sdk':
+      '@localant/skill-sdk':
         specifier: workspace:*
         version: link:../../../packages/skill-sdk
 
   packages/cli:
     dependencies:
-      '@chatgpt-local-app/gateway':
+      '@localant/gateway':
         specifier: workspace:*
         version: link:../gateway
-      '@chatgpt-local-app/mcp':
+      '@localant/mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@chatgpt-local-app/shared':
+      '@localant/shared':
         specifier: workspace:*
         version: link:../shared
       commander:
@@ -73,10 +73,10 @@ importers:
 
   packages/gateway:
     dependencies:
-      '@chatgpt-local-app/shared':
+      '@localant/shared':
         specifier: workspace:*
         version: link:../shared
-      '@chatgpt-local-app/skill-sdk':
+      '@localant/skill-sdk':
         specifier: workspace:*
         version: link:../skill-sdk
       '@modelcontextprotocol/sdk':
@@ -94,13 +94,13 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@chatgpt-local-app/dashboard':
+      '@localant/dashboard':
         specifier: workspace:*
         version: link:../dashboard
-      '@chatgpt-local-app/gateway':
+      '@localant/gateway':
         specifier: workspace:*
         version: link:../gateway
-      '@chatgpt-local-app/shared':
+      '@localant/shared':
         specifier: workspace:*
         version: link:../shared
       '@modelcontextprotocol/sdk':
@@ -121,7 +121,7 @@ importers:
 
   packages/skill-sdk:
     dependencies:
-      '@chatgpt-local-app/shared':
+      '@localant/shared':
         specifier: workspace:*
         version: link:../shared
       zod:

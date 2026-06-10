@@ -1,6 +1,6 @@
 # hello-world
 
-A minimal example local skill for `chatgpt-local-app`.
+A minimal example local skill for `LocalAnt`.
 
 ## Permissions
 None. This skill only echoes a greeting — no filesystem, shell, network, or secret access.

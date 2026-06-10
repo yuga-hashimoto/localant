@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { ConfigSchema, type Config, defaultConfig, appPaths, type AppPaths } from "@chatgpt-local-app/shared";
+import { ConfigSchema, type Config, defaultConfig, appPaths, type AppPaths } from "@localant/shared";
 
 /** Loads, persists and initializes on-disk configuration and identity files. */
 export class ConfigStore {

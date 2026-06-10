@@ -1,11 +1,11 @@
 # Troubleshooting
 
-## `chatgpt-local-app doctor`
+## `localant doctor`
 
 Diagnose your environment. Run this first when something isn't working:
 
 ```bash
-chatgpt-local-app doctor
+localant doctor
 ```
 
 ## Common issues
@@ -14,7 +14,7 @@ chatgpt-local-app doctor
 
 The gateway **auto-falls-back** to the next free port if its preferred port
 (default `8787`) is busy — e.g. when Cloudflare's `workerd` / `wrangler dev` is
-running, which also defaults to `8787`. The startup log and `chatgpt-local-app
+running, which also defaults to `8787`. The startup log and `LocalAnt
 status` always show the port it actually bound to, and the printed MCP URL uses
 that port, so there is normally nothing to do.
 
@@ -25,13 +25,13 @@ If you want a fixed port, set `gateway.port` (and `dashboard.port`) in
 # Find what's using the port
 lsof -i :8787
 # Stop any stale gateway process
-chatgpt-local-app stop
+localant stop
 ```
 
 ### Tunnel not working
 
-1. Check `chatgpt-local-app doctor` — is `cloudflared` or `ngrok` on PATH?
-2. Verify the tunnel status: `chatgpt-local-app tunnel status`
+1. Check `localant doctor` — is `cloudflared` or `ngrok` on PATH?
+2. Verify the tunnel status: `localant tunnel status`
 3. Install Cloudflare Tunnel: `brew install cloudflare/cloudflare/cloudflared`
    (macOS) or see https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/
 4. Alternative: install ngrok from https://ngrok.com/download
@@ -56,8 +56,8 @@ chatgpt-local-app stop
 
 This is expected for risk-2+ tools. Approve from the dashboard or:
 ```bash
-chatgpt-local-app approvals list
-chatgpt-local-app approvals approve <id>
+localant approvals list
+localant approvals approve <id>
 ```
 Then ask ChatGPT to retry.
 
@@ -65,7 +65,7 @@ Then ask ChatGPT to retry.
 
 - Only paths inside `security.allowedDirectories` are accessible.
 - Sensitive paths (`~/.ssh`, `/etc`, etc) are always blocked.
-- Run `chatgpt-local-app doctor` to see your allowed directories.
+- Run `localant doctor` to see your allowed directories.
 
 ### "Command blocked" on shell tools
 
@@ -80,13 +80,13 @@ Then ask ChatGPT to retry.
   "codingAgents": { "claude-code": { "enabled": true, "command": "claude" } }
   ```
 - Make sure the CLI is on PATH: `which claude` or `which codex`.
-- `chatgpt-local-app doctor` checks for optional tools.
+- `localant doctor` checks for optional tools.
 
 ### Changes lost or files missing
 
 - File mutations always create a backup first. Check:
   ```bash
-  ls ~/Library/Application\ Support/chatgpt-local-app/backups/
+  ls ~/Library/Application\ Support/LocalAnt/backups/
   ```
   (macOS path; adjust for your OS)
 
@@ -94,22 +94,22 @@ Then ask ChatGPT to retry.
 
 | OS | Path |
 |----|------|
-| macOS | `~/Library/Application Support/chatgpt-local-app` |
-| Linux | `~/.config/chatgpt-local-app` |
-| Windows | `%APPDATA%/chatgpt-local-app` |
+| macOS | `~/Library/Application Support/LocalAnt` |
+| Linux | `~/.config/LocalAnt` |
+| Windows | `%APPDATA%/LocalAnt` |
 
 ### Reset everything
 
 ```bash
-chatgpt-local-app uninstall --purge
+localant uninstall --purge
 # then set up fresh:
-npx -y chatgpt-local-app setup
+npx -y localant setup
 ```
 
 ### Where are the logs?
 
 ```bash
-chatgpt-local-app logs
+localant logs
 ```
 
 Gateway process logs go to `logs/` inside the config directory.
@@ -118,7 +118,7 @@ The audit log (all tool calls) is at `audit/audit.jsonl`.
 ### Still stuck?
 
 File an issue on the GitHub repository with:
-- `chatgpt-local-app doctor` output
+- `localant doctor` output
 - What you were doing
 - Error message
 - Platform and Node version (`node -v`, `uname -a`)

@@ -6,7 +6,7 @@ decentralized.
 ## Install from Git
 
 ```bash
-chatgpt-local-app skills install https://github.com/user/my-skill
+localant skills install https://github.com/user/my-skill
 ```
 
 or the `skill_install_from_git` tool. The repo is cloned into the skills

@@ -1,6 +1,6 @@
 # Security
 
-`chatgpt-local-app` performs operations on your local machine on behalf of a
+`LocalAnt` performs operations on your local machine on behalf of a
 remote model (ChatGPT). Security is the top design priority. This document
 describes the threat model and the controls that mitigate it.
 

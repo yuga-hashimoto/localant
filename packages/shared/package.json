@@ -1,5 +1,5 @@
 {
-  "name": "@chatgpt-local-app/shared",
+  "name": "@localant/shared",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",

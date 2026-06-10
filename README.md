@@ -1,8 +1,8 @@
-# chatgpt-local-app
+# LocalAnt
 
 > **Use ChatGPT as the brain. Use your local computer as the hands.**
 
-`chatgpt-local-app` lets you use ChatGPT as the brain and your local computer as the hands.
+`LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
 
 It exposes safe, permissioned local skills to ChatGPT through MCP:
 run approved commands, inspect projects, manage files, call coding agents like
@@ -13,7 +13,7 @@ full audit logging.
 ```text
 ChatGPT
   ↓ Apps SDK / MCP Connector (Streamable HTTP /mcp)
-chatgpt-local-app  ── Gateway · Risk engine · Approval queue · Audit log · Dashboard
+LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashboard
   ↓ Local PC
   ├─ Shell (allowlisted) · Filesystem (allowlisted) · Git
   ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
@@ -24,7 +24,7 @@ chatgpt-local-app  ── Gateway · Risk engine · Approval queue · Audit log 
 
 ---
 
-## What is chatgpt-local-app?
+## What is LocalAnt?
 
 A **local-first MCP Gateway** for ChatGPT. ChatGPT is the conversational UI and
 decision-maker; your PC is the execution environment. The gateway publishes a
@@ -62,14 +62,14 @@ and audit.
 ## 3-minute setup
 
 ```bash
-npx -y chatgpt-local-app setup
+npx -y localant setup
 ```
 
 or:
 
 ```bash
-npm install -g chatgpt-local-app
-chatgpt-local-app setup
+npm install -g localant
+localant setup
 ```
 
 `setup` checks your environment, initializes config, generates an auth token,
@@ -77,7 +77,7 @@ enables built-in skills, starts the gateway + dashboard, opens a public tunnel,
 copies the MCP URL to your clipboard, and prints the ChatGPT connection steps.
 
 ```text
-✅ chatgpt-local-app is running
+✅ LocalAnt is running
 
   Local Gateway:  http://127.0.0.1:8787
   Dashboard:      http://127.0.0.1:8788
@@ -88,7 +88,7 @@ Connect ChatGPT:
   2. Advanced settings → Developer Mode ON
   3. Connectors → Create
   4. Paste the MCP URL above
-  5. Name it: chatgpt-local-app
+  5. Name it: LocalAnt
 ```
 
 > **From source** (this repo): `pnpm install && pnpm build && node packages/cli/dist/bin.js setup`
@@ -99,7 +99,7 @@ Connect ChatGPT:
 2. **Advanced settings → Developer Mode ON**
 3. **Connectors → Create**
 4. Paste the **MCP URL** (`https://…/mcp?key=<token>`)
-5. Name it **chatgpt-local-app**
+5. Name it **LocalAnt**
 6. Ask ChatGPT: *"Run health check on my local app"*
 
 The token is embedded in the URL so the connector authenticates even where
@@ -145,12 +145,12 @@ skills/<name>/
 ```
 
 Manage them with `skill_list/info/enable/disable/run/validate/...` tools or the
-CLI (`chatgpt-local-app skills ...`). See [docs/skills.md](docs/skills.md).
+CLI (`localant skills ...`). See [docs/skills.md](docs/skills.md).
 
 ### How to create a skill
 
 ```ts
-import { defineSkill, z } from "@chatgpt-local-app/skill-sdk";
+import { defineSkill, z } from "@LocalAnt/skill-sdk";
 
 export default defineSkill({
   name: "hello-world",
@@ -237,13 +237,13 @@ them behind the gateway's safety pipeline.
 ## CLI
 
 ```bash
-chatgpt-local-app setup | start | stop | restart | status | doctor | update | uninstall
-chatgpt-local-app tunnel status
-chatgpt-local-app dashboard | logs
-chatgpt-local-app approvals list | approve <id> [--session] | deny <id>
-chatgpt-local-app skills list | info <name> | enable <name> | disable <name> | install <git-url> | validate <name> | publish <name>
-chatgpt-local-app projects list | add <path> [--name <n>] | remove <id>
-chatgpt-local-app secrets set <name> [value] | list | remove <name>
+localant setup | start | stop | restart | status | doctor | update | uninstall
+localant tunnel status
+localant dashboard | logs
+localant approvals list | approve <id> [--session] | deny <id>
+localant skills list | info <name> | enable <name> | disable <name> | install <git-url> | validate <name> | publish <name>
+localant projects list | add <path> [--name <n>] | remove <id>
+localant secrets set <name> [value] | list | remove <name>
 ```
 
 ## Architecture
@@ -265,8 +265,8 @@ See [docs/architecture.md](docs/architecture.md).
 
 - **Does ChatGPT get a raw shell?** No. Only allowlisted commands run without
   approval; anything else needs an explicit local approval.
-- **Where is my config?** `~/Library/Application Support/chatgpt-local-app` (macOS),
-  `~/.config/chatgpt-local-app` (Linux), `%APPDATA%/chatgpt-local-app` (Windows).
+- **Where is my config?** `~/Library/Application Support/LocalAnt` (macOS),
+  `~/.config/LocalAnt` (Linux), `%APPDATA%/LocalAnt` (Windows).
 - **Do I need Claude Code/Codex/adb/Playwright?** Only for those specific tool
   families; they degrade gracefully with install guidance.
 - **Is the tunnel safe?** A public tunnel exposes the gateway; the auth token is
@@ -274,15 +274,15 @@ See [docs/architecture.md](docs/architecture.md).
 
 ## Troubleshooting
 
-`chatgpt-local-app doctor` diagnoses your environment. More in
+`localant doctor` diagnoses your environment. More in
 [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## How to uninstall
 
 ```bash
-chatgpt-local-app uninstall          # prints steps
-chatgpt-local-app uninstall --purge  # also deletes the config/data directory
-npm uninstall -g chatgpt-local-app
+localant uninstall          # prints steps
+localant uninstall --purge  # also deletes the config/data directory
+npm uninstall -g localant
 ```
 
 ## License

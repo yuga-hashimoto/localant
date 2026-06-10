@@ -53,7 +53,7 @@ agent:      none | plan | execute
 ## Authoring with the SDK
 
 ```ts
-import { defineSkill, z } from "@chatgpt-local-app/skill-sdk";
+import { defineSkill, z } from "@LocalAnt/skill-sdk";
 
 export default defineSkill({
   name: "hello-world",
@@ -82,7 +82,7 @@ Tools: `skill_list`, `skill_info`, `skill_validate`, `skill_enable`,
 `skill_install_from_git`, `skill_publish_to_git`, `skill_uninstall`,
 `skill_permissions`, `skill_update_permissions`, `skill_search_registry`.
 
-CLI: `chatgpt-local-app skills <list|info|enable|disable|validate|install|publish>`.
+CLI: `localant skills <list|info|enable|disable|validate|install|publish>`.
 
 ## Generating a skill from ChatGPT
 

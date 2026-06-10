@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createGateway } from "@chatgpt-local-app/gateway";
+import { createGateway } from "@localant/gateway";
 
 let base: string;
 function gw() {

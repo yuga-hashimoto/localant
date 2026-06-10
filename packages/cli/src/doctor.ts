@@ -1,4 +1,4 @@
-import { commandExists } from "@chatgpt-local-app/gateway";
+import { commandExists } from "@localant/gateway";
 import { c, ok, warn, fail } from "./util.js";
 
 interface Check {

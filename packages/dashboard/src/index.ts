@@ -12,7 +12,7 @@ export function dashboardHtml(): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>chatgpt-local-app — Dashboard</title>
+<title>LocalAnt — Dashboard</title>
 <style>
   :root { --bg:#0b0f17; --panel:#131a26; --panel2:#1b2433; --text:#e6edf3; --muted:#8b98a9; --accent:#4f8cff; --danger:#ff5f56; --ok:#3fb950; --warn:#d29922; --border:#243049; }
   * { box-sizing:border-box; }
@@ -46,7 +46,7 @@ export function dashboardHtml(): string {
 </head>
 <body>
 <header>
-  <h1>chatgpt-local-app</h1>
+  <h1>LocalAnt</h1>
   <span class="pill" id="statusPill">connecting…</span>
   <span class="pill" id="tunnelPill"></span>
 </header>
@@ -86,7 +86,7 @@ const VIEWS = {
     const card=el('<div class="card"><h2>ChatGPT MCP endpoint</h2>'
       +'<pre id="ep">'+esc(endpoint)+'</pre>'
       +'<div class="row"><button class="btn" id="copyEp">Copy</button></div>'
-      +'<ol class="muted"><li>ChatGPT → Settings → Apps &amp; Connectors</li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it chatgpt-local-app</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
+      +'<ol class="muted"><li>ChatGPT → Settings → Apps &amp; Connectors</li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
     m.appendChild(card);
     document.getElementById('copyEp').onclick=()=>navigator.clipboard.writeText(endpoint);
     const hc=el('<div class="card"><h2>Health check</h2><button class="btn ghost" id="hcBtn">Run</button><pre id="hcOut" style="display:none"></pre></div>');

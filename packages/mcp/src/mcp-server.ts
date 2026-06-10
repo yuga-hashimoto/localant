@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { Gateway } from "@chatgpt-local-app/gateway";
+import type { Gateway } from "@localant/gateway";
 
 const SESSION_ID = "chatgpt";
 
@@ -10,7 +10,7 @@ const SESSION_ID = "chatgpt";
  * pipeline (validation → approval → redaction → audit).
  */
 export function buildMcpServer(gw: Gateway): McpServer {
-  const server = new McpServer({ name: "chatgpt-local-app", version: "1.0.0" });
+  const server = new McpServer({ name: "LocalAnt", version: "1.0.0" });
 
   for (const tool of gw.registry.list()) {
     const shape = (tool.inputSchema as unknown as { shape?: Record<string, z.ZodTypeAny> }).shape ?? {};

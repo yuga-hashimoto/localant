@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { nanoid } from "nanoid";
-import type { AppPaths, Config } from "@chatgpt-local-app/shared";
+import type { AppPaths, Config } from "@localant/shared";
 import { PathGuard } from "../security/path-guard.js";
 
 export interface FileInfo {

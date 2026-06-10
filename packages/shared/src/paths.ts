@@ -1,13 +1,13 @@
 import os from "node:os";
 import path from "node:path";
 
-const APP_NAME = "chatgpt-local-app";
+const APP_NAME = "LocalAnt";
 
 /**
  * Resolve the per-OS configuration directory.
- * - macOS:   ~/Library/Application Support/chatgpt-local-app
- * - Windows: %APPDATA%/chatgpt-local-app
- * - Linux:   $XDG_CONFIG_HOME/chatgpt-local-app or ~/.config/chatgpt-local-app
+ * - macOS:   ~/Library/Application Support/LocalAnt
+ * - Windows: %APPDATA%/LocalAnt
+ * - Linux:   $XDG_CONFIG_HOME/LocalAnt or ~/.config/LocalAnt
  */
 export function configDir(): string {
   const home = os.homedir();

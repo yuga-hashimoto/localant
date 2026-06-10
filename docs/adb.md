@@ -1,6 +1,6 @@
 # Android / ADB
 
-`chatgpt-local-app` can control an Android device or emulator via `adb` when
+`LocalAnt` can control an Android device or emulator via `adb` when
 you explicitly opt in. All ADB tools are gated behind the gateway's approval
 pipeline.
 
@@ -8,7 +8,7 @@ pipeline.
 
 1. Enable USB debugging on your device.
 2. Authorize your computer (`adb devices` once).
-3. Confirm `adb` is on PATH: `chatgpt-local-app doctor`.
+3. Confirm `adb` is on PATH: `localant doctor`.
 
 ## Available tools
 
@@ -39,7 +39,7 @@ pipeline.
 > "Take a screenshot of my connected Android device."
 
 ChatGPT calls `adb_list_devices`, then `adb_screenshot`. The file lands in the
-workspace directory (`~/Library/Application Support/chatgpt-local-app/workspace`).
+workspace directory (`~/Library/Application Support/LocalAnt/workspace`).
 
 ## FAQ
 

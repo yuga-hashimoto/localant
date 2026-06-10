@@ -2,8 +2,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { createGateway } from "@chatgpt-local-app/gateway";
-import { startHttpServers } from "@chatgpt-local-app/mcp";
+import { createGateway } from "@localant/gateway";
+import { startHttpServers } from "@localant/mcp";
 
 const base = fs.mkdtempSync(path.join(process.cwd(), ".tmp-tests", "smoke-"));
 const gw = createGateway(base);

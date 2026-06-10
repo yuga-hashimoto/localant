@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import type { Config } from "@chatgpt-local-app/shared";
-import { createLogger } from "@chatgpt-local-app/shared";
+import type { Config } from "@localant/shared";
+import { createLogger } from "@localant/shared";
 
 const log = createLogger("mcp-bridge");
 
@@ -32,7 +32,7 @@ export class McpBridge {
     if (!cfg) throw new Error(`MCP server '${name}' not registered.`);
     if (!cfg.enabled) throw new Error(`MCP server '${name}' is disabled.`);
 
-    const client = new Client({ name: "chatgpt-local-app-bridge", version: "1.0.0" });
+    const client = new Client({ name: "localant-bridge", version: "1.0.0" });
     const transport = new StdioClientTransport({ command: cfg.command, args: cfg.args });
 
     try {

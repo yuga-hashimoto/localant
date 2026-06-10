@@ -1,5 +1,5 @@
 {
-  "name": "@chatgpt-local-app/gateway",
+  "name": "@localant/gateway",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -8,8 +8,8 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
-    "@chatgpt-local-app/shared": "workspace:*",
-    "@chatgpt-local-app/skill-sdk": "workspace:*",
+    "@localant/shared": "workspace:*",
+    "@localant/skill-sdk": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.12.0",
     "nanoid": "^5.0.9",
     "tsx": "^4.19.2",

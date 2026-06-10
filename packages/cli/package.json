@@ -1,19 +1,19 @@
 {
-  "name": "@chatgpt-local-app/cli",
+  "name": "@localant/cli",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "chatgpt-local-app": "dist/bin.js"
+    "localant": "dist/bin.js"
   },
   "exports": {
     ".": "./dist/index.js"
   },
   "dependencies": {
-    "@chatgpt-local-app/gateway": "workspace:*",
-    "@chatgpt-local-app/mcp": "workspace:*",
-    "@chatgpt-local-app/shared": "workspace:*",
+    "@localant/gateway": "workspace:*",
+    "@localant/mcp": "workspace:*",
+    "@localant/shared": "workspace:*",
     "commander": "^12.1.0"
   }
 }

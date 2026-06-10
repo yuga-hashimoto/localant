@@ -1,4 +1,4 @@
-import { defineSkill, z } from "@chatgpt-local-app/skill-sdk";
+import { defineSkill, z } from "@localant/skill-sdk";
 
 export default defineSkill({
   name: "hello-world",

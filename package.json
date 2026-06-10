@@ -1,12 +1,12 @@
 {
-  "name": "chatgpt-local-app",
+  "name": "localant",
   "version": "1.0.0",
   "private": false,
-  "description": "Use ChatGPT as the brain and your local computer as the hands. A safe, permissioned local MCP Gateway for ChatGPT.",
+  "description": "LocalAnt — Use ChatGPT as the brain and your local computer as the hands. A safe, permissioned local MCP Gateway for ChatGPT.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "chatgpt-local-app": "packages/cli/dist/bin.js"
+    "localant": "packages/cli/dist/bin.js"
   },
   "files": [
     "packages/*/dist",
@@ -41,13 +41,14 @@
     "claude-code",
     "codex",
     "automation",
-    "openclaw"
+    "openclaw",
+    "localant"
   ],
   "devDependencies": {
-    "@chatgpt-local-app/gateway": "workspace:*",
-    "@chatgpt-local-app/mcp": "workspace:*",
-    "@chatgpt-local-app/shared": "workspace:*",
-    "@chatgpt-local-app/skill-sdk": "workspace:*",
+    "@localant/gateway": "workspace:*",
+    "@localant/mcp": "workspace:*",
+    "@localant/shared": "workspace:*",
+    "@localant/skill-sdk": "workspace:*",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",

@@ -1,6 +1,6 @@
 # Architecture
 
-`chatgpt-local-app` is a pnpm + TypeScript monorepo built with project
+`LocalAnt` is a pnpm + TypeScript monorepo built with project
 references. The runtime is ESM on Node.js.
 
 ## Packages

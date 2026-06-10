@@ -7,7 +7,7 @@ import {
   type SkillManifest,
   type SkillState,
   type RiskLevel,
-} from "@chatgpt-local-app/shared";
+} from "@localant/shared";
 import { execFileSafe } from "../util/exec.js";
 
 const RUNNER = fileURLToPath(new URL("../skill-runner.js", import.meta.url));
@@ -285,7 +285,7 @@ Call the tool \`${name.replace(/-/g, "_")}_run\` from ChatGPT once enabled.
 }
 
 function skillSrcTemplate(name: string, toolName: string, requirements: string[]): string {
-  return `import { defineSkill, z } from "@chatgpt-local-app/skill-sdk";
+  return `import { defineSkill, z } from "@localant/skill-sdk";
 
 // Requirements:
 ${requirements.map((r) => `// - ${r}`).join("\n") || "// - implement me"}

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { nanoid } from "nanoid";
-import { redact, truncate, type AppPaths, type AuditEntry, type RiskLevel } from "@chatgpt-local-app/shared";
+import { redact, truncate, type AppPaths, type AuditEntry, type RiskLevel } from "@localant/shared";
 
 /** Append-only audit log backed by a JSONL file. Secrets are redacted. */
 export class AuditLog {

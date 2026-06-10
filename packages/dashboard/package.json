@@ -1,5 +1,5 @@
 {
-  "name": "@chatgpt-local-app/dashboard",
+  "name": "@localant/dashboard",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",

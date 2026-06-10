@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { sensitiveBlocklist } from "@chatgpt-local-app/shared";
+import { sensitiveBlocklist } from "@localant/shared";
 
 export class PathAccessError extends Error {
   constructor(message: string) {

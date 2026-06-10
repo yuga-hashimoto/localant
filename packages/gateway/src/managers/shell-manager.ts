@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { nanoid } from "nanoid";
-import type { Config } from "@chatgpt-local-app/shared";
+import type { Config } from "@localant/shared";
 import { CommandGuard, parseCommand } from "../security/command-guard.js";
 import { PathGuard } from "../security/path-guard.js";
 import { execFileSafe } from "../util/exec.js";

@@ -2,9 +2,9 @@ import http from "node:http";
 import crypto from "node:crypto";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort } from "@chatgpt-local-app/shared";
-import type { Gateway } from "@chatgpt-local-app/gateway";
-import { dashboardHtml } from "@chatgpt-local-app/dashboard";
+import { createLogger, findAvailablePort } from "@localant/shared";
+import type { Gateway } from "@localant/gateway";
+import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
 
 const log = createLogger("http");

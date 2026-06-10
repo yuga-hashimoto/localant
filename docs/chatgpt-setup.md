@@ -7,7 +7,7 @@
    ```
    https://xxxxx.trycloudflare.com/mcp?key=<token>
    ```
-5. Name it **chatgpt-local-app** and save.
+5. Name it **LocalAnt** and save.
 6. Start a chat and ask: *"Run health check on my local app"*.
 
 ## Authentication
@@ -24,7 +24,7 @@ The gateway requires the auth token. Two ways to provide it:
 Find your URL again anytime:
 
 ```bash
-chatgpt-local-app status        # shows MCP URL
+localant status        # shows MCP URL
 # or in the dashboard Home tab → Copy
 ```
 

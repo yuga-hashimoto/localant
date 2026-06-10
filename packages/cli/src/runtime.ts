@@ -1,6 +1,6 @@
 import fs from "node:fs";
-import { createGateway, type Gateway } from "@chatgpt-local-app/gateway";
-import { startHttpServers } from "@chatgpt-local-app/mcp";
+import { createGateway, type Gateway } from "@localant/gateway";
+import { startHttpServers } from "@localant/mcp";
 import { c, ok, warn, copyToClipboard, openBrowser, urlBox } from "./util.js";
 
 export interface StartOptions {
@@ -66,7 +66,7 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
   const cfg = gw.config();
   const rt = gw.runtimeInfo();
   console.log("");
-  console.log(ok(`${c.bold("chatgpt-local-app")} is running`));
+  console.log(ok(`${c.bold("LocalAnt")} is running`));
   console.log("");
   console.log(`  Local Gateway:  ${c.cyan(rt.gateway)}`);
   if (cfg.dashboard.enabled && rt.dashboard) console.log(`  Dashboard:      ${c.cyan(rt.dashboard)}`);
@@ -81,7 +81,7 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
   console.log("  2. Advanced settings → Developer Mode ON");
   console.log("  3. Connectors → Create");
   console.log(`  4. Paste the MCP URL above${mcpEndpoint ? "" : " (start the tunnel first)"}`);
-  console.log("  5. Name it: chatgpt-local-app");
+  console.log("  5. Name it: LocalAnt");
   console.log("");
   console.log(`Then ask ChatGPT: ${c.cyan('"Run health check on my local app"')}`);
   console.log(c.gray("\nPress Ctrl+C to stop."));

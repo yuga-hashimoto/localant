@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RiskLevel } from "@chatgpt-local-app/shared";
+import type { RiskLevel } from "@localant/shared";
 
 /**
  * A tool is generic over its Zod input schema `S`. Handlers receive the

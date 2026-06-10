@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
-import type { AppPaths } from "@chatgpt-local-app/shared";
+import type { AppPaths } from "@localant/shared";
 
 /**
  * Local secret vault. Values are encrypted at rest with AES-256-GCM using a

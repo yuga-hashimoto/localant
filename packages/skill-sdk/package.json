@@ -1,5 +1,5 @@
 {
-  "name": "@chatgpt-local-app/skill-sdk",
+  "name": "@localant/skill-sdk",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -8,7 +8,7 @@
     ".": "./dist/index.js"
   },
   "dependencies": {
-    "@chatgpt-local-app/shared": "workspace:*",
+    "@localant/shared": "workspace:*",
     "zod": "^3.24.1"
   }
 }

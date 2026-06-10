@@ -23,7 +23,7 @@ ChatGPT. ChatGPT acts as PM/reviewer; the agent implements locally.
 }
 ```
 
-Register the project first: `chatgpt-local-app projects add ~/Projects/my-app`
+Register the project first: `localant projects add ~/Projects/my-app`
 (or `project_register`). Set validate/test commands with
 `project_set_validate_command` / `project_set_test_command`.
 

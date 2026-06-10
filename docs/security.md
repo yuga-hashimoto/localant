@@ -18,7 +18,7 @@ Highlights:
 
 ## Operational guidance
 
-- Stop the tunnel when you're not using it (`chatgpt-local-app stop`).
+- Stop the tunnel when you're not using it (`localant stop`).
 - Keep the MCP URL/token private; rotate by deleting `token` in the config dir
   and restarting (you'll re-add the connector).
 - Review skills before enabling; check the permission manifest and risk level.

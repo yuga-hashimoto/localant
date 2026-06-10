@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RiskLevel } from "@chatgpt-local-app/shared";
+import type { RiskLevel } from "@localant/shared";
 
 export { z };
 export type { RiskLevel };

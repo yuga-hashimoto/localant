@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ConfigSchema } from "@chatgpt-local-app/shared";
+import { ConfigSchema } from "@localant/shared";
 import type { Gateway } from "../gateway.js";
 
 const VERSION = "1.0.0";
@@ -25,7 +25,7 @@ export function registerSystemTools(gw: Gateway): void {
 
   r.register({
     name: "get_version",
-    description: "Return the chatgpt-local-app version.",
+    description: "Return the LocalAnt version.",
     risk: 0,
     inputSchema: z.object({}).strip(),
     handler: () => ({ version: VERSION }),

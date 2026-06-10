@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { createLogger, type Config } from "@chatgpt-local-app/shared";
+import { createLogger, type Config } from "@localant/shared";
 import { commandExists } from "../util/exec.js";
 
 const log = createLogger("tunnel");

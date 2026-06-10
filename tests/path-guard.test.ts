@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { PathGuard, PathAccessError } from "@chatgpt-local-app/gateway";
+import { PathGuard, PathAccessError } from "@localant/gateway";
 
 let root: string;
 let allowed: string;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { CommandGuard, parseCommand } from "@chatgpt-local-app/gateway";
+import { CommandGuard, parseCommand } from "@localant/gateway";
 
 const allowed = ["pwd", "ls", "git status", "git diff", "pnpm test"];
 const blocked = ["sudo", "su", "rm", "dd", "mkfs", "chown", "ssh", "shutdown"];

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import net from "node:net";
-import { findAvailablePort } from "@chatgpt-local-app/shared";
+import { findAvailablePort } from "@localant/shared";
 
 const servers: net.Server[] = [];
 

@@ -6,7 +6,7 @@ import {
   RISK_LABELS,
   type Config,
   type AppPaths,
-} from "@chatgpt-local-app/shared";
+} from "@localant/shared";
 import { ConfigStore } from "./stores/config-store.js";
 import { SecretVault } from "./stores/secret-vault.js";
 import { AuditLog } from "./stores/audit-log.js";
@@ -239,7 +239,7 @@ export class Gateway {
       message:
         `Approval required (risk ${risk}, ${requirement}). ` +
         `Ask the user to approve in the dashboard or run: ` +
-        `chatgpt-local-app approvals approve ${req.id}. ` +
+        `localant approvals approve ${req.id}. ` +
         `Then call this tool again.`,
     };
   }
