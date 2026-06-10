@@ -82,10 +82,26 @@ export function dashboardHtml(token = ""): string {
   .field input, .field select { width:100%; }
   .spin { display:inline-block; width:12px; height:12px; border:2px solid rgba(255,255,255,.3); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:middle; }
   @keyframes sp { to { transform:rotate(360deg); } }
+  .navbadge { background:var(--danger); color:#fff; border-radius:999px; padding:0 6px; font-size:11px; margin-left:6px; }
+  #modalOverlay { position:fixed; inset:0; background:rgba(0,0,0,.6); display:none; align-items:center; justify-content:center; z-index:60; padding:24px; }
+  #modalOverlay.show { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; max-width:560px; width:100%; max-height:82vh; overflow:auto; }
+  .modal h2 { margin:0 0 12px; font-size:15px; }
+  .modal .close { float:right; cursor:pointer; color:var(--muted); background:none; border:none; font-size:20px; line-height:1; }
+  .modal table td { font-size:12px; }
+  .modal table td:first-child { color:var(--muted); white-space:nowrap; width:1%; padding-right:16px; }
+  @media (max-width:720px){
+    .layout { flex-direction:column; }
+    nav { width:100%; border-right:none; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:4px; }
+    nav button { width:auto; flex:0 0 auto; }
+    main { padding:16px; }
+    header { padding:12px 16px; }
+  }
 </style>
 </head>
 <body>
 <div id="toast"></div>
+<div id="modalOverlay"><div class="modal" id="modalBox"></div></div>
 <header>
   <span class="logo">${LOGO_SVG}</span>
   <h1>LocalAnt</h1>
@@ -99,7 +115,22 @@ export function dashboardHtml(token = ""): string {
 <script>
 const TABS = ["Home","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
 let current = "Home";
+let pendingApprovals = 0;
 const DASH_TOKEN = ${JSON.stringify(token)};
+
+function openModal(title, html){
+  document.getElementById('modalBox').innerHTML='<button class="close" id="modalClose">×</button><h2>'+esc(title)+'</h2>'+html;
+  document.getElementById('modalOverlay').classList.add('show');
+  document.getElementById('modalClose').onclick=closeModal;
+}
+function closeModal(){ document.getElementById('modalOverlay').classList.remove('show'); }
+
+// Wire a Show/Hide button to toggle a password input's visibility.
+function wirePw(inputId, btnId){
+  const inp=document.getElementById(inputId), btn=document.getElementById(btnId);
+  if(!inp||!btn) return;
+  btn.onclick=()=>{ const show=inp.type==='password'; inp.type=show?'text':'password'; btn.textContent=show?'Hide':'Show'; };
+}
 
 function toast(msg, kind){
   const wrap=document.getElementById('toast');
@@ -153,7 +184,13 @@ function esc(s){ return String(s==null?"":s).replace(/[&<>]/g, c=>({"&":"&amp;",
 
 function renderNav(){
   const nav=document.getElementById('nav'); nav.innerHTML='';
-  for(const t of TABS){ const b=el('<button>'+t+'</button>'); if(t===current)b.className='active'; b.onclick=()=>{current=t;renderNav();render();}; nav.appendChild(b); }
+  for(const t of TABS){
+    const label = (t==='Approvals' && pendingApprovals>0) ? (t+'<span class="navbadge">'+pendingApprovals+'</span>') : t;
+    const b=el('<button>'+label+'</button>');
+    if(t===current)b.className='active';
+    b.onclick=()=>{current=t;renderNav();render();};
+    nav.appendChild(b);
+  }
 }
 
 async function render(){
@@ -366,9 +403,11 @@ const VIEWS = {
       +'<h3>Add secret</h3>'
       +'<div class="row" style="margin-top:12px;gap:12px;">'
         +'<input type="text" id="secName" placeholder="Secret name (e.g. QIITA_TOKEN)" style="width:250px" />'
-        +'<input type="password" id="secVal" placeholder="Secret value" style="width:250px" />'
+        +'<input type="password" id="secVal" placeholder="Secret value" style="width:220px" />'
+        +'<button class="btn ghost sm" id="secValShow">Show</button>'
         +'<button class="btn" id="addSecBtn">Add secret</button>'
       +'</div></div>';
+    wirePw('secVal','secValShow');
     const ul=document.getElementById('sl');
     if(!s.names.length) ul.appendChild(el('<li class="muted">No secrets stored.</li>'));
     for(const n of s.names){
@@ -453,7 +492,7 @@ const VIEWS = {
           +['cloudflared','ngrok','localtunnel','serveo','none'].map(function(p){return '<option value="'+p+'"'+((tun.provider||'cloudflared')===p?' selected':'')+'>'+p+'</option>';}).join('')
         +'</select></div>'
       +'<div class="field"><label>Custom subdomain (localtunnel / serveo — no registration)</label><input type="text" id="tunSubdomain" value="'+esc(tun.subdomain||'')+'" placeholder="e.g. my-localant-mcp" /></div>'
-      +'<div class="field"><label>Token / authtoken (cloudflared tunnel token / ngrok authtoken)</label><input type="password" id="tunToken" value="'+esc(tun.token||'')+'" placeholder="Cloudflare Tunnel token or ngrok authtoken" /></div>'
+      +'<div class="field"><label>Token / authtoken (cloudflared tunnel token / ngrok authtoken)</label><div class="row" style="gap:8px"><input type="password" id="tunToken" value="'+esc(tun.token||'')+'" placeholder="Cloudflare Tunnel token or ngrok authtoken" style="flex:1" /><button class="btn ghost sm" id="tunTokenShow">Show</button></div></div>'
       +'<div class="field"><label>Custom domain (ngrok static domain)</label><input type="text" id="tunDomain" value="'+esc(tun.domain||'')+'" placeholder="e.g. my-app.ngrok-free.app" /></div>'
       +'<div class="field"><label>Public URL (override — used as-is)</label><input type="text" id="tunUrl" value="'+esc(tun.publicUrl||'')+'" placeholder="e.g. https://my-domain.com" /></div>'
       +'<div class="row"><button class="btn" id="saveTunBtn">Save tunnel settings</button><button class="btn ghost" id="saveRestartBtn">Save &amp; restart tunnel</button></div>'
@@ -479,6 +518,7 @@ const VIEWS = {
         +'<textarea id="rawCfg" rows="16">'+esc(JSON.stringify(c,null,2))+'</textarea>'
         +'<div class="row" style="margin-top:8px"><button class="btn" id="saveRaw">Validate &amp; save</button></div></div>';
 
+    wirePw('tunToken','tunTokenShow');
     const saveSec = async (update) => { await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({security:update})}); };
     const saveTun = async (update) => { await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tunnel:update})}); };
 
@@ -544,32 +584,56 @@ async function showSkillDetail(name){
     const s=await api('skills/'+encodeURIComponent(name));
     const perms=(s.manifest&&s.manifest.permissions)||{};
     const v=s.validation||{valid:true,errors:[]};
-    const lines=[
-      'name: '+s.manifest.name,
-      'version: '+s.manifest.version,
-      'risk: '+s.manifest.riskLevel,
-      'enabled: '+s.enabled,
-      'bundled: '+s.bundled,
-      'dir: '+s.dir,
-      'tools: '+(s.manifest.tools||[]).map(function(t){return t.name;}).join(', '),
-      'permissions: '+JSON.stringify(perms),
-      'valid: '+v.valid+(v.errors&&v.errors.length?(' ('+v.errors.join('; ')+')'):'')
-    ];
-    alert(lines.join('\\n'));
+    const row=(k,val)=>'<tr><td>'+esc(k)+'</td><td>'+val+'</td></tr>';
+    const tools=(s.manifest.tools||[]).map(function(t){return '<code>'+esc(t.name)+'</code>';}).join(' ')||'<span class="muted">none</span>';
+    const validHtml = v.valid ? '<span class="risk0">valid</span>' : '<span class="risk4">'+esc((v.errors||[]).join('; '))+'</span>';
+    const html='<table>'
+      +row('Name','<b>'+esc(s.manifest.name)+'</b>')
+      +row('Version',esc(s.manifest.version))
+      +row('Risk','<span class="'+riskClass(s.manifest.riskLevel)+'">'+s.manifest.riskLevel+'</span>')
+      +row('State',(s.enabled?'<span class="risk0">enabled</span>':'<span class="muted">disabled</span>')+(s.bundled?' · bundled':''))
+      +row('Directory','<code style="word-break:break-all">'+esc(s.dir)+'</code>')
+      +row('Tools',tools)
+      +row('Permissions','<pre style="margin:0">'+esc(JSON.stringify(perms,null,2))+'</pre>')
+      +row('Validation',validHtml)
+      +'</table>';
+    openModal('Skill: '+s.manifest.name, html);
   } catch(e){ toast(e.message,'err'); }
+}
+
+function setStatus(online, s){
+  const pill=document.getElementById('statusPill');
+  pill.textContent = online ? '● online' : '● offline';
+  pill.style.color = online ? 'var(--ok)' : 'var(--danger)';
+  const t=(s&&s.tunnel)||{};
+  document.getElementById('tunnelPill').textContent = online ? (t.url ? ('tunnel: '+t.provider) : 'tunnel: off') : '';
+}
+
+// Poll status + pending approvals so the header and the Approvals badge stay
+// live — a risk-gated action triggered by ChatGPT shows up without a manual
+// refresh. Only the badge/pills update unless you're on the Approvals tab.
+async function poll(){
+  try{
+    const s=await api('status');
+    setStatus(true, s);
+    const ap=await api('approvals');
+    const prev=pendingApprovals;
+    pendingApprovals=ap.length;
+    if(pendingApprovals!==prev){
+      renderNav();
+      if(current==='Approvals' && !document.getElementById('modalOverlay').classList.contains('show')) render();
+    }
+  } catch(e){ setStatus(false); }
 }
 
 async function boot(){
   window.addEventListener('hashchange', render);
+  document.getElementById('modalOverlay').addEventListener('click', (e)=>{ if(e.target.id==='modalOverlay') closeModal(); });
+  document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
   renderNav();
-  try{
-    const s=await api('status');
-    document.getElementById('statusPill').textContent='● online';
-    document.getElementById('statusPill').style.color='var(--ok)';
-    const t=s.tunnel||{};
-    document.getElementById('tunnelPill').textContent = t.url ? ('tunnel: '+t.provider) : 'tunnel: off';
-  } catch(e){ document.getElementById('statusPill').textContent='● offline'; }
+  await poll();
   render();
+  setInterval(poll, 5000);
 }
 boot();
 </script>
