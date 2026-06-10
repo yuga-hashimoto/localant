@@ -26,8 +26,9 @@ All notable changes to this project are documented here. The format is based on
   Dependabot, ROADMAP, Japanese README, and README badges.
 
 ### Changed
-- Minimum Node lowered to **20.10** (from 22); CI now runs Linux/macOS/Windows
-  on Node 20 and 22.
+- Runtime minimum Node lowered to **20.10** (from 22) for end users running the
+  prebuilt package. CI builds/tests on Node 22 across Linux/macOS/Windows
+  (pnpm 11 itself requires Node 22.13+).
 - Releases are **tag-driven** with npm **provenance**; pushing to `main` no
   longer publishes (this was the cause of red CI on merges).
 - Expanded test suite: secret vault (encryption/migration), approval store

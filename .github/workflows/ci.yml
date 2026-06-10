@@ -12,8 +12,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # pnpm 11 requires Node 22.13+ to run, so the build/test toolchain uses
+        # Node 22. LocalAnt's runtime still supports Node 20.10+ (see engines);
+        # end users install the prebuilt dist with plain `npm`/`node`.
         os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [20, 22]
+        node: [22]
     steps:
       - uses: actions/checkout@v4
 

@@ -11,7 +11,10 @@ participating you agree to uphold it.
 
 ## Development setup
 
-Requirements: **Node ≥ 20.10** and **pnpm 11** (`corepack enable` will provide it).
+Requirements: **pnpm 11** (`corepack enable` will provide it), which itself needs
+**Node ≥ 22.13** to run. The published package runs on **Node ≥ 20.10** at
+runtime (end users install the prebuilt `dist` with `npm`), but building from
+source requires Node 22 because of the pnpm toolchain.
 
 ```bash
 git clone https://github.com/yuga-hashimoto/localant
