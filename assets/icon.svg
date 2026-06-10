@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <!-- Body -->
+  <ellipse cx="52" cy="70" rx="20" ry="14" fill="#4f8cff"/>
+  <ellipse cx="88" cy="68" rx="18" ry="13" fill="#4f8cff"/>
+  <!-- Head -->
+  <circle cx="42" cy="50" r="15" fill="#4f8cff"/>
+  <!-- Eyes -->
+  <circle cx="37" cy="47" r="3" fill="#0b0f17"/>
+  <circle cx="46" cy="47" r="3" fill="#0b0f17"/>
+  <!-- Antennae -->
+  <path d="M35 38 Q28 18 22 10" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M46 38 Q50 16 58 8" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="22" cy="9" r="2.5" fill="#7fafff"/>
+  <circle cx="58" cy="7" r="2.5" fill="#7fafff"/>
+  <!-- Legs -->
+  <path d="M42 68 L28 88" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M52 70 L52 92" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M62 68 L72 90" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M78 66 L68 90" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M88 68 L92 92" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M98 64 L108 88" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
+  <!-- Terminal cursor (representing local execution) -->
+  <rect x="68" y="40" width="28" height="10" rx="2" fill="#1b2433" stroke="#3fb950" stroke-width="0.8"/>
+  <text x="72" y="48" font-family="monospace" font-size="7" fill="#3fb950">&gt;_</text>
+</svg>
