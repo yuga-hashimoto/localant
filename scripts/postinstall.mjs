@@ -1,16 +1,14 @@
 #!/usr/bin/env node
-/**
- * postinstall — creates Node module resolution shims for @localant/* packages.
- *
- * The published npm tarball flattens the monorepo: packages/*/dist/ are at
- * their original paths, but `@localant/shared` etc. are not in node_modules/.
- * Node would fail to resolve them since there's no node_modules/@localant/*.
- *
- * This script creates minimal package.json files at
- *   node_modules/@localant/<pkg>/package.json
- * whose "main" points back to the real dist entry, making Node.js resolution
- * work without any symlinks, install-time tooling, or bundling.
- */
+// postinstall — creates Node module resolution shims for @localant packages.
+//
+// The published npm tarball flattens the monorepo: packages dist dirs are at
+// their original paths, but @localant/shared etc. are not in node_modules.
+// Node would fail to resolve them since there's no node_modules/@localant.
+//
+// This script creates minimal package.json files at
+//   node_modules/@localant/<pkg>/package.json
+// whose "main" points back to the real dist entry, making Node.js resolution
+// work without any symlinks, install-time tooling, or bundling.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
