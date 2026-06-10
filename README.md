@@ -169,16 +169,25 @@ Full details: [SECURITY.md](SECURITY.md).
 ## Dashboard
 
 A local-only dashboard (`http://127.0.0.1:8788`) is a full control panel — every
-setting that's available on the CLI is editable from the web, and vice versa:
+setting that's available on the CLI is editable from the web, and vice versa.
+A live status badge and a pending-approvals counter update automatically.
 
-- **Home** — status, MCP endpoint (copy), tunnel start/stop/restart, health check.
-- **Settings** — security mode (open/strict/yolo), risk policy, tunnel provider +
+- **Home** — status, MCP endpoint (copy), tunnel start/stop/restart, **Test
+  connection** (fetches the public URL to confirm ChatGPT can reach you), health
+  check.
+- **Settings** — security mode (open/strict/yolo), risk policy, **auth token
+  reveal/rotate** (rotation takes effect with no restart), tunnel provider +
   fixed-URL config with **Save & restart**, gateway/dashboard ports, allowed
-  directories/commands, blocked tokens (core tokens shown but locked), and a raw
-  JSON editor with validation.
-- **Skills** — create, enable/disable, inspect permissions, uninstall.
-- **Projects** — register/remove. **Agents** — enable/disable (e.g. Codex) and
-  view task logs. **Secrets** — add/remove (names only). Plus approvals and audit.
+  directories/commands, blocked tokens (core tokens shown but locked), **bridged
+  MCP servers** (add/test/remove downstream stdio servers), and a raw JSON editor
+  with validation.
+- **Skills** — create, enable/disable, inspect permissions (modal), uninstall.
+- **Agents** — enable/disable (e.g. Codex), **launch plan/execute tasks** and
+  live-tail their logs.
+- **Audit** — full-text search and click-through to the full input/output of any
+  entry.
+- **Projects** — register/remove. **Secrets** — add/remove with reveal toggle
+  (names only). Plus a live **Approvals** queue.
 
 ## Skills
 
