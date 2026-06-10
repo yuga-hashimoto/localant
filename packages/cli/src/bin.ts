@@ -2,12 +2,13 @@
 import fs from "node:fs";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
+import { APP_VERSION } from "@localant/shared";
 import { c, ok, warn, fail, openBrowser } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
 
 const program = new Command();
-program.name("LocalAnt").description("Use ChatGPT as the brain and your local computer as the hands.").version("1.0.0");
+program.name("LocalAnt").description("Use ChatGPT as the brain and your local computer as the hands.").version(APP_VERSION);
 
 function startOpts(o: Record<string, unknown>): StartOptions {
   // Commander stores `--no-tunnel` etc. as `tunnel: false` (default true), so we
@@ -145,6 +146,26 @@ program.command("logs").description("Show recent audit log entries").option("-n,
     console.log(`${c.gray(e.timestamp.slice(0, 19))} ${c.bold(e.tool)} risk${e.risk} ${e.approval}${e.error ? c.red(" ERR") : ""}`);
   }
 });
+
+// ---------- token ----------
+const tokenCmd = program.command("token").description("Manage the gateway auth token");
+tokenCmd
+  .command("rotate")
+  .description("Generate a new auth token (stored secrets are preserved)")
+  .action(() => {
+    const gw = createGateway();
+    const next = gw.configStore.rotateToken();
+    console.log(ok("Auth token rotated. Stored secrets are unaffected."));
+    console.log(`  New token: ${c.cyan(next)}`);
+    console.log(warn("Restart the gateway and re-create the ChatGPT connector with the new MCP URL."));
+  });
+tokenCmd
+  .command("show")
+  .description("Print the current auth token")
+  .action(() => {
+    const gw = createGateway();
+    console.log(gw.configStore.getToken());
+  });
 
 // ---------- tunnel ----------
 const tunnel = program.command("tunnel").description("Tunnel control");

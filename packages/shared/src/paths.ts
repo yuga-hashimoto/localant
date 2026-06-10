@@ -27,6 +27,7 @@ export interface AppPaths {
   root: string;
   configFile: string;
   tokenFile: string;
+  vaultKeyFile: string;
   auditLog: string;
   approvalsFile: string;
   secretsFile: string;
@@ -43,6 +44,7 @@ export function appPaths(base = configDir()): AppPaths {
     root: base,
     configFile: path.join(base, "config.json"),
     tokenFile: path.join(base, "token"),
+    vaultKeyFile: path.join(base, "vault.key"),
     auditLog: path.join(base, "audit", "audit.jsonl"),
     approvalsFile: path.join(base, "approvals.json"),
     secretsFile: path.join(base, "secrets.json"),

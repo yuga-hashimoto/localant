@@ -19,7 +19,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=22"
+    "node": ">=20.10"
   },
   "scripts": {
     "build": "tsc -b",
@@ -29,6 +29,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "validate": "pnpm build && pnpm test",
     "start": "node packages/cli/dist/bin.js start",
     "setup": "node packages/cli/dist/bin.js setup",
@@ -64,6 +65,7 @@
     "@types/node": "^22.10.0",
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9.17.0",
     "rimraf": "^6.0.1",
     "tsx": "^4.19.2",

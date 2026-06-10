@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an idea or new tool/skill for LocalAnt
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do that LocalAnt can't do well today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the tool, skill, or change you'd like. Note any security implications (new risk level, permissions, approvals).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security
+      options:
+        - label: This change could affect the security model (filesystem/shell/network/secrets/approvals) and I've described the impact above.

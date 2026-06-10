@@ -2,7 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort } from "@localant/shared";
+import { createLogger, findAvailablePort, APP_VERSION } from "@localant/shared";
 import type { Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
@@ -25,6 +25,36 @@ function extractToken(req: Request): string | undefined {
   const headerKey = req.header("x-cla-token");
   if (headerKey) return headerKey;
   return undefined;
+}
+
+/** Hostnames considered local. Used to defend the dashboard against
+ * DNS-rebinding (an attacker domain resolving to 127.0.0.1 carries its own
+ * Host header, which will not be in this set). */
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+function isLocalRequest(req: Request): boolean {
+  // express strips the port from req.hostname.
+  return LOCAL_HOSTS.has(req.hostname);
+}
+
+/**
+ * Minimal fixed-window in-memory rate limiter keyed by client IP. No external
+ * dependency; resets every `windowMs`. Returns false when the caller is over
+ * the limit.
+ */
+function createRateLimiter(limit: number, windowMs: number): (key: string) => boolean {
+  let windowStart = Date.now();
+  let counts = new Map<string, number>();
+  return (key: string): boolean => {
+    const now = Date.now();
+    if (now - windowStart >= windowMs) {
+      windowStart = now;
+      counts = new Map();
+    }
+    const next = (counts.get(key) ?? 0) + 1;
+    counts.set(key, next);
+    return next <= limit;
+  };
 }
 
 export interface Servers {
@@ -60,8 +90,17 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
     return true;
   };
 
+  // Rate limit the public MCP endpoint to blunt brute-force / abuse over the
+  // tunnel. Generous enough for normal ChatGPT use; keyed by client IP.
+  const mcpRateLimit = createRateLimiter(120, 60_000);
+
   // Streamable HTTP MCP endpoint (stateless: one server+transport per request).
   app.post("/mcp", async (req, res) => {
+    const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
+    if (!mcpRateLimit(ip)) {
+      res.status(429).json({ error: "Too many requests. Slow down." });
+      return;
+    }
     if (!requireAuth(req, res)) return;
     try {
       const server = buildMcpServer(gw);
@@ -94,10 +133,25 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   let dashboardPort: number | undefined;
   if (cfg.dashboard.enabled) {
     dashboardPort = await findAvailablePort(cfg.dashboard.port, "127.0.0.1", [gatewayPort]);
+    // Per-process token embedded in the served HTML and required on /api/*.
+    // A cross-origin page cannot read the dashboard HTML (so it cannot learn
+    // the token) and cannot forge the custom header without a CORS preflight
+    // we never grant — this closes the CSRF / token-theft hole.
+    const dashToken = crypto.randomBytes(24).toString("base64url");
     const dash = express();
     dash.use(express.json({ limit: "2mb" }));
-    mountDashboardApi(dash, gw);
-    dash.get("/", (_req, res) => res.type("html").send(dashboardHtml()));
+
+    // DNS-rebinding defense: only serve requests whose Host is local.
+    dash.use((req, res, next) => {
+      if (!isLocalRequest(req)) {
+        res.status(403).json({ error: "Forbidden: dashboard is local-only." });
+        return;
+      }
+      next();
+    });
+
+    mountDashboardApi(dash, gw, dashToken);
+    dash.get("/", (_req, res) => res.type("html").send(dashboardHtml(dashToken)));
     dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");
     log.info(`dashboard listening on http://127.0.0.1:${dashboardPort}`);
   }
@@ -106,11 +160,27 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   return { gateway: gatewayServer, dashboard: dashboardServer, gatewayPort, dashboardPort };
 }
 
-/** Dashboard API — bound to 127.0.0.1 only, so no external auth is required. */
-function mountDashboardApi(app: express.Express, gw: Gateway): void {
+/**
+ * Dashboard API — bound to 127.0.0.1 only and additionally gated by a
+ * per-process token (defends against CSRF / DNS-rebinding from a browser tab).
+ */
+function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string): void {
   const r = express.Router();
+
+  // Require the dashboard token on every /api/* call. The token is embedded in
+  // the served HTML, so the legitimate same-origin page always has it; a
+  // cross-origin attacker cannot read it nor forge the custom header.
+  r.use((req, res, next) => {
+    const provided = req.header("x-dashboard-token");
+    if (!provided || !tokenMatches(provided, dashToken)) {
+      res.status(401).json({ error: "Unauthorized dashboard request." });
+      return;
+    }
+    next();
+  });
+
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
-  r.get("/health", (_q, s) => s.json({ status: "ok", version: "1.0.0", time: new Date().toISOString() }));
+  r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
   r.get("/config", (_q, s) => s.json(gw.config()));
   r.get("/mcp-endpoint", (_q, s) => {
     const t = gw.tunnel.current();

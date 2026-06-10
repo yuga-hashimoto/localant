@@ -34,7 +34,8 @@ describe("PathGuard", () => {
     expect(() => g.assertAccess(path.join(allowed, "..", "secret.txt"), "read")).toThrow(PathAccessError);
   });
 
-  it("rejects symlink traversal out of the allowlist", () => {
+  // Creating symlinks on Windows requires elevated privileges in CI.
+  it.skipIf(process.platform === "win32")("rejects symlink traversal out of the allowlist", () => {
     const outside = path.join(root, "outside");
     fs.mkdirSync(outside);
     fs.writeFileSync(path.join(outside, "secret.txt"), "secret");

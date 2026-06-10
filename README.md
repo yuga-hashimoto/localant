@@ -4,6 +4,17 @@
 
 # LocalAnt
 
+<p align="center">
+  <a href="https://github.com/yuga-hashimoto/localant/actions/workflows/ci.yml"><img src="https://github.com/yuga-hashimoto/localant/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://www.npmjs.com/package/localant"><img src="https://img.shields.io/npm/v/localant.svg" alt="npm version" /></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/node/v/localant.svg" alt="node version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license" /></a>
+</p>
+
+<p align="center">
+  <b>English</b> · <a href="README.ja.md">日本語</a>
+</p>
+
 > **Use ChatGPT as the brain. Use your local computer as the hands.**
 
 `LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
@@ -242,6 +253,7 @@ them behind the gateway's safety pipeline.
 
 ```bash
 localant setup | start | stop | restart | status | doctor | update | uninstall
+localant token rotate | show   # re-issue the auth token (secrets preserved)
 localant tunnel status
 localant dashboard | logs
 localant approvals list | approve <id> [--session] | deny <id>
@@ -288,6 +300,13 @@ localant uninstall          # prints steps
 localant uninstall --purge  # also deletes the config/data directory
 npm uninstall -g localant
 ```
+
+## Contributing
+
+Contributions are welcome — especially tests and security hardening. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, coding standards, and the release
+process, and [ROADMAP.md](ROADMAP.md) for where the project is headed. Please
+report vulnerabilities privately per [SECURITY.md](SECURITY.md).
 
 ## License
 

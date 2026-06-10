@@ -6,3 +6,4 @@ examples/skills/*/dist/
 coverage/
 *.log
 .tmp-tests/
+.commandcode/

@@ -1,4 +1,5 @@
 export * from "./paths.js";
+export * from "./version.js";
 export * from "./net.js";
 export * from "./risk.js";
 export * from "./redaction.js";

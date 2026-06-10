@@ -24,6 +24,12 @@ export class ConfigStore {
       const token = crypto.randomBytes(32).toString("base64url");
       fs.writeFileSync(p.tokenFile, token, { mode: 0o600 });
     }
+    if (!fs.existsSync(p.vaultKeyFile)) {
+      // A dedicated, random 256-bit vault key kept independent of the auth
+      // token, so rotating the token never makes stored secrets undecryptable.
+      const key = crypto.randomBytes(32).toString("base64");
+      fs.writeFileSync(p.vaultKeyFile, key, { mode: 0o600 });
+    }
     if (!fs.existsSync(p.secretsFile)) {
       fs.writeFileSync(p.secretsFile, JSON.stringify({}), { mode: 0o600 });
     }
@@ -58,5 +64,21 @@ export class ConfigStore {
 
   getToken(): string {
     return fs.readFileSync(this.paths.tokenFile, "utf8").trim();
+  }
+
+  /** Read the dedicated vault key (base64). Independent of the auth token. */
+  getVaultKey(): Buffer {
+    return Buffer.from(fs.readFileSync(this.paths.vaultKeyFile, "utf8").trim(), "base64");
+  }
+
+  /**
+   * Generate a fresh auth token and persist it. Returns the new token. Because
+   * the vault key is stored separately, rotating the token does NOT invalidate
+   * stored secrets.
+   */
+  rotateToken(): string {
+    const token = crypto.randomBytes(32).toString("base64url");
+    fs.writeFileSync(this.paths.tokenFile, token, { mode: 0o600 });
+    return token;
   }
 }

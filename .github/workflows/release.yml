@@ -35,10 +35,11 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Publish to npm
-        run: pnpm publish --no-git-checks --access public
+      - name: Publish to npm (with provenance)
+        run: pnpm publish --no-git-checks --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
