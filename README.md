@@ -121,6 +121,13 @@ The token is embedded in the URL so the connector authenticates even where
 custom headers aren't available. You can also send `Authorization: Bearer <token>`.
 See [docs/chatgpt-setup.md](docs/chatgpt-setup.md).
 
+> **Tip — set a fixed URL so you never recreate the connector.** The default
+> Quick Tunnel URL changes on every restart. Configure a fixed tunnel (ngrok
+> static domain, a custom subdomain, or your own domain) in the dashboard
+> **Settings** tab or with `localant config set tunnel.domain <domain>`. The
+> auth token is persistent, so a stable URL means you connect ChatGPT **once**.
+> Full instructions: [docs/chatgpt-setup.md → Keep a fixed URL](docs/chatgpt-setup.md#keep-a-fixed-url-dont-recreate-the-connector-every-time).
+
 ## Security model
 
 LocalAnt has three security modes (set `security.mode` in config or the
@@ -161,9 +168,17 @@ Full details: [SECURITY.md](SECURITY.md).
 
 ## Dashboard
 
-A local-only dashboard (`http://127.0.0.1:8788`) shows status, the MCP endpoint
-(with copy button), pending approvals, the audit log, skills (enable/disable),
-projects, secret names, and coding agents.
+A local-only dashboard (`http://127.0.0.1:8788`) is a full control panel — every
+setting that's available on the CLI is editable from the web, and vice versa:
+
+- **Home** — status, MCP endpoint (copy), tunnel start/stop/restart, health check.
+- **Settings** — security mode (open/strict/yolo), risk policy, tunnel provider +
+  fixed-URL config with **Save & restart**, gateway/dashboard ports, allowed
+  directories/commands, blocked tokens (core tokens shown but locked), and a raw
+  JSON editor with validation.
+- **Skills** — create, enable/disable, inspect permissions, uninstall.
+- **Projects** — register/remove. **Agents** — enable/disable (e.g. Codex) and
+  view task logs. **Secrets** — add/remove (names only). Plus approvals and audit.
 
 ## Skills
 

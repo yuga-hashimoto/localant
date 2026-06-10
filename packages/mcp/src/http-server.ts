@@ -160,7 +160,7 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   // OAuth トークンエンドポイント
   app.post("/oauth/token", express.urlencoded({ extended: true }), (req, res) => {
     const body = req.body || {};
-    const { grant_type, code, redirect_uri } = body;
+    const { grant_type, code } = body;
     if (grant_type !== "authorization_code") {
       return res.status(400).json({ error: "unsupported_grant_type" });
     }

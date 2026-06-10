@@ -84,6 +84,19 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
   console.log("  5. Name it: LocalAnt");
   console.log("");
   console.log(`Then ask ChatGPT: ${c.cyan('"Run health check on my local app"')}`);
+
+  // Quick Tunnel URLs are random and change on every restart, forcing the user
+  // to recreate the ChatGPT connector each time. Point them at a fixed URL.
+  if (rt.tunnel?.url && /trycloudflare\.com/.test(rt.tunnel.url)) {
+    console.log("");
+    console.log(warn("This is a temporary Quick Tunnel URL — it changes on every restart,"));
+    console.log(c.yellow("   so you'll have to recreate the ChatGPT connector each time."));
+    console.log(c.gray("   For a permanent URL (recreate the connector once, never again):"));
+    console.log(c.gray("     • ngrok static domain (free):  set tunnel.provider=ngrok, tunnel.token, tunnel.domain"));
+    console.log(c.gray("     • custom subdomain (no signup): set tunnel.provider=localtunnel, tunnel.subdomain"));
+    console.log(c.gray(`     • configure it in the dashboard Settings tab, or: ${c.cyan("localant config set tunnel.domain <domain>")}`));
+    console.log(c.gray("   The auth token is persistent, so a fixed URL means no re-auth. See docs/chatgpt-setup.md."));
+  }
   console.log(c.gray("\nPress Ctrl+C to stop."));
 }
 
