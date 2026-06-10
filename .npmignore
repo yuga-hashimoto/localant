@@ -1,0 +1,15 @@
+node_modules/
+*.tsbuildinfo
+.DS_Store
+coverage/
+*.log
+.tmp-tests/
+tests/
+scripts/
+eslint.config.js
+vitest.config.ts
+tsconfig.json
+tsconfig.base.json
+pnpm-workspace.yaml
+pnpm-lock.yaml
+.gitignore

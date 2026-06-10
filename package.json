@@ -9,9 +9,9 @@
     "localant": "packages/cli/dist/bin.js"
   },
   "files": [
-    "packages/*/dist",
+    "packages/*/dist/**",
     "packages/*/package.json",
-    "examples/skills",
+    "examples/skills/**",
     "README.md",
     "SECURITY.md",
     "LICENSE"
