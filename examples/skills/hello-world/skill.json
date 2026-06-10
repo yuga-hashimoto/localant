@@ -1,0 +1,32 @@
+{
+  "name": "hello-world",
+  "displayName": "Hello World",
+  "version": "0.1.0",
+  "description": "A minimal example local skill that greets a name.",
+  "author": "chatgpt-local-app",
+  "license": "MIT",
+  "entry": "src/index.ts",
+  "riskLevel": 0,
+  "permissions": {
+    "filesystem": { "mode": "none", "allowedDirectories": [] },
+    "shell": { "mode": "none", "allowedCommands": [] },
+    "network": { "mode": "none", "allowedHosts": [] },
+    "secrets": [],
+    "browser": "none",
+    "adb": "none",
+    "git": "none",
+    "agent": "none"
+  },
+  "tools": [
+    {
+      "name": "hello",
+      "description": "Say hello to a name.",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": { "name": { "type": "string" } },
+        "required": ["name"]
+      }
+    }
+  ]
+}

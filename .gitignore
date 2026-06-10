@@ -1,0 +1,8 @@
+node_modules/
+packages/*/dist/
+examples/skills/*/dist/
+*.tsbuildinfo
+.DS_Store
+coverage/
+*.log
+.tmp-tests/

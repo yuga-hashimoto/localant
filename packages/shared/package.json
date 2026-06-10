@@ -1,0 +1,13 @@
+{
+  "name": "@chatgpt-local-app/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}

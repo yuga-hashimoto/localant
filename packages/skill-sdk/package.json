@@ -1,0 +1,14 @@
+{
+  "name": "@chatgpt-local-app/skill-sdk",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "dependencies": {
+    "@chatgpt-local-app/shared": "workspace:*",
+    "zod": "^3.24.1"
+  }
+}

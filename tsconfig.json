@@ -1,0 +1,10 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/skill-sdk" },
+    { "path": "packages/gateway" },
+    { "path": "packages/mcp" },
+    { "path": "packages/cli" }
+  ]
+}
