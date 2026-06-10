@@ -548,6 +548,23 @@ const VIEWS = {
       }
       tkb.appendChild(tr);
     }
+
+    // If a task is running, refresh the view when its status changes (e.g.
+    // running → completed) — but never while the launcher textarea has focus,
+    // so we don't interrupt typing.
+    if(tasks.some(function(t){return t.status==='running';})){
+      const sig=tasks.map(function(t){return t.id+':'+t.status;}).join(',');
+      const tm=setInterval(async()=>{
+        const ta=document.getElementById('runTask');
+        if(ta && document.activeElement===ta) return;
+        if(document.getElementById('modalOverlay').classList.contains('show')) return;
+        try{
+          const now=await api('agents/tasks');
+          if(now.map(function(t){return t.id+':'+t.status;}).join(',')!==sig && current==='Agents'){ render(); }
+        }catch(e){}
+      }, 3000);
+      logTimers.push(tm);
+    }
   },
 
   async Settings(m){
