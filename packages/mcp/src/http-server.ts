@@ -2,7 +2,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger } from "@chatgpt-local-app/shared";
+import { createLogger, findAvailablePort } from "@chatgpt-local-app/shared";
 import type { Gateway } from "@chatgpt-local-app/gateway";
 import { dashboardHtml } from "@chatgpt-local-app/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
@@ -30,6 +30,10 @@ function extractToken(req: Request): string | undefined {
 export interface Servers {
   gateway: http.Server;
   dashboard?: http.Server;
+  /** Port the gateway actually bound to (may differ from config on collision). */
+  gatewayPort: number;
+  /** Port the dashboard actually bound to, if enabled. */
+  dashboardPort?: number;
 }
 
 /**
@@ -78,21 +82,28 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   app.get("/mcp", methodNotAllowed);
   app.delete("/mcp", methodNotAllowed);
 
-  const gatewayServer = await listen(app, cfg.gateway.port, cfg.gateway.host);
-  log.info(`gateway listening on http://${cfg.gateway.host}:${cfg.gateway.port}`);
+  const gatewayPort = await findAvailablePort(cfg.gateway.port, cfg.gateway.host);
+  if (gatewayPort !== cfg.gateway.port) {
+    log.info(`port ${cfg.gateway.port} is busy — falling back to ${gatewayPort}`);
+  }
+  const gatewayServer = await listen(app, gatewayPort, cfg.gateway.host);
+  log.info(`gateway listening on http://${cfg.gateway.host}:${gatewayPort}`);
 
   // ---------- Local-only dashboard app ----------
   let dashboardServer: http.Server | undefined;
+  let dashboardPort: number | undefined;
   if (cfg.dashboard.enabled) {
+    dashboardPort = await findAvailablePort(cfg.dashboard.port, "127.0.0.1", [gatewayPort]);
     const dash = express();
     dash.use(express.json({ limit: "2mb" }));
     mountDashboardApi(dash, gw);
     dash.get("/", (_req, res) => res.type("html").send(dashboardHtml()));
-    dashboardServer = await listen(dash, cfg.dashboard.port, "127.0.0.1");
-    log.info(`dashboard listening on http://127.0.0.1:${cfg.dashboard.port}`);
+    dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");
+    log.info(`dashboard listening on http://127.0.0.1:${dashboardPort}`);
   }
 
-  return { gateway: gatewayServer, dashboard: dashboardServer };
+  gw.setBoundPorts(gatewayPort, dashboardPort);
+  return { gateway: gatewayServer, dashboard: dashboardServer, gatewayPort, dashboardPort };
 }
 
 /** Dashboard API — bound to 127.0.0.1 only, so no external auth is required. */

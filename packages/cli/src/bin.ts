@@ -10,7 +10,14 @@ const program = new Command();
 program.name("chatgpt-local-app").description("Use ChatGPT as the brain and your local computer as the hands.").version("1.0.0");
 
 function startOpts(o: Record<string, unknown>): StartOptions {
-  return { noTunnel: Boolean(o.noTunnel), noOpen: Boolean(o.noOpen), noClipboard: Boolean(o.noClipboard), quiet: Boolean(o.quiet) };
+  // Commander stores `--no-tunnel` etc. as `tunnel: false` (default true), so we
+  // invert those flags here rather than reading non-existent `noTunnel` keys.
+  return {
+    noTunnel: o.tunnel === false,
+    noOpen: o.open === false,
+    noClipboard: o.clipboard === false,
+    quiet: Boolean(o.quiet),
+  };
 }
 
 program

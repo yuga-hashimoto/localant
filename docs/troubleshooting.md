@@ -12,10 +12,19 @@ chatgpt-local-app doctor
 
 ### Gateway won't start — port already in use
 
+The gateway **auto-falls-back** to the next free port if its preferred port
+(default `8787`) is busy — e.g. when Cloudflare's `workerd` / `wrangler dev` is
+running, which also defaults to `8787`. The startup log and `chatgpt-local-app
+status` always show the port it actually bound to, and the printed MCP URL uses
+that port, so there is normally nothing to do.
+
+If you want a fixed port, set `gateway.port` (and `dashboard.port`) in
+`config.json`. To see what is holding a port:
+
 ```bash
 # Find what's using the port
 lsof -i :8787
-# Stop any stale process
+# Stop any stale gateway process
 chatgpt-local-app stop
 ```
 

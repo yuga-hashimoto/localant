@@ -66,6 +66,21 @@ export class Gateway {
   private cfg: Config;
   readonly startedAt = new Date().toISOString();
 
+  /** Ports the servers actually bound to (may differ from config if the
+   * preferred port was busy and we fell back to a free one). */
+  private boundGatewayPort?: number;
+  private boundDashboardPort?: number;
+
+  setBoundPorts(gatewayPort: number, dashboardPort?: number): void {
+    this.boundGatewayPort = gatewayPort;
+    this.boundDashboardPort = dashboardPort;
+  }
+
+  /** The gateway port in effect right now (bound port if started, else config). */
+  gatewayPort(): number {
+    return this.boundGatewayPort ?? this.cfg.gateway.port;
+  }
+
   constructor(base?: string) {
     this.configStore = new ConfigStore(base);
     this.configStore.ensureInitialized();
@@ -230,14 +245,15 @@ export class Gateway {
   }
 
   runtimeInfo() {
+    const dashPort = this.boundDashboardPort ?? this.cfg.dashboard.port;
     return {
       startedAt: this.startedAt,
       pid: process.pid,
       host: os.hostname(),
       platform: process.platform,
       node: process.version,
-      gateway: `http://${this.cfg.gateway.host}:${this.cfg.gateway.port}`,
-      dashboard: this.cfg.dashboard.enabled ? `http://127.0.0.1:${this.cfg.dashboard.port}` : undefined,
+      gateway: `http://${this.cfg.gateway.host}:${this.gatewayPort()}`,
+      dashboard: this.cfg.dashboard.enabled ? `http://127.0.0.1:${dashPort}` : undefined,
       tunnel: this.tunnel.current(),
     };
   }

@@ -18,7 +18,7 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
   let mcpEndpoint: string | undefined;
   if (!opts.noTunnel && cfg.tunnel.provider !== "none") {
     if (!opts.quiet) process.stdout.write(c.gray("Starting tunnel… "));
-    const tunnel = await gw.tunnel.start(cfg.gateway.port);
+    const tunnel = await gw.tunnel.start(servers.gatewayPort);
     if (tunnel.status === "running" && tunnel.url) {
       mcpEndpoint = `${tunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
       if (!opts.quiet) process.stdout.write(c.green("ok\n"));
@@ -37,7 +37,7 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
 
   if (!opts.quiet) printReady(gw, mcpEndpoint);
 
-  const dashUrl = `http://127.0.0.1:${cfg.dashboard.port}`;
+  const dashUrl = `http://127.0.0.1:${servers.dashboardPort ?? cfg.dashboard.port}`;
   if (mcpEndpoint && !opts.noClipboard) {
     const copied = await copyToClipboard(mcpEndpoint);
     if (copied && !opts.quiet) console.log(ok("MCP endpoint copied to clipboard"));
@@ -64,11 +64,12 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
 
 function printReady(gw: Gateway, mcpEndpoint?: string): void {
   const cfg = gw.config();
+  const rt = gw.runtimeInfo();
   console.log("");
   console.log(ok(`${c.bold("chatgpt-local-app")} is running`));
   console.log("");
-  console.log(`  Local Gateway:  ${c.cyan(`http://${cfg.gateway.host}:${cfg.gateway.port}`)}`);
-  if (cfg.dashboard.enabled) console.log(`  Dashboard:      ${c.cyan(`http://127.0.0.1:${cfg.dashboard.port}`)}`);
+  console.log(`  Local Gateway:  ${c.cyan(rt.gateway)}`);
+  if (cfg.dashboard.enabled && rt.dashboard) console.log(`  Dashboard:      ${c.cyan(rt.dashboard)}`);
   console.log(`  MCP Endpoint:   ${mcpEndpoint ? c.cyan(mcpEndpoint) : c.yellow("(tunnel not running)")}`);
   console.log("");
   if (mcpEndpoint) {
