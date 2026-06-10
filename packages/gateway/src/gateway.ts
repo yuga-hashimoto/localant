@@ -4,8 +4,12 @@ import {
   redactDeep,
   createLogger,
   RISK_LABELS,
+  CORE_BLOCKED_COMMAND_TOKENS,
+  type ApprovalRequirement,
   type Config,
   type AppPaths,
+  type RiskLevel,
+  type SecurityMode,
 } from "@localant/shared";
 import { ConfigStore } from "./stores/config-store.js";
 import { SecretVault } from "./stores/secret-vault.js";
@@ -98,7 +102,9 @@ export class Gateway {
     this.approvals = new ApprovalStore(this.paths);
 
     this.pathGuard = new PathGuard(this.cfg.security.allowedDirectories);
+    this.pathGuard.setMode(this.cfg.security.mode);
     this.commandGuard = new CommandGuard(this.cfg.security.allowedCommands, this.cfg.security.blockedCommandTokens);
+    this.commandGuard.setMode(this.cfg.security.mode);
 
     this.fs = new FsManager(this.pathGuard, this.paths, () => this.cfg);
     this.git = new GitManager(this.pathGuard);
@@ -121,13 +127,24 @@ export class Gateway {
   }
 
   saveConfig(next: Config): Config {
-    this.cfg = this.configStore.save(next);
+    // Core blocked tokens can never be removed, regardless of mode or what the
+    // dashboard/config tried to set. Union them back in before persisting.
+    const blocked = Array.from(
+      new Set([...CORE_BLOCKED_COMMAND_TOKENS, ...next.security.blockedCommandTokens]),
+    );
+    const guarded: Config = {
+      ...next,
+      security: { ...next.security, blockedCommandTokens: blocked },
+    };
+    this.cfg = this.configStore.save(guarded);
     this.applyConfig();
     return this.cfg;
   }
 
   private applyConfig(): void {
+    this.pathGuard.setMode(this.cfg.security.mode);
     this.pathGuard.setAllowedDirectories(this.cfg.security.allowedDirectories);
+    this.commandGuard.setMode(this.cfg.security.mode);
     this.commandGuard.setAllowed(this.cfg.security.allowedCommands);
     this.commandGuard.setBlocked(this.cfg.security.blockedCommandTokens);
   }
@@ -158,7 +175,7 @@ export class Gateway {
       return { ok: false, error: `Invalid input for ${name}: ${describeError(e)}` };
     }
 
-    const requirement = approvalFor(tool.risk, { approveRisk1: this.cfg.security.approveRisk1 });
+    const requirement = approvalRequirementForMode(this.cfg.security.mode, tool.risk, this.cfg.security.approveRisk1);
     if (requirement !== "none") {
       const gate = this.checkApproval(name, tool.risk, requirement, ctx, summarize(tool, input));
       if (!gate.allowed) {
@@ -248,6 +265,12 @@ export class Gateway {
     };
   }
 
+  /** Stop the current tunnel (if any) and start a fresh one on the live port. */
+  async restartTunnel() {
+    this.tunnel.stop();
+    return this.tunnel.start(this.gatewayPort());
+  }
+
   runtimeInfo() {
     const dashPort = this.boundDashboardPort ?? this.cfg.dashboard.port;
     return {
@@ -261,6 +284,24 @@ export class Gateway {
       tunnel: this.tunnel.current(),
     };
   }
+}
+
+/**
+ * Map a security mode + tool risk to an approval requirement.
+ *  - strict: full per-risk policy (allowlist enforcement happens in the guards).
+ *  - open: deny-list deployment for personal use — only risk-4
+ *    (destructive/publish/deploy) actions need approval. Everything else runs
+ *    subject to the sensitive blocklist + core blocked tokens.
+ *  - yolo: no approval gates at all (blocklist still applies).
+ */
+export function approvalRequirementForMode(
+  mode: SecurityMode,
+  risk: RiskLevel,
+  approveRisk1: boolean,
+): ApprovalRequirement {
+  if (mode === "yolo") return "none";
+  if (mode === "open") return risk >= 4 ? approvalFor(risk, { approveRisk1 }) : "none";
+  return approvalFor(risk, { approveRisk1 });
 }
 
 function summarize(tool: { summarize?: (i: any) => string }, input: unknown): string {

@@ -12,6 +12,7 @@ export function dashboardHtml(token = ""): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/png" href="/favicon.png" />
 <title>LocalAnt — Dashboard</title>
 <style>
   :root { --bg:#0b0f17; --panel:#131a26; --panel2:#1b2433; --text:#e6edf3; --muted:#8b98a9; --accent:#4f8cff; --danger:#ff5f56; --ok:#3fb950; --warn:#d29922; --border:#243049; }
@@ -63,7 +64,17 @@ const api = (p, opts) => {
   o.headers = Object.assign({}, o.headers, { "x-dashboard-token": DASH_TOKEN });
   return fetch("/api/"+p, o).then(r => r.json());
 };
-const el = (h) => { const d=document.createElement('div'); d.innerHTML=h; return d.firstElementChild; };
+const el = (h) => {
+  const d=document.createElement('div');
+  const t=h.trim();
+  if(t.startsWith('<tr') || t.startsWith('<td')){
+    const tbl=document.createElement('table');
+    tbl.innerHTML=h;
+    return tbl.querySelector('tr') || tbl.querySelector('td') || d;
+  }
+  d.innerHTML=h;
+  return d.firstElementChild;
+};
 function riskClass(r){ return "risk"+r; }
 function esc(s){ return String(s??"").replace(/[&<>]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 
@@ -73,8 +84,57 @@ function renderNav(){
 }
 
 async function render(){
-  const m=document.getElementById('main'); m.innerHTML='<p class="muted">Loading…</p>';
+  const m=document.getElementById('main');
+  const hash=window.location.hash;
+  if(hash.startsWith('#oauth/approve')){
+    const nav=document.getElementById('nav'); if(nav)nav.style.display='none';
+    await renderOAuthApprove(m);
+    return;
+  }
+  const nav=document.getElementById('nav'); if(nav)nav.style.display='block';
+  m.innerHTML='<p class="muted">Loading…</p>';
   try { await VIEWS[current](m); } catch(e){ m.innerHTML='<div class="card">Error: '+esc(e.message)+'</div>'; }
+}
+
+async function renderOAuthApprove(m){
+  const hash = window.location.hash;
+  const qIdx = hash.indexOf('?');
+  const params = new URLSearchParams(qIdx !== -1 ? hash.slice(qIdx) : '');
+  const state = params.get('state') || '';
+  const redirectUri = params.get('redirect_uri') || '';
+
+  m.innerHTML = '<div class="card" style="max-width:500px;margin:40px auto;padding:24px;">'
+    +'<h2 style="margin-top:0;">Approve ChatGPT Connection</h2>'
+    +'<p>ChatGPT wants to connect to your LocalAnt instance.</p>'
+    +'<p class="muted" style="word-break:break-all;font-size:12px;background:var(--panel2);padding:10px;border-radius:8px;">Redirect URI: <code>'+esc(redirectUri)+'</code></p>'
+    +'<div class="row" style="margin-top:24px;gap:12px;display:flex;">'
+      +'<button class="btn ok" id="oauthApproveBtn" style="flex:1;padding:12px;">Approve &amp; Connect</button>'
+      +'<button class="btn danger" id="oauthDenyBtn" style="flex:1;padding:12px;background:none;border:1px solid var(--danger);color:var(--danger)">Deny</button>'
+    +'</div>'
+    +'<div id="oauthErr" class="muted" style="margin-top:12px;color:var(--danger)"></div>'
+    +'</div>';
+
+  document.getElementById('oauthApproveBtn').onclick = async () => {
+    try {
+      const res = await api('oauth/approve', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ redirect_uri: redirectUri })
+      });
+      if (res.error) {
+        document.getElementById('oauthErr').textContent = res.error;
+      } else {
+        const target = redirectUri + (redirectUri.includes('?') ? '&' : '?') + 'code=' + res.code + '&state=' + encodeURIComponent(state);
+        window.location.href = target;
+      }
+    } catch(e) {
+      document.getElementById('oauthErr').textContent = e.message;
+    }
+  };
+
+  document.getElementById('oauthDenyBtn').onclick = () => {
+    window.location.href = redirectUri + (redirectUri.includes('?') ? '&' : '?') + 'error=access_denied&state=' + encodeURIComponent(state);
+  };
 }
 
 const VIEWS = {
@@ -91,7 +151,7 @@ const VIEWS = {
     const card=el('<div class="card"><h2>ChatGPT MCP endpoint</h2>'
       +'<pre id="ep">'+esc(endpoint)+'</pre>'
       +'<div class="row"><button class="btn" id="copyEp">Copy</button></div>'
-      +'<ol class="muted"><li>ChatGPT → Settings → Apps &amp; Connectors</li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
+      +'<ol class="muted"><li>Open <a href="https://chatgpt.com/#settings/Connectors" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600;">ChatGPT Connectors Settings</a></li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
     m.appendChild(card);
     document.getElementById('copyEp').onclick=()=>navigator.clipboard.writeText(endpoint);
     const hc=el('<div class="card"><h2>Health check</h2><button class="btn ghost" id="hcBtn">Run</button><pre id="hcOut" style="display:none"></pre></div>');
@@ -151,10 +211,52 @@ const VIEWS = {
   },
   async Secrets(m){
     const s=await api('secrets');
-    m.innerHTML='<div class="card"><h2>Secrets</h2><p class="muted">Names only — values are never displayed.</p><ul id="sl"></ul></div>';
+    m.innerHTML='<div class="card"><h2>Secrets</h2><p class="muted">Names only — values are never displayed.</p>'
+      +'<ul id="sl" style="padding-left:20px;margin-bottom:24px;"></ul>'
+      +'<h3>Add Secret</h3>'
+      +'<div class="row" style="margin-top:12px;gap:12px;">'
+        +'<input type="text" id="secName" placeholder="Secret Name (e.g. QIITA_TOKEN)" style="width:250px" />'
+        +'<input type="password" id="secVal" placeholder="Secret Value" style="width:250px" />'
+        +'<button class="btn" id="addSecBtn">Add Secret</button>'
+      +'</div>'
+      +'<div id="secErr" class="muted" style="margin-top:8px;color:var(--danger)"></div>'
+      +'</div>';
     const ul=document.getElementById('sl');
-    for(const n of s.names){ ul.appendChild(el('<li><code>'+esc(n)+'</code></li>')); }
+    for(const n of s.names){
+      const li=el('<li style="margin-bottom:8px;display:flex;align-items:center;gap:12px;">'
+        +'<code>'+esc(n)+'</code>'
+        +'<button class="btn danger" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>'
+        +'</li>');
+      li.querySelector('button').onclick=async()=>{
+        if(confirm('Are you sure you want to remove secret "'+n+'"?')){
+          await api('secrets/'+encodeURIComponent(n),{method:'DELETE'});
+          render();
+        }
+      };
+      ul.appendChild(li);
+    }
     if(!s.names.length) ul.appendChild(el('<li class="muted">No secrets stored.</li>'));
+
+    document.getElementById('addSecBtn').onclick=async()=>{
+      const name = document.getElementById('secName').value.trim();
+      const value = document.getElementById('secVal').value.trim();
+      const errEl = document.getElementById('secErr');
+      errEl.textContent = '';
+      if(!name || !value){
+        errEl.textContent = 'Both Name and Value are required.';
+        return;
+      }
+      const res = await api('secrets',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({name,value})
+      });
+      if(res.error) {
+        errEl.textContent = res.error;
+      } else {
+        render();
+      }
+    };
   },
   async Agents(m){
     const a=await api('agents');
@@ -164,11 +266,177 @@ const VIEWS = {
   },
   async Settings(m){
     const c=await api('config');
-    m.innerHTML='<div class="card"><h2>Configuration</h2><pre>'+esc(JSON.stringify(c,null,2))+'</pre><p class="muted">Edit config via the CLI or update_config tool.</p></div>';
+    const sec=c.security||{};
+    const mode=sec.mode||'strict';
+    const appR1=sec.approveRisk1||false;
+    const allowedDirs=sec.allowedDirectories||[];
+    const allowedCmds=sec.allowedCommands||[];
+    const blockedTokens=sec.blockedCommandTokens||[];
+
+    const tun=c.tunnel||{};
+    const tunProvider=tun.provider||'cloudflared';
+    const tunUrl=tun.publicUrl||'';
+    const tunToken=tun.token||'';
+    const tunDomain=tun.domain||'';
+    const tunSubdomain=tun.subdomain||'';
+
+    m.innerHTML='<div class="card"><h2>Security Settings</h2>'
+      +'<div style="margin-bottom:16px;">'
+        +'<label style="display:block;margin-bottom:6px;font-weight:600;">Security Mode</label>'
+        +'<select id="secMode" style="background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;width:150px;">'
+          +'<option value="strict"'+(mode==='strict'?' selected':'')+'>strict</option>'
+          +'<option value="yolo"'+(mode==='yolo'?' selected':'')+'>yolo</option>'
+        +'</select>'
+        +'<p class="muted" style="margin-top:6px;font-size:12px;">In <b>yolo</b> mode, allowed directories/commands check and human approval gates are bypassed.</p>'
+      +'</div>'
+      +'<div style="margin-bottom:24px;">'
+        +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;">'
+          +'<input type="checkbox" id="approveRisk1"'+(appR1?' checked':'')+' /> Require human approval for Risk 1 (draft) actions'
+        +'</label>'
+      +'</div>'
+      +'</div>'
+      
+      +'<div class="card"><h2>Tunnel Settings (Fixed URL / Subdomain)</h2>'
+      +'<div style="margin-bottom:16px;">'
+        +'<label style="display:block;margin-bottom:6px;font-weight:600;">Tunnel Provider</label>'
+        +'<select id="tunProvider" style="background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px;font-size:13px;width:150px;">'
+          +'<option value="cloudflared"'+(tunProvider==='cloudflared'?' selected':'')+'>cloudflared</option>'
+          +'<option value="ngrok"'+(tunProvider==='ngrok'?' selected':'')+'>ngrok</option>'
+          +'<option value="localtunnel"'+(tunProvider==='localtunnel'?' selected':'')+'>localtunnel</option>'
+          +'<option value="serveo"'+(tunProvider==='serveo'?' selected':'')+'>serveo</option>'
+          +'<option value="none"'+(tunProvider==='none'?' selected':'')+'>none</option>'
+        +'</select>'
+      +'</div>'
+      +'<div style="margin-bottom:16px;display:flex;flex-direction:column;gap:12px;">'
+        +'<div>'
+          +'<label style="display:block;margin-bottom:6px;font-weight:600;">Custom Subdomain (localtunnel / serveo)</label>'
+          +'<input type="text" id="tunSubdomain" value="'+esc(tunSubdomain)+'" placeholder="e.g. my-localant-mcp (no registration needed)" style="width:100%;" />'
+        +'</div>'
+        +'<div>'
+          +'<label style="display:block;margin-bottom:6px;font-weight:600;">Tunnel Token / Authtoken (cloudflare / ngrok)</label>'
+          +'<input type="password" id="tunToken" value="'+esc(tunToken)+'" placeholder="Cloudflare Tunnel Token or ngrok Authtoken" style="width:100%;" />'
+        +'</div>'
+        +'<div>'
+          +'<label style="display:block;margin-bottom:6px;font-weight:600;">Custom Domain (ngrok)</label>'
+          +'<input type="text" id="tunDomain" value="'+esc(tunDomain)+'" placeholder="e.g. my-app.ngrok-free.app" style="width:100%;" />'
+        +'</div>'
+        +'<div>'
+          +'<label style="display:block;margin-bottom:6px;font-weight:600;">Public URL (optional)</label>'
+          +'<input type="text" id="tunUrl" value="'+esc(tunUrl)+'" placeholder="e.g. https://my-custom-domain.com" style="width:100%;" />'
+        +'</div>'
+      +'</div>'
+      +'<button class="btn" id="saveTunBtn">Save Tunnel Settings</button>'
+      +'</div>'
+
+      +'<div class="card"><h2>Allowed Directories</h2>'
+      +'<ul id="dirList" style="padding-left:20px;margin-bottom:16px;"></ul>'
+      +'<div class="row" style="gap:12px;">'
+        +'<input type="text" id="newDir" placeholder="Absolute directory path" style="flex:1;" />'
+        +'<button class="btn" id="addDirBtn">Add Directory</button>'
+      +'</div>'
+      +'</div>'
+
+      +'<div class="card"><h2>Allowed Commands</h2>'
+      +'<ul id="cmdList" style="padding-left:20px;margin-bottom:16px;"></ul>'
+      +'<div class="row" style="gap:12px;">'
+        +'<input type="text" id="newCmd" placeholder="Command prefix (e.g. npm run)" style="flex:1;" />'
+        +'<button class="btn" id="addCmdBtn">Add Command</button>'
+      +'</div>'
+      +'</div>'
+
+      +'<div class="card"><h2>Blocked Command Tokens</h2>'
+      +'<ul id="tokList" style="padding-left:20px;margin-bottom:16px;"></ul>'
+      +'<div class="row" style="gap:12px;">'
+        +'<input type="text" id="newTok" placeholder="Token (e.g. sudo)" style="flex:1;" />'
+        +'<button class="btn" id="addTokBtn">Add Token</button>'
+      +'</div>'
+      +'</div>'
+
+      +'<div class="card"><h2>Raw JSON Config</h2><pre>'+esc(JSON.stringify(c,null,2))+'</pre></div>';
+
+    // Event Handlers
+    const saveSec = async (update) => {
+      await api('config', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ security: update })
+      });
+      render();
+    };
+
+    const saveTun = async (update) => {
+      await api('config', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ tunnel: update })
+      });
+      render();
+    };
+
+    document.getElementById('secMode').onchange=async(e)=>saveSec({ mode: e.target.value });
+    document.getElementById('approveRisk1').onchange=async(e)=>saveSec({ approveRisk1: e.target.checked });
+    document.getElementById('tunProvider').onchange=async(e)=>saveTun({ provider: e.target.value });
+    document.getElementById('saveTunBtn').onclick=async()=>{
+      const token = document.getElementById('tunToken').value.trim();
+      const domain = document.getElementById('tunDomain').value.trim();
+      const publicUrl = document.getElementById('tunUrl').value.trim();
+      const subdomain = document.getElementById('tunSubdomain').value.trim();
+      await saveTun({ token, domain, publicUrl, subdomain });
+    };
+
+    // Render Lists
+    const dirList=document.getElementById('dirList');
+    allowedDirs.forEach(d => {
+      const li=el('<li style="margin-bottom:8px;display:flex;align-items:center;gap:12px;">'
+        +'<code>'+esc(d)+'</code>'
+        +'<button class="btn danger" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>'
+        +'</li>');
+      li.querySelector('button').onclick=()=>saveSec({ allowedDirectories: allowedDirs.filter(x=>x!==d) });
+      dirList.appendChild(li);
+    });
+    if(!allowedDirs.length) dirList.innerHTML='<li class="muted">No directories allowlisted.</li>';
+
+    document.getElementById('addDirBtn').onclick=async()=>{
+      const val=document.getElementById('newDir').value.trim();
+      if(val) saveSec({ allowedDirectories: [...allowedDirs, val] });
+    };
+
+    const cmdList=document.getElementById('cmdList');
+    allowedCmds.forEach(c => {
+      const li=el('<li style="margin-bottom:8px;display:flex;align-items:center;gap:12px;">'
+        +'<code>'+esc(c)+'</code>'
+        +'<button class="btn danger" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>'
+        +'</li>');
+      li.querySelector('button').onclick=()=>saveSec({ allowedCommands: allowedCmds.filter(x=>x!==c) });
+      cmdList.appendChild(li);
+    });
+    if(!allowedCmds.length) cmdList.innerHTML='<li class="muted">No commands allowlisted.</li>';
+
+    document.getElementById('addCmdBtn').onclick=async()=>{
+      const val=document.getElementById('newCmd').value.trim();
+      if(val) saveSec({ allowedCommands: [...allowedCmds, val] });
+    };
+
+    const tokList=document.getElementById('tokList');
+    blockedTokens.forEach(t => {
+      const li=el('<li style="margin-bottom:8px;display:flex;align-items:center;gap:12px;">'
+        +'<code>'+esc(t)+'</code>'
+        +'<button class="btn danger" style="padding:2px 8px;font-size:11px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>'
+        +'</li>');
+      li.querySelector('button').onclick=()=>saveSec({ blockedCommandTokens: blockedTokens.filter(x=>x!==t) });
+      tokList.appendChild(li);
+    });
+    if(!blockedTokens.length) tokList.innerHTML='<li class="muted">No tokens blocked.</li>';
+
+    document.getElementById('addTokBtn').onclick=async()=>{
+      const val=document.getElementById('newTok').value.trim();
+      if(val) saveSec({ blockedCommandTokens: [...blockedTokens, val] });
+    };
   },
 };
 
 async function boot(){
+  window.addEventListener('hashchange', render);
   renderNav();
   try{ const s=await api('status'); document.getElementById('statusPill').textContent='● online'; document.getElementById('statusPill').style.color='var(--ok)';
     const t=s.tunnel||{}; document.getElementById('tunnelPill').textContent = t.url? ('tunnel: '+t.provider) : 'tunnel: off'; }

@@ -123,17 +123,36 @@ See [docs/chatgpt-setup.md](docs/chatgpt-setup.md).
 
 ## Security model
 
-| Risk | Meaning | Approval |
-|------|---------|----------|
-| 0 | read-only | none |
-| 1 | safe write draft | config (default none) |
-| 2 | file modification | **required** |
-| 3 | shell / agent / network write | **required** |
-| 4 | destructive / publish / deploy | **double approval** |
+LocalAnt has three security modes (set `security.mode` in config or the
+dashboard Settings tab):
 
-- No raw shell by default — only `shell_run_allowed_command` against an allowlist.
-- Filesystem access limited to **allowed directories**; sensitive paths
-  (`~/.ssh`, `~/.aws`, `/etc`, …) are always blocked; symlink escapes are caught.
+| Mode | Filesystem / shell | Approval gates | For |
+|------|--------------------|----------------|-----|
+| **`open`** (default) | deny-list — everything allowed except the sensitive blocklist + core blocked tokens | only risk-4 (destructive/publish) | personal single-user machines |
+| `strict` | allow-list — only allowed directories & commands | per risk level (see below) | shared / multi-user environments |
+| `yolo` | deny-list (same as `open`) | none at all | trusted automation only |
+
+The default is **`open`**: a deny-list model for personal use. There is no
+directory or command allow-list to maintain — ChatGPT can read/write anywhere
+and run any command **except** the always-blocked items below.
+
+**Strict-mode approval matrix:**
+
+| Risk | Meaning | Approval (strict) | Approval (open) |
+|------|---------|-------------------|-----------------|
+| 0 | read-only | none | none |
+| 1 | safe write draft | config (default none) | none |
+| 2 | file modification | **required** | none |
+| 3 | shell / agent / network write | **required** | none |
+| 4 | destructive / publish / deploy | **double approval** | **double approval** |
+
+**Always enforced, in every mode (including `open` and `yolo`):**
+
+- Sensitive paths (`~/.ssh`, `~/.aws`, `~/.gnupg`, `/etc`, Keychains, …) are
+  **never** readable or writable; symlink escapes are caught.
+- Core blocked commands — `sudo`, `su`, `dd`, `mkfs`, `fdisk`, `diskutil`,
+  `shutdown`, `reboot` — and `rm -rf` / `chmod 777` are **always rejected** and
+  cannot be removed from the blocklist.
 - Secrets live in an encrypted local vault and are **redacted** from tool
   output and the audit log.
 - Generated/installed skills are **disabled by default** until you review them.

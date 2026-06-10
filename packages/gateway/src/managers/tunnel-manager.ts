@@ -37,9 +37,16 @@ export class TunnelManager {
     if (cfg.provider === "ngrok" && (await commandExists("ngrok"))) {
       return this.startNgrok(port);
     }
+    if (cfg.provider === "localtunnel") {
+      return this.startLocaltunnel(port);
+    }
+    if (cfg.provider === "serveo" && (await commandExists("ssh"))) {
+      return this.startServeo(port);
+    }
     // Fallbacks
     if (await commandExists("cloudflared")) return this.startCloudflared(port);
     if (await commandExists("ngrok")) return this.startNgrok(port);
+    if (await commandExists("ssh")) return this.startServeo(port);
 
     this.info = {
       provider: "none",
@@ -53,8 +60,22 @@ export class TunnelManager {
   private startCloudflared(port: number): Promise<TunnelInfo> {
     return new Promise((resolve) => {
       this.info = { provider: "cloudflared", status: "starting" };
-      const child = spawn("cloudflared", ["tunnel", "--url", `http://127.0.0.1:${port}`], { shell: false });
+      const cfg = this.config().tunnel;
+      let args: string[];
+      if (cfg.token) {
+        args = ["tunnel", "run", "--token", cfg.token];
+      } else {
+        args = ["tunnel", "--url", `http://127.0.0.1:${port}`];
+      }
+      const child = spawn("cloudflared", args, { shell: false });
       this.child = child;
+
+      if (cfg.token) {
+        this.info = { provider: "cloudflared", url: cfg.publicUrl || "Zero Trust Tunnel", status: "running" };
+        resolve(this.info);
+        return;
+      }
+
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
         const m = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/i);
@@ -81,7 +102,15 @@ export class TunnelManager {
   private startNgrok(port: number): Promise<TunnelInfo> {
     return new Promise((resolve) => {
       this.info = { provider: "ngrok", status: "starting" };
-      const child = spawn("ngrok", ["http", String(port), "--log", "stdout"], { shell: false });
+      const cfg = this.config().tunnel;
+      const args = ["http", String(port), "--log", "stdout"];
+      if (cfg.domain) {
+        args.push("--domain", cfg.domain);
+      }
+      if (cfg.token) {
+        args.push("--authtoken", cfg.token);
+      }
+      const child = spawn("ngrok", args, { shell: false });
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
@@ -99,8 +128,87 @@ export class TunnelManager {
       });
       setTimeout(() => {
         if (this.info.status !== "running") {
-          this.info = { provider: "ngrok", status: "error", error: "Timed out waiting for ngrok URL." };
+          if (cfg.domain) {
+            this.info = { provider: "ngrok", url: cfg.publicUrl || `https://${cfg.domain}`, status: "running" };
+            resolve(this.info);
+          } else {
+            this.info = { provider: "ngrok", status: "error", error: "Timed out waiting for ngrok URL." };
+            resolve(this.info);
+          }
+        }
+      }, 20_000);
+    });
+  }
+
+  private startLocaltunnel(port: number): Promise<TunnelInfo> {
+    return new Promise((resolve) => {
+      this.info = { provider: "localtunnel", status: "starting" };
+      const cfg = this.config().tunnel;
+      const args = ["localtunnel", "--port", String(port)];
+      if (cfg.subdomain) {
+        args.push("--subdomain", cfg.subdomain);
+      }
+      const child = spawn("npx", args, { shell: true });
+      this.child = child;
+      const onData = (buf: Buffer) => {
+        const text = buf.toString("utf8");
+        const m = text.match(/https:\/\/[a-z0-9-]+\.localtunnel\.me/i);
+        if (m && this.info.status !== "running") {
+          this.info = { provider: "localtunnel", url: m[0], status: "running" };
           resolve(this.info);
+        }
+      };
+      child.stdout.on("data", onData);
+      child.stderr.on("data", onData);
+      child.on("error", (e) => {
+        this.info = { provider: "localtunnel", status: "error", error: e.message };
+        resolve(this.info);
+      });
+      setTimeout(() => {
+        if (this.info.status !== "running") {
+          if (cfg.subdomain) {
+            this.info = { provider: "localtunnel", url: cfg.publicUrl || `https://${cfg.subdomain}.localtunnel.me`, status: "running" };
+            resolve(this.info);
+          } else {
+            this.info = { provider: "localtunnel", status: "error", error: "Timed out waiting for localtunnel URL." };
+            resolve(this.info);
+          }
+        }
+      }, 20_000);
+    });
+  }
+
+  private startServeo(port: number): Promise<TunnelInfo> {
+    return new Promise((resolve) => {
+      this.info = { provider: "serveo", status: "starting" };
+      const cfg = this.config().tunnel;
+      const subdomain = cfg.subdomain ? `${cfg.subdomain}:` : "";
+      const args = ["-R", `${subdomain}80:127.0.0.1:${port}`, "-o", "StrictHostKeyChecking=no", "serveo.net"];
+      const child = spawn("ssh", args, { shell: false });
+      this.child = child;
+      const onData = (buf: Buffer) => {
+        const text = buf.toString("utf8");
+        const m = text.match(/https:\/\/[a-z0-9-]+\.serveo\.net/i);
+        if (m && this.info.status !== "running") {
+          this.info = { provider: "serveo", url: m[0], status: "running" };
+          resolve(this.info);
+        }
+      };
+      child.stdout.on("data", onData);
+      child.stderr.on("data", onData);
+      child.on("error", (e) => {
+        this.info = { provider: "serveo", status: "error", error: e.message };
+        resolve(this.info);
+      });
+      setTimeout(() => {
+        if (this.info.status !== "running") {
+          if (cfg.subdomain) {
+            this.info = { provider: "serveo", url: cfg.publicUrl || `https://${cfg.subdomain}.serveo.net`, status: "running" };
+            resolve(this.info);
+          } else {
+            this.info = { provider: "serveo", status: "error", error: "Timed out waiting for serveo URL." };
+            resolve(this.info);
+          }
         }
       }, 20_000);
     });

@@ -1,8 +1,11 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort, APP_VERSION } from "@localant/shared";
+import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema } from "@localant/shared";
 import type { Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
@@ -73,6 +76,7 @@ export interface Servers {
 export async function startHttpServers(gw: Gateway): Promise<Servers> {
   const cfg = gw.config();
   const token = gw.configStore.getToken();
+  const pendingCodes = new Map<string, { redirectUri: string; createdAt: number }>();
 
   // ---------- Public gateway app ----------
   const app = express();
@@ -121,6 +125,47 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   app.get("/mcp", methodNotAllowed);
   app.delete("/mcp", methodNotAllowed);
 
+  // OAuth 認可エンドポイント
+  app.get("/oauth/authorize", (req, res) => {
+    const { redirect_uri, state } = req.query;
+    if (!redirect_uri) {
+      return res.status(400).send("Missing redirect_uri");
+    }
+    const rt = gw.runtimeInfo();
+    if (!rt.dashboard) {
+      return res.status(500).send("Dashboard is not running, cannot authorize.");
+    }
+    const target = `${rt.dashboard}/#oauth/approve?state=${encodeURIComponent(String(state || ""))}&redirect_uri=${encodeURIComponent(String(redirect_uri))}`;
+    res.redirect(target);
+  });
+
+  // OAuth トークンエンドポイント
+  app.post("/oauth/token", express.urlencoded({ extended: true }), (req, res) => {
+    const body = req.body || {};
+    const { grant_type, code, redirect_uri } = body;
+    if (grant_type !== "authorization_code") {
+      return res.status(400).json({ error: "unsupported_grant_type" });
+    }
+    if (!code) {
+      return res.status(400).json({ error: "invalid_request", error_description: "Missing code" });
+    }
+    const pending = pendingCodes.get(code);
+    if (!pending) {
+      return res.status(400).json({ error: "invalid_grant", error_description: "Invalid or expired code" });
+    }
+    if (Date.now() - pending.createdAt > 600_000) {
+      pendingCodes.delete(code);
+      return res.status(400).json({ error: "invalid_grant", error_description: "Code expired" });
+    }
+    pendingCodes.delete(code);
+
+    res.json({
+      access_token: token,
+      token_type: "Bearer",
+      expires_in: 315360000,
+    });
+  });
+
   const gatewayPort = await findAvailablePort(cfg.gateway.port, cfg.gateway.host);
   if (gatewayPort !== cfg.gateway.port) {
     log.info(`port ${cfg.gateway.port} is busy — falling back to ${gatewayPort}`);
@@ -150,7 +195,28 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
       next();
     });
 
-    mountDashboardApi(dash, gw, dashToken);
+    mountDashboardApi(dash, gw, dashToken, pendingCodes);
+    dash.get("/favicon.png", (_req, res) => {
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const candidates = [
+        path.join(__dirname, "..", "..", "..", "assets", "hero.png"),
+        path.join(__dirname, "..", "assets", "hero.png"),
+        path.join(__dirname, "assets", "hero.png"),
+        path.join(process.cwd(), "assets", "hero.png"),
+      ];
+      let found: string | undefined;
+      for (const c of candidates) {
+        if (fs.existsSync(c)) {
+          found = c;
+          break;
+        }
+      }
+      if (found) {
+        res.sendFile(found);
+      } else {
+        res.status(404).end();
+      }
+    });
     dash.get("/", (_req, res) => res.type("html").send(dashboardHtml(dashToken)));
     dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");
     log.info(`dashboard listening on http://127.0.0.1:${dashboardPort}`);
@@ -164,8 +230,27 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
  * Dashboard API — bound to 127.0.0.1 only and additionally gated by a
  * per-process token (defends against CSRF / DNS-rebinding from a browser tab).
  */
-function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string): void {
+function mountDashboardApi(
+  app: express.Express,
+  gw: Gateway,
+  dashToken: string,
+  pendingCodes: Map<string, { redirectUri: string; createdAt: number }>,
+): void {
   const r = express.Router();
+
+  r.post("/oauth/approve", (q, s) => {
+    const { redirect_uri } = q.body;
+    if (!redirect_uri) {
+      s.status(400).json({ error: "Missing redirect_uri" });
+      return;
+    }
+    const code = crypto.randomBytes(16).toString("hex");
+    pendingCodes.set(code, {
+      redirectUri: redirect_uri,
+      createdAt: Date.now(),
+    });
+    s.json({ code });
+  });
 
   // Require the dashboard token on every /api/* call. The token is embedded in
   // the served HTML, so the legitimate same-origin page always has it; a
@@ -214,8 +299,52 @@ function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string)
   r.post("/skills/:name/disable", (q, s) => s.json(gw.skills.setEnabled(q.params.name, false)));
   r.get("/projects", (_q, s) => s.json(gw.projects.list()));
   r.get("/secrets", (_q, s) => s.json({ names: gw.vault.list() }));
+  r.post("/secrets", (q, s) => {
+    try {
+      const { name, value } = q.body;
+      if (!name || !value) {
+        s.status(400).json({ error: "Name and value are required." });
+        return;
+      }
+      gw.vault.set(name, value);
+      s.json({ ok: true });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/secrets/:name", (q, s) => {
+    try {
+      const ok = gw.vault.remove(q.params.name);
+      s.json({ ok });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/config", (q, s) => {
+    try {
+      const current = gw.config();
+      const next = mergeConfig(current, q.body);
+      const parsed = ConfigSchema.parse(next);
+      const saved = gw.saveConfig(parsed);
+      s.json(saved);
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.get("/agents", async (_q, s) => s.json(await gw.agents.list()));
   app.use("/api", r);
+}
+
+function mergeConfig(current: any, update: any): any {
+  const next = { ...current };
+  for (const key of Object.keys(update)) {
+    if (update[key] !== null && typeof update[key] === "object" && !Array.isArray(update[key])) {
+      next[key] = mergeConfig(next[key] || {}, update[key]);
+    } else {
+      next[key] = update[key];
+    }
+  }
+  return next;
 }
 
 function listen(app: express.Express, port: number, host: string): Promise<http.Server> {

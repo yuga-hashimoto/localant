@@ -77,7 +77,7 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
     console.log("");
   }
   console.log(c.bold("Connect ChatGPT:"));
-  console.log("  1. Open ChatGPT → Settings → Apps & Connectors");
+  console.log("  1. Open ChatGPT Connectors: https://chatgpt.com/#settings/Connectors");
   console.log("  2. Advanced settings → Developer Mode ON");
   console.log("  3. Connectors → Create");
   console.log(`  4. Paste the MCP URL above${mcpEndpoint ? "" : " (start the tunnel first)"}`);

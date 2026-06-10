@@ -31,11 +31,11 @@ describe("Gateway tool pipeline", () => {
     expect(logs.some((l) => l.tool === "get_version")).toBe(true);
   });
 
-  it("requires approval for a risk-2 tool and blocks until approved", async () => {
+  it("requires approval for a risk-2 tool and blocks until approved (strict mode)", async () => {
     const g = gw();
     const dir = path.join(base, "proj");
     fs.mkdirSync(dir);
-    g.saveConfig({ ...g.config(), security: { ...g.config().security, allowedDirectories: [dir] } });
+    g.saveConfig({ ...g.config(), security: { ...g.config().security, mode: "strict", allowedDirectories: [dir] } });
 
     const first = await g.executeTool("fs_create_file", { path: path.join(dir, "a.txt"), content: "x", overwrite: false }, { caller: "test" });
     expect(first.ok).toBe(false);
@@ -45,6 +45,30 @@ describe("Gateway tool pipeline", () => {
     const second = await g.executeTool("fs_create_file", { path: path.join(dir, "a.txt"), content: "x", overwrite: false }, { caller: "test" });
     expect(second.ok).toBe(true);
     expect(fs.existsSync(path.join(dir, "a.txt"))).toBe(true);
+  });
+
+  it("runs a risk-2 tool without approval in open mode (default)", async () => {
+    const g = gw();
+    const dir = path.join(base, "proj-open");
+    fs.mkdirSync(dir);
+    // open is the default mode; no allowlist needed, no approval for risk < 4.
+    expect(g.config().security.mode).toBe("open");
+    const res = await g.executeTool(
+      "fs_create_file",
+      { path: path.join(dir, "b.txt"), content: "x", overwrite: false },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(true);
+    expect(fs.existsSync(path.join(dir, "b.txt"))).toBe(true);
+  });
+
+  it("always keeps core blocked tokens even if config tries to drop them", async () => {
+    const g = gw();
+    g.saveConfig({ ...g.config(), security: { ...g.config().security, blockedCommandTokens: [] } });
+    const tokens = g.config().security.blockedCommandTokens;
+    expect(tokens).toContain("sudo");
+    expect(tokens).toContain("dd");
+    expect(tokens).toContain("mkfs");
   });
 
   it("rejects filesystem access outside the allowlist", async () => {

@@ -49,4 +49,28 @@ describe("PathGuard", () => {
     const g = new PathGuard([os.homedir()]);
     expect(() => g.assertAccess(path.join(os.homedir(), ".ssh", "id_rsa"), "read")).toThrow(/blocklist/i);
   });
+
+  it("allows access outside allowed directories when mode is yolo", () => {
+    const g = new PathGuard([allowed]);
+    g.setMode("yolo");
+    expect(g.assertAccess(path.join(root, "outside.txt"), "read")).toContain("outside.txt");
+  });
+
+  it("still rejects sensitive blocklist paths even when mode is yolo", () => {
+    const g = new PathGuard([os.homedir()]);
+    g.setMode("yolo");
+    expect(() => g.assertAccess(path.join(os.homedir(), ".ssh", "id_rsa"), "read")).toThrow(/blocklist/i);
+  });
+
+  it("allows access outside allowed directories when mode is open", () => {
+    const g = new PathGuard([allowed]);
+    g.setMode("open");
+    expect(g.assertAccess(path.join(root, "outside.txt"), "read")).toContain("outside.txt");
+  });
+
+  it("still rejects sensitive blocklist paths when mode is open", () => {
+    const g = new PathGuard([os.homedir()]);
+    g.setMode("open");
+    expect(() => g.assertAccess(path.join(os.homedir(), ".ssh", "id_rsa"), "read")).toThrow(/blocklist/i);
+  });
 });

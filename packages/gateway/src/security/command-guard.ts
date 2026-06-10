@@ -1,3 +1,5 @@
+import type { SecurityMode } from "@localant/shared";
+
 export class CommandRejectedError extends Error {
   constructor(message: string) {
     super(message);
@@ -37,10 +39,18 @@ function hasDangerousMetachars(input: string): boolean {
 }
 
 export class CommandGuard {
+  // Fail closed: a freshly constructed guard is strict until the gateway applies
+  // the configured mode. The product-level default (`open`) lives in the config.
+  private mode: SecurityMode = "strict";
+
   constructor(
     private allowedCommands: string[],
     private blockedTokens: string[],
   ) {}
+
+  setMode(mode: SecurityMode): void {
+    this.mode = mode;
+  }
 
   setAllowed(commands: string[]): void {
     this.allowedCommands = commands;
@@ -89,15 +99,17 @@ export class CommandGuard {
     }
 
     // Must match an allowlisted prefix.
-    const ok = this.allowedCommands.some((cmd) => {
-      const c = cmd.trim().replace(/\s+/g, " ").toLowerCase();
-      const n = normalized.toLowerCase();
-      return n === c || n.startsWith(c + " ");
-    });
-    if (!ok) {
-      throw new CommandRejectedError(
-        `Command rejected: '${normalized}' is not in the allowed command list. Use shell_request_command_approval to request it.`,
-      );
+    if (this.mode === "strict") {
+      const ok = this.allowedCommands.some((cmd) => {
+        const c = cmd.trim().replace(/\s+/g, " ").toLowerCase();
+        const n = normalized.toLowerCase();
+        return n === c || n.startsWith(c + " ");
+      });
+      if (!ok) {
+        throw new CommandRejectedError(
+          `Command rejected: '${normalized}' is not in the allowed command list. Use shell_request_command_approval to request it.`,
+        );
+      }
     }
     return normalized;
   }

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { sensitiveBlocklist } from "@localant/shared";
+import { sensitiveBlocklist, type SecurityMode } from "@localant/shared";
 
 export class PathAccessError extends Error {
   constructor(message: string) {
@@ -35,9 +35,16 @@ function isWithin(parent: string, child: string): boolean {
  */
 export class PathGuard {
   private readonly blocklist: string[];
+  // Fail closed: a freshly constructed guard is strict until the gateway applies
+  // the configured mode. The product-level default (`open`) lives in the config.
+  private mode: SecurityMode = "strict";
 
   constructor(private allowedDirs: string[]) {
     this.blocklist = sensitiveBlocklist().map(normalizeAbs);
+  }
+
+  setMode(mode: SecurityMode): void {
+    this.mode = mode;
   }
 
   setAllowedDirectories(dirs: string[]): void {
@@ -90,7 +97,7 @@ export class PathGuard {
     if (this.inBlocklist(resolved)) {
       throw new PathAccessError(`Access denied: '${requested}' is in the sensitive blocklist.`);
     }
-    if (!this.inAllowlist(resolved)) {
+    if (this.mode === "strict" && !this.inAllowlist(resolved)) {
       throw new PathAccessError(
         `Access denied: '${requested}' is outside the allowed directories. Add it with fs_add_allowed_directory.`,
       );
@@ -101,7 +108,7 @@ export class PathGuard {
     if (this.inBlocklist(real)) {
       throw new PathAccessError(`Access denied: '${requested}' resolves (via symlink) into a sensitive path.`);
     }
-    if (!this.inAllowlist(real)) {
+    if (this.mode === "strict" && !this.inAllowlist(real)) {
       throw new PathAccessError(`Access denied: '${requested}' resolves (via symlink) outside allowed directories.`);
     }
 

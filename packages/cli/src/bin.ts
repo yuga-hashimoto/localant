@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
-import { APP_VERSION } from "@localant/shared";
+import { APP_VERSION, ConfigSchema } from "@localant/shared";
 import { c, ok, warn, fail, openBrowser } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
@@ -277,6 +277,45 @@ secrets.command("remove <name>").action((name) => {
   const gw = createGateway();
   console.log(gw.vault.remove(name) ? ok(`Removed '${name}'`) : fail("Not found"));
 });
+
+// ---------- config ----------
+const configCmd = program.command("config").description("Manage configuration");
+configCmd
+  .command("show")
+  .description("Print the current configuration")
+  .action(() => {
+    const gw = createGateway();
+    console.log(JSON.stringify(gw.config(), null, 2));
+  });
+configCmd
+  .command("set <key> <value>")
+  .description("Set a configuration value (e.g. security.mode yolo)")
+  .action((key, value) => {
+    const gw = createGateway();
+    const cfg = gw.config();
+
+    let parsedVal: any = value;
+    if (value === "true") parsedVal = true;
+    else if (value === "false") parsedVal = false;
+    else if (!isNaN(Number(value))) parsedVal = Number(value);
+
+    // handle nested key paths, e.g. security.mode
+    const parts = key.split(".");
+    let curr = cfg as any;
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (!curr[parts[i]]) curr[parts[i]] = {};
+      curr = curr[parts[i]];
+    }
+    curr[parts[parts.length - 1]] = parsedVal;
+
+    try {
+      const parsed = ConfigSchema.parse(cfg);
+      gw.saveConfig(parsed);
+      console.log(ok(`Set config ${key} = ${value}`));
+    } catch (e) {
+      console.log(fail(`Invalid configuration: ${(e as Error).message}`));
+    }
+  });
 
 function ensureWorkspace(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });

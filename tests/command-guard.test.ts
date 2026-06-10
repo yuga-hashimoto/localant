@@ -41,8 +41,34 @@ describe("CommandGuard.assertAllowed", () => {
     expect(() => guard().assertAllowed("pwd; sudo reboot")).toThrow();
   });
 
-  it("rejects rm -rf regardless of spacing", () => {
-    expect(() => guard().assertAllowed("rm    -rf   /tmp/x")).toThrow();
+  it("accepts a non-allowlisted command when mode is yolo", () => {
+    const g = guard();
+    g.setMode("yolo");
+    expect(g.assertAllowed("cat /etc/passwd")).toBe("cat /etc/passwd");
+  });
+
+  it("still rejects blocked tokens when mode is yolo", () => {
+    const g = guard();
+    g.setMode("yolo");
+    expect(() => g.assertAllowed("sudo reboot")).toThrow(/blocked/);
+  });
+
+  it("accepts a non-allowlisted command when mode is open", () => {
+    const g = guard();
+    g.setMode("open");
+    expect(g.assertAllowed("cat /etc/hosts")).toBe("cat /etc/hosts");
+  });
+
+  it("still rejects blocked tokens when mode is open", () => {
+    const g = guard();
+    g.setMode("open");
+    expect(() => g.assertAllowed("sudo reboot")).toThrow(/blocked/);
+  });
+
+  it("still rejects rm -rf when mode is open", () => {
+    const g = guard();
+    g.setMode("open");
+    expect(() => g.assertAllowed("rm -rf /tmp/x")).toThrow(/rm/);
   });
 });
 

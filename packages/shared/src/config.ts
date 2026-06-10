@@ -42,6 +42,37 @@ export const BLOCKED_COMMAND_TOKENS: string[] = [
   "fdisk",
 ];
 
+/**
+ * Non-negotiable blocked tokens. These remain blocked in EVERY mode (including
+ * `open` and `yolo`) and cannot be removed from the blocklist via the dashboard
+ * or config — they are always unioned back in on save. These are the commands
+ * that can brick the machine or escalate privileges; everything else is the
+ * user's choice in a personal-use deployment.
+ */
+export const CORE_BLOCKED_COMMAND_TOKENS: string[] = [
+  "sudo",
+  "su",
+  "mkfs",
+  "mkfs.ext4",
+  "dd",
+  "fdisk",
+  "diskutil",
+  "shutdown",
+  "reboot",
+];
+
+/**
+ * Security modes:
+ *  - strict: allowlist-based. Only allowed directories/commands; approval gates
+ *    per risk level. Recommended for shared / multi-user environments.
+ *  - open (default): deny-list based for personal use. No directory/command
+ *    allowlist — everything is permitted except the sensitive blocklist and
+ *    core blocked tokens. Only risk-4 (destructive/publish) actions need
+ *    approval.
+ *  - yolo: like open, but no approval gates at all. The blocklist still applies.
+ */
+export type SecurityMode = "strict" | "open" | "yolo";
+
 const FilesystemPermission = z.object({
   mode: z.enum(["none", "read", "write"]).default("read"),
   allowedDirectories: z.array(z.string()).default([]),
@@ -104,12 +135,16 @@ export const ConfigSchema = z.object({
     .default({ enabled: true, port: 8788 }),
   tunnel: z
     .object({
-      provider: z.enum(["cloudflared", "ngrok", "none"]).default("cloudflared"),
+      provider: z.enum(["cloudflared", "ngrok", "localtunnel", "serveo", "none"]).default("cloudflared"),
       publicUrl: z.string().optional(),
+      token: z.string().optional(),
+      domain: z.string().optional(),
+      subdomain: z.string().optional(),
     })
     .default({ provider: "cloudflared" }),
   security: z
     .object({
+      mode: z.enum(["strict", "open", "yolo"]).default("open"),
       allowedDirectories: z.array(z.string()).default(defaultAllowedDirectories()),
       allowedCommands: z.array(z.string()).default(DEFAULT_ALLOWED_COMMANDS),
       blockedCommandTokens: z.array(z.string()).default(BLOCKED_COMMAND_TOKENS),
