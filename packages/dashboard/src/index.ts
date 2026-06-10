@@ -116,6 +116,8 @@ export function dashboardHtml(token = ""): string {
 const TABS = ["Home","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
 let current = "Home";
 let pendingApprovals = 0;
+let logTimers = [];
+function clearLogTimers(){ logTimers.forEach(clearInterval); logTimers=[]; }
 const DASH_TOKEN = ${JSON.stringify(token)};
 
 function openModal(title, html){
@@ -194,6 +196,7 @@ function renderNav(){
 }
 
 async function render(){
+  clearLogTimers();
   const m=document.getElementById('main');
   const hash=window.location.hash;
   if(hash.startsWith('#oauth/approve')){
@@ -276,10 +279,18 @@ const VIEWS = {
 
     const card=el('<div class="card"><h2>ChatGPT MCP endpoint</h2>'
       +'<pre id="ep">'+esc(endpoint)+'</pre>'
-      +'<div class="row"><button class="btn" id="copyEp">Copy</button></div>'
+      +'<div class="row"><button class="btn" id="copyEp">Copy</button><button class="btn ghost" id="testEp">Test connection</button><span id="testOut" class="muted" style="font-size:12px"></span></div>'
       +'<ol class="muted"><li>Open <a href="https://chatgpt.com/#settings/Connectors" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600;">ChatGPT Connectors Settings</a></li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
     m.appendChild(card);
     document.getElementById('copyEp').onclick=()=>{ navigator.clipboard.writeText(endpoint); toast('Copied endpoint'); };
+    const testBtn=document.getElementById('testEp');
+    testBtn.onclick=action(testBtn,async()=>{
+      const out=document.getElementById('testOut');
+      out.textContent='';
+      const r=await api('tunnel/test',{method:'POST'});
+      if(r.reachable){ out.innerHTML='<span class="risk0">✓ reachable ('+r.status+', '+r.ms+'ms) — ChatGPT can reach your gateway.</span>'; }
+      else { out.innerHTML='<span class="risk4">✗ not reachable'+(r.reason?': '+esc(r.reason):'')+'</span>'; }
+    },'Testing');
 
     m.appendChild(tunnelControls(t));
 
@@ -319,11 +330,25 @@ const VIEWS = {
   },
 
   async Audit(m){
-    const logs=await api('audit');
-    m.innerHTML='<div class="card"><h2>Audit log</h2><table><thead><tr><th>Time</th><th>Tool</th><th>Risk</th><th>Approval</th><th>ms</th><th>In</th></tr></thead><tbody id="lg"></tbody></table></div>';
+    m.innerHTML='<div class="card"><h2>Audit log</h2>'
+      +'<div class="row" style="margin-bottom:12px;gap:8px"><input type="text" id="auditQ" placeholder="Search tool / input / output…" style="flex:1;min-width:200px" /><button class="btn ghost" id="auditSearch">Search</button><button class="btn ghost" id="auditClear">Clear</button></div>'
+      +'<p class="muted" style="margin-top:0;font-size:12px">Click a row for the full entry.</p>'
+      +'<table><thead><tr><th>Time</th><th>Tool</th><th>Risk</th><th>Approval</th><th>ms</th><th>In</th></tr></thead><tbody id="lg"></tbody></table></div>';
     const tb=document.getElementById('lg');
-    if(!logs.length){ tb.appendChild(el('<tr><td colspan=6 class="muted">No audit entries yet.</td></tr>')); return; }
-    for(const e of logs){ tb.appendChild(el('<tr><td class="muted">'+esc(e.timestamp.replace("T"," ").slice(0,19))+'</td><td>'+esc(e.tool)+'</td><td class="'+riskClass(e.risk)+'">'+e.risk+'</td><td>'+esc(e.approval)+(e.error?' <span class="risk4">err</span>':'')+'</td><td>'+e.durationMs+'</td><td class="muted">'+esc(String(e.inputSummary).slice(0,80))+'</td></tr>')); }
+    const load=async(q)=>{
+      tb.innerHTML='';
+      const logs=await api('audit'+(q?('?q='+encodeURIComponent(q)):''));
+      if(!logs.length){ tb.appendChild(el('<tr><td colspan=6 class="muted">'+(q?'No matches.':'No audit entries yet.')+'</td></tr>')); return; }
+      for(const e of logs){
+        const tr=el('<tr style="cursor:pointer"><td class="muted">'+esc(e.timestamp.replace("T"," ").slice(0,19))+'</td><td>'+esc(e.tool)+'</td><td class="'+riskClass(e.risk)+'">'+e.risk+'</td><td>'+esc(e.approval)+(e.error?' <span class="risk4">err</span>':'')+'</td><td>'+e.durationMs+'</td><td class="muted">'+esc(String(e.inputSummary).slice(0,80))+'</td></tr>');
+        tr.onclick=()=>showAuditDetail(e.id);
+        tb.appendChild(tr);
+      }
+    };
+    document.getElementById('auditSearch').onclick=action(document.getElementById('auditSearch'),async()=>{ await load(document.getElementById('auditQ').value.trim()); });
+    document.getElementById('auditClear').onclick=async()=>{ document.getElementById('auditQ').value=''; await load(''); };
+    document.getElementById('auditQ').addEventListener('keydown',(ev)=>{ if(ev.key==='Enter') document.getElementById('auditSearch').click(); });
+    await load('');
   },
 
   async Skills(m){
@@ -430,6 +455,7 @@ const VIEWS = {
   async Agents(m){
     const a=await api('agents');
     const tasks=await api('agents/tasks');
+    const projects=await api('projects');
     m.innerHTML='<div class="card"><h2>Coding agents</h2><table><thead><tr><th>Agent</th><th>CLI available</th><th>Command</th><th>Enabled</th></tr></thead><tbody id="ag"></tbody></table></div>';
     const tb=document.getElementById('ag');
     for(const x of a){
@@ -442,6 +468,37 @@ const VIEWS = {
       tb.appendChild(tr);
     }
 
+    // Launcher: only agents that are enabled AND on PATH can actually run.
+    const runnable=a.filter(function(x){return x.enabled && x.available;});
+    const runCard=el('<div class="card"><h2>Run a task</h2></div>');
+    if(!runnable.length){
+      runCard.appendChild(el('<p class="muted">Enable an agent above whose CLI is installed to run tasks from here.</p>'));
+    } else if(!projects.length){
+      runCard.appendChild(el('<p class="muted">Register a project in the Projects tab first.</p>'));
+    } else {
+      const agentOpts=runnable.map(function(x){return '<option value="'+esc(x.agent)+'">'+esc(x.agent)+'</option>';}).join('');
+      const projOpts=projects.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';}).join('');
+      runCard.appendChild(el('<div class="row" style="gap:12px;margin-bottom:12px">'
+        +'<select id="runAgent">'+agentOpts+'</select>'
+        +'<select id="runProject">'+projOpts+'</select>'
+        +'<select id="runMode"><option value="plan">plan (read-only)</option><option value="execute">execute (creates a branch)</option></select>'
+        +'</div>'));
+      runCard.appendChild(el('<textarea id="runTask" rows="3" placeholder="Describe the task…"></textarea>'));
+      const runBtn=el('<div class="row" style="margin-top:8px"><button class="btn" id="runBtn">Run</button></div>');
+      runCard.appendChild(runBtn);
+      runBtn.querySelector('#runBtn').onclick=action(runBtn.querySelector('#runBtn'),async()=>{
+        const agent=document.getElementById('runAgent').value;
+        const projectId=document.getElementById('runProject').value;
+        const mode=document.getElementById('runMode').value;
+        const task=document.getElementById('runTask').value.trim();
+        if(!task){ toast('Describe the task first.','err'); return; }
+        await api('agents/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent,projectId,task,mode})});
+        toast('Task '+mode+' started');
+        render();
+      },'Running');
+    }
+    m.appendChild(runCard);
+
     const taskCard=el('<div class="card"><h2>Agent tasks</h2><table><thead><tr><th>Created</th><th>Agent</th><th>Mode</th><th>Status</th><th>Branch</th><th></th></tr></thead><tbody id="tk"></tbody></table></div>');
     m.appendChild(taskCard);
     const tkb=taskCard.querySelector('#tk');
@@ -451,7 +508,18 @@ const VIEWS = {
       const tr=el('<tr><td class="muted">'+esc(String(t.createdAt).replace("T"," ").slice(0,19))+'</td><td>'+esc(t.agent)+'</td><td>'+esc(t.mode)+'</td><td class="'+stCls+'">'+esc(t.status)+'</td><td class="muted">'+esc(t.branch||'')+'</td><td></td></tr>');
       const cell=tr.lastElementChild;
       const logs=el('<button class="btn ghost sm">Logs</button>');
-      logs.onclick=action(logs,async()=>{ const r=await api('agents/tasks/'+encodeURIComponent(t.id)+'/logs'); const pre=el('<pre></pre>'); pre.textContent=r.logs||'(no output)'; const ex=tr.nextElementSibling; if(ex&&ex.classList.contains('logrow')){ ex.remove(); return; } const lr=el('<tr class="logrow"><td colspan=6></td></tr>'); lr.firstElementChild.appendChild(pre); tr.after(lr); });
+      logs.onclick=action(logs,async()=>{
+        const ex=tr.nextElementSibling;
+        if(ex&&ex.classList.contains('logrow')){ ex.remove(); return; }
+        const pre=el('<pre></pre>');
+        const fetchLogs=async()=>{ try{ const r=await api('agents/tasks/'+encodeURIComponent(t.id)+'/logs'); pre.textContent=r.logs||'(no output)'; pre.scrollTop=pre.scrollHeight; }catch(e){} };
+        await fetchLogs();
+        const lr=el('<tr class="logrow"><td colspan=6></td></tr>');
+        lr.firstElementChild.appendChild(pre);
+        tr.after(lr);
+        // Live-tail a running task's output until it finishes or the row closes.
+        if(t.status==='running'){ const tm=setInterval(()=>{ if(!document.body.contains(pre)){ clearInterval(tm); return; } fetchLogs(); }, 2000); logTimers.push(tm); }
+      });
       cell.appendChild(logs);
       if(t.status==='running'){
         const stop=el('<button class="btn danger sm" style="margin-left:6px">Stop</button>');
@@ -483,6 +551,13 @@ const VIEWS = {
         +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>open</b>: deny-list for personal use — anything except the blocklist; only risk-4 needs approval. <b>strict</b>: allow-list + per-risk approval (shared machines). <b>yolo</b>: no approval gates at all.</p>'
       +'</div>'
       +'<div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="approveRisk1"'+(sec.approveRisk1?' checked':'')+' style="width:auto"/> Require approval for Risk 1 (draft) actions</label></div>'
+      +'</div>'
+
+      +'<div class="card"><h2>Auth token</h2>'
+      +'<p class="muted" style="margin-top:0">The token authenticates ChatGPT (it is embedded in the MCP URL). Keep it secret.</p>'
+      +'<div class="row" style="gap:8px"><input type="password" id="authTok" value="" placeholder="•••••••• (click Reveal)" readonly style="flex:1" /><button class="btn ghost sm" id="authReveal">Reveal</button><button class="btn ghost sm" id="authCopy">Copy</button></div>'
+      +'<p class="muted" style="margin-top:8px;font-size:12px">Rotating the token immediately invalidates the old MCP URL — you must update the URL in the ChatGPT connector (or just re-paste the new one shown on Home). Existing stored secrets are unaffected.</p>'
+      +'<button class="btn danger" id="authRotate" style="margin-top:4px">Rotate token</button>'
       +'</div>'
 
       +'<div class="card"><h2>Tunnel — fixed URL</h2>'
@@ -524,6 +599,19 @@ const VIEWS = {
 
     document.getElementById('secMode').onchange=async(e)=>{ try{ await saveSec({mode:e.target.value}); toast('Mode → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('approveRisk1').onchange=async(e)=>{ try{ await saveSec({approveRisk1:e.target.checked}); toast('Saved'); }catch(err){ toast(err.message,'err'); } };
+
+    const authTok=document.getElementById('authTok');
+    document.getElementById('authReveal').onclick=action(document.getElementById('authReveal'),async()=>{
+      if(authTok.type==='text' && authTok.value){ authTok.type='password'; document.getElementById('authReveal').textContent='Reveal'; return; }
+      const r=await api('token'); authTok.value=r.token; authTok.type='text'; document.getElementById('authReveal').textContent='Hide';
+    });
+    document.getElementById('authCopy').onclick=action(document.getElementById('authCopy'),async()=>{ const r=await api('token'); navigator.clipboard.writeText(r.token); toast('Token copied'); });
+    document.getElementById('authRotate').onclick=action(document.getElementById('authRotate'),async()=>{
+      if(!confirm('Rotate the auth token? The current MCP URL stops working until you update it in ChatGPT.')) return;
+      const r=await api('token/rotate',{method:'POST'});
+      authTok.value=r.token; authTok.type='text'; document.getElementById('authReveal').textContent='Hide';
+      toast('Token rotated — update the connector URL (see Home)');
+    });
     document.getElementById('tunProvider').onchange=async(e)=>{ try{ await saveTun({provider:e.target.value}); toast('Provider → '+e.target.value); }catch(err){ toast(err.message,'err'); } };
 
     function tunPayload(){
@@ -578,6 +666,25 @@ const VIEWS = {
     });
   },
 };
+
+async function showAuditDetail(id){
+  try {
+    const e=await api('audit/'+encodeURIComponent(id));
+    const row=(k,val)=>'<tr><td>'+esc(k)+'</td><td>'+val+'</td></tr>';
+    const html='<table>'
+      +row('Time',esc(e.timestamp))
+      +row('Tool','<b>'+esc(e.tool)+'</b>')
+      +row('Caller',esc(e.caller))
+      +row('Risk','<span class="'+riskClass(e.risk)+'">'+e.risk+'</span>')
+      +row('Approval',esc(e.approval))
+      +row('Duration',e.durationMs+' ms')
+      +(e.error?row('Error','<span class="risk4">'+esc(e.error)+'</span>'):'')
+      +row('Input','<pre style="margin:0">'+esc(e.inputSummary)+'</pre>')
+      +row('Output','<pre style="margin:0">'+esc(e.outputSummary)+'</pre>')
+      +'</table>';
+    openModal('Audit entry', html);
+  } catch(e){ toast(e.message,'err'); }
+}
 
 async function showSkillDetail(name){
   try {

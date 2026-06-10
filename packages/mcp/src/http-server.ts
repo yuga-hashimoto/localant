@@ -93,7 +93,9 @@ export interface Servers {
  */
 export async function startHttpServers(gw: Gateway): Promise<Servers> {
   const cfg = gw.config();
-  const token = gw.configStore.getToken();
+  // Read the token fresh on every check so rotating it from the dashboard/CLI
+  // takes effect immediately, without restarting the gateway.
+  const currentToken = (): string => gw.configStore.getToken();
   const pendingCodes = new Map<string, { redirectUri: string; createdAt: number }>();
 
   // ---------- Public gateway app ----------
@@ -105,7 +107,7 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
 
   const requireAuth = (req: Request, res: Response): boolean => {
     const provided = extractToken(req);
-    if (!provided || !tokenMatches(provided, token)) {
+    if (!provided || !tokenMatches(provided, currentToken())) {
       res.status(401).json({ error: "Unauthorized. Provide the auth token via Authorization: Bearer <token> or ?key=<token>." });
       return false;
     }
@@ -178,7 +180,7 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
     pendingCodes.delete(code);
 
     res.json({
-      access_token: token,
+      access_token: currentToken(),
       token_type: "Bearer",
       expires_in: 315360000,
     });
@@ -270,10 +272,26 @@ function mountDashboardApi(
     const t = gw.tunnel.current();
     s.json({ endpoint: t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null, tunnel: t });
   });
+  r.get("/token", (_q, s) => s.json({ token: gw.configStore.getToken() }));
+  r.post("/token/rotate", (_q, s) => {
+    const token = gw.configStore.rotateToken();
+    s.json({ token });
+  });
   r.get("/approvals", (_q, s) => s.json(gw.approvals.listPending()));
   r.post("/approvals/:id/approve", (q, s) => s.json(gw.approvals.approve(q.params.id, q.body?.scope === "session" ? "session" : "once") ?? { error: "not found" }));
   r.post("/approvals/:id/deny", (q, s) => s.json(gw.approvals.deny(q.params.id) ?? { error: "not found" }));
-  r.get("/audit", (_q, s) => s.json(gw.audit.list(100)));
+  r.get("/audit", (q, s) => {
+    const query = typeof q.query.q === "string" ? q.query.q.trim() : "";
+    s.json(query ? gw.audit.search(query, 100) : gw.audit.list(100));
+  });
+  r.get("/audit/:id", (q, s) => {
+    const entry = gw.audit.get(q.params.id);
+    if (!entry) {
+      s.status(404).json({ error: "Audit entry not found." });
+      return;
+    }
+    s.json(entry);
+  });
   r.get("/skills", (_q, s) =>
     s.json({
       skillsDir: gw.paths.skillsDir,
@@ -386,6 +404,22 @@ function mountDashboardApi(
   r.get("/agents", async (_q, s) => s.json(await gw.agents.list()));
   r.post("/agents/:name/enable", async (q, s) => setAgentEnabled(gw, q.params.name, true, s));
   r.post("/agents/:name/disable", async (q, s) => setAgentEnabled(gw, q.params.name, false, s));
+  r.post("/agents/run", async (q, s) => {
+    try {
+      const { agent, projectId, task, mode } = q.body ?? {};
+      if (!agent || !projectId || !task) {
+        s.status(400).json({ error: "agent, projectId and task are required." });
+        return;
+      }
+      if (mode === "execute") {
+        s.json(await gw.agents.startTask(agent, projectId, task));
+      } else {
+        s.json(await gw.agents.plan(agent, projectId, task));
+      }
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.get("/agents/tasks", (_q, s) => s.json(gw.agents.listTasks()));
   r.get("/agents/tasks/:id/logs", (q, s) => {
     try {
@@ -403,6 +437,24 @@ function mountDashboardApi(
   });
 
   r.get("/tunnel", (_q, s) => s.json(gw.tunnel.current()));
+  r.post("/tunnel/test", async (_q, s) => {
+    const t = gw.tunnel.current();
+    if (!t.url) {
+      s.json({ reachable: false, reason: "No tunnel URL — start the tunnel first." });
+      return;
+    }
+    const target = `${t.url.replace(/\/$/, "")}/healthz`;
+    const started = Date.now();
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(target, { signal: ctrl.signal });
+      clearTimeout(timer);
+      s.json({ reachable: resp.ok, status: resp.status, ms: Date.now() - started, url: target });
+    } catch (e) {
+      s.json({ reachable: false, ms: Date.now() - started, url: target, reason: (e as Error).message });
+    }
+  });
   r.post("/tunnel/restart", async (_q, s) => {
     try {
       s.json(await gw.restartTunnel());

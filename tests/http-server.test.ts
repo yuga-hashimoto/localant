@@ -208,4 +208,53 @@ describe("dashboard api routes", () => {
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toMatch(/svg/);
   });
+
+  it("reveals and rotates the auth token (and /mcp honors the new token)", async () => {
+    const before = ((await (await apiGet("token")).json()) as { token: string }).token;
+    expect(before).toBeTruthy();
+    const rotated = ((await (await apiSend("token/rotate", "POST")).json()) as { token: string }).token;
+    expect(rotated).not.toBe(before);
+    // The old token must now be rejected and the new one accepted on /mcp.
+    const gwUrl = `http://127.0.0.1:${apiServers.gatewayPort}/mcp`;
+    const oldRes = await fetch(`${gwUrl}?key=${before}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    expect(oldRes.status).toBe(401);
+    const newRes = await fetch(`${gwUrl}?key=${rotated}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "t", version: "1" } } }),
+    });
+    expect(newRes.status).not.toBe(401);
+  });
+
+  it("searches the audit log and fetches a full entry", async () => {
+    // Generate an audit entry via a real tool call.
+    await apiGw.executeTool("get_version", {}, { caller: "test" });
+    const all = (await (await apiGet("audit")).json()) as { id: string; tool: string }[];
+    expect(all.length).toBeGreaterThan(0);
+    const hit = (await (await apiGet("audit?q=get_version")).json()) as { id: string }[];
+    expect(hit.length).toBeGreaterThan(0);
+    const detail = await apiGet("audit/" + hit[0]!.id);
+    expect(detail.status).toBe(200);
+    expect(((await detail.json()) as { outputSummary: string }).outputSummary).toBeTruthy();
+    const missing = await apiGet("audit/nope");
+    expect(missing.status).toBe(404);
+  });
+
+  it("rejects an agent run with missing fields and unknown agent/project", async () => {
+    const bad = await apiSend("agents/run", "POST", { agent: "codex" });
+    expect(bad.status).toBe(400);
+    const unknown = await apiSend("agents/run", "POST", { agent: "nope", projectId: "x", task: "do" });
+    expect(unknown.status).toBe(400);
+  });
+
+  it("returns a not-reachable tunnel test when no tunnel is running", async () => {
+    await apiSend("tunnel/stop", "POST");
+    const res = await apiSend("tunnel/test", "POST");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { reachable: boolean }).reachable).toBe(false);
+  });
 });
