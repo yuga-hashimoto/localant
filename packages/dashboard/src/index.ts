@@ -8,27 +8,6 @@
  * inside this outer template literal without escaping collisions.
  */
 
-/** The ant logo, inlined so the header renders with no extra request. */
-const LOGO_SVG = `<svg viewBox="0 0 128 128" fill="none" width="26" height="26" aria-hidden="true">
-  <ellipse cx="52" cy="70" rx="20" ry="14" fill="#4f8cff"/>
-  <ellipse cx="88" cy="68" rx="18" ry="13" fill="#4f8cff"/>
-  <circle cx="42" cy="50" r="15" fill="#4f8cff"/>
-  <circle cx="37" cy="47" r="3" fill="#0b0f17"/>
-  <circle cx="46" cy="47" r="3" fill="#0b0f17"/>
-  <path d="M35 38 Q28 18 22 10" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M46 38 Q50 16 58 8" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <circle cx="22" cy="9" r="2.5" fill="#7fafff"/>
-  <circle cx="58" cy="7" r="2.5" fill="#7fafff"/>
-  <path d="M42 68 L28 88" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M52 70 L52 92" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M62 68 L72 90" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M78 66 L68 90" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M88 68 L92 92" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <path d="M98 64 L108 88" stroke="#4f8cff" stroke-width="2.5" stroke-linecap="round"/>
-  <rect x="68" y="40" width="28" height="10" rx="2" fill="#1b2433" stroke="#3fb950" stroke-width="0.8"/>
-  <text x="72" y="48" font-family="monospace" font-size="7" fill="#3fb950">&gt;_</text>
-</svg>`;
-
 export function dashboardHtml(token = ""): string {
   return `<!doctype html>
 <html lang="en">
@@ -113,7 +92,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","MCP","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Projects","Secrets","Agents","Settings"];
 let current = "Home";
 let pendingApprovals = 0;
 let logTimers = [];
@@ -755,36 +734,80 @@ const VIEWS = {
     });
   },
 
+  // Unified "everything is a tool" view: built-in tools + skill tools + bridged
+  // MCP tools in one searchable list, with the Skills and MCP management sections
+  // folded in below (reusing the Skills/MCP renderers).
   async Tools(m){
-    const tools = await api('tools');
-    const cfg = await api('config');
+    const [tools, skillsData, mcpServers, cfg] = await Promise.all([
+      api('tools'), api('skills'), api('mcp-servers'), api('config')
+    ]);
     const profile = (cfg.tools && cfg.tools.profile) || 'minimal';
-    const activeCount = tools.filter(function(t){ return t.active; }).length;
-    m.innerHTML = '<div class="card"><h2>Exposed Tools</h2>'
-      + '<p class="muted">All built-in and skill-provided tools registered in LocalAnt. Profile <code>'+esc(profile)+'</code> advertises <b>'+activeCount+'</b> of '+tools.length+' to ChatGPT. <span class="muted">Inactive tools are blocked at call time — switch the profile in Settings.</span></p>'
-      + '<table><thead><tr><th>Name</th><th>Exposed</th><th>Risk</th><th>Description</th><th>Parameters</th></tr></thead><tbody id="tl"></tbody></table></div>';
-    const tb = document.getElementById('tl');
-    if(!tools.length){ tb.appendChild(el('<tr><td colspan=5 class="muted">No tools registered.</td></tr>')); return; }
-    for(const t of tools){
-      const params = Object.entries(t.inputSchema || {}).map(function(item) {
-        const name = item[0];
-        const info = item[1];
-        const desc = info.description ? (' - ' + esc(info.description)) : '';
-        return '<code>' + esc(name) + '</code>: <span class="muted">' + esc(info.type) + '</span>' + desc;
-      }).join('<br>') || '<span class="muted">none</span>';
+    const skills = skillsData.skills || [];
 
-      const exposed = t.active
-        ? '<span style="color:var(--ok,#3fb950)">●</span>'
-        : '<span class="muted" title="Hidden in the current tool profile">○</span>';
-      const tr = el('<tr'+(t.active?'':' style="opacity:.55"')+'>'
-        + '<td><b>' + esc(t.name) + '</b></td>'
-        + '<td>' + exposed + '</td>'
-        + '<td class="' + riskClass(t.risk) + '">risk ' + t.risk + '</td>'
-        + '<td>' + esc(t.description) + '</td>'
-        + '<td>' + params + '</td>'
-        + '</tr>');
-      tb.appendChild(tr);
+    // Bridged MCP tools require a live connection — fetch them for enabled servers.
+    const mcpTools = {};
+    await Promise.all(mcpServers.filter(function(s){return s.enabled;}).map(async function(sv){
+      try{ const r=await api('mcp-servers/'+encodeURIComponent(sv.name)+'/test',{method:'POST'}); if(r&&r.ok) mcpTools[sv.name]=r.tools||[]; }catch(e){}
+    }));
+
+    const caps=[];
+    for(const t of tools){ caps.push({src:'built-in', name:t.name, risk:t.risk, on:t.active, on_l:'active', off_l:'hidden', desc:t.description||'', via:''}); }
+    for(const s of skills){ for(const tn of (s.tools||[])){ caps.push({src:'skill', name:s.name+'.'+tn, risk:s.riskLevel, on:s.enabled, on_l:'enabled', off_l:'disabled', desc:s.description||'', via:'skill_run'}); } }
+    for(const sv of mcpServers){ const tl=mcpTools[sv.name]||[]; for(const tn of tl){ caps.push({src:'mcp', name:sv.name+'.'+tn, risk:3, on:sv.enabled, on_l:'enabled', off_l:'disabled', desc:'', via:'mcp_server_run_tool'}); } if(sv.enabled && !tl.length){ caps.push({src:'mcp', name:sv.name+' — (no tools / unreachable)', risk:3, on:false, on_l:'enabled', off_l:'unreachable', desc:'', via:'mcp_server_run_tool'}); } }
+
+    const reachable = caps.filter(function(c){return c.on;}).length;
+    const nB = caps.filter(function(c){return c.src==='built-in'&&c.on;}).length;
+    const nS = caps.filter(function(c){return c.src==='skill'&&c.on;}).length;
+    const nM = caps.filter(function(c){return c.src==='mcp'&&c.on;}).length;
+    const SRC={'built-in':['Built-in','#3b82f6'],'skill':['Skill','#a855f7'],'mcp':['MCP','#10b981']};
+    const badge=function(src){ const x=SRC[src]; return '<span class="tag" style="border-color:'+x[1]+';color:'+x[1]+'">'+x[0]+'</span>'; };
+
+    m.innerHTML = '<div class="card"><h2>Tools — everything ChatGPT can use</h2>'
+      + '<p class="muted" style="margin-top:0">From ChatGPT\'s point of view it\'s all tools. This is every capability in one place — <b>built-in</b> tools, <b>skill</b> tools (invoked via <code>skill_run</code>), and bridged <b>MCP</b> tools (via <code>mcp_server_run_tool</code>). Profile <code>'+esc(profile)+'</code> — <b>'+reachable+'</b> reachable now ('+nB+' built-in · '+nS+' skill · '+nM+' mcp). Inactive items are blocked at call time; change the profile in Settings, enable skills/servers below.</p>'
+      + '<div class="row" style="gap:8px;margin-bottom:10px;align-items:center">'
+        + '<input type="text" id="capSearch" placeholder="Search capabilities…" style="flex:1;min-width:200px" />'
+        + '<span id="capChips" class="row" style="gap:6px"></span>'
+      + '</div>'
+      + '<table><thead><tr><th>Capability</th><th>Source</th><th>Risk</th><th>Status</th><th>Description</th></tr></thead><tbody id="capList"></tbody></table>'
+      + '<p class="muted" id="capEmpty" style="display:none">No matching capabilities.</p>'
+      + '</div>'
+      + '<div id="skillsHost"></div>'
+      + '<div id="mcpHost"></div>';
+
+    let activeSrc='all';
+    const applyCap=function(){
+      const q=(document.getElementById('capSearch').value||'').toLowerCase().trim();
+      let shown=0;
+      for(const tr of rowEls){
+        const ok=(activeSrc==='all'||tr._src===activeSrc)&&(!q||tr._text.indexOf(q)>=0);
+        tr.style.display=ok?'':'none'; if(ok) shown++;
+      }
+      document.getElementById('capEmpty').style.display=shown?'none':'';
+    };
+
+    const chipWrap=document.getElementById('capChips');
+    const chipEls={};
+    for(const pair of [['all','All'],['built-in','Built-in'],['skill','Skill'],['mcp','MCP']]){
+      const b=el('<button class="btn ghost sm">'+pair[1]+'</button>');
+      if(pair[0]==='all') b.style.borderColor='var(--accent)';
+      b.onclick=function(){ activeSrc=pair[0]; for(const k in chipEls){ chipEls[k].style.borderColor=(k===pair[0]?'var(--accent)':''); } applyCap(); };
+      chipEls[pair[0]]=b; chipWrap.appendChild(b);
     }
+
+    const tb=document.getElementById('capList');
+    const rowEls=[];
+    if(!caps.length){ tb.appendChild(el('<tr><td colspan=5 class="muted">No capabilities registered.</td></tr>')); }
+    for(const c of caps){
+      const status=c.on?'<span class="risk0">'+c.on_l+'</span>':'<span class="muted">'+c.off_l+'</span>';
+      const tr=el('<tr'+(c.on?'':' style="opacity:.5"')+'><td><code>'+esc(c.name)+'</code>'+(c.via?'<br><span class="muted" style="font-size:11px">via '+c.via+'</span>':'')+'</td><td>'+badge(c.src)+'</td><td class="'+riskClass(c.risk)+'">'+c.risk+'</td><td>'+status+'</td><td class="muted">'+esc(c.desc)+'</td></tr>');
+      tr._src=c.src; tr._text=(c.name+' '+c.desc).toLowerCase();
+      rowEls.push(tr); tb.appendChild(tr);
+    }
+    document.getElementById('capSearch').oninput=applyCap;
+
+    // Reuse the Skills + MCP renderers as folded management sections.
+    await VIEWS.Skills(document.getElementById('skillsHost'));
+    await VIEWS.MCP(document.getElementById('mcpHost'));
   },
 };
 

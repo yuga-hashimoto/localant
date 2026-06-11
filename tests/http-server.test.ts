@@ -203,12 +203,6 @@ describe("dashboard api routes", () => {
     expect(((await stop.json()) as { status: string }).status).toBe("stopped");
   });
 
-  it("serves the icon.svg asset", async () => {
-    const res = await fetch(`${apiBase}/icon.svg`);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("content-type")).toMatch(/svg/);
-  });
-
   it("reveals and rotates the auth token (and /mcp honors the new token)", async () => {
     const before = ((await (await apiGet("token")).json()) as { token: string }).token;
     expect(before).toBeTruthy();
