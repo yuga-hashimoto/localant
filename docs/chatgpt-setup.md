@@ -7,8 +7,9 @@
    ```
    https://xxxxx.trycloudflare.com/mcp?key=<token>
    ```
-5. Name it **LocalAnt** and save.
-6. Start a chat and ask: *"Run health check on my local app"*.
+5. Set **Authentication** to **None**.
+6. Name it **LocalAnt** and save.
+7. Start a chat and ask: *"Run health check on my local app"*.
 
 ## Keep a fixed URL (don't recreate the connector every time)
 

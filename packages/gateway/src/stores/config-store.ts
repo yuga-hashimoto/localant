@@ -48,7 +48,22 @@ export class ConfigStore {
   load(): Config {
     try {
       const raw = JSON.parse(fs.readFileSync(this.paths.configFile, "utf8"));
-      return ConfigSchema.parse(raw);
+      const config = ConfigSchema.parse(raw);
+
+      // Merge missing default coding agents into existing config automatically
+      const def = defaultConfig();
+      let changed = false;
+      for (const [key, val] of Object.entries(def.codingAgents)) {
+        if (!config.codingAgents[key]) {
+          config.codingAgents[key] = val;
+          changed = true;
+        }
+      }
+      if (changed) {
+        this.save(config);
+      }
+
+      return config;
     } catch {
       return defaultConfig();
     }

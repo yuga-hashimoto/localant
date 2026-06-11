@@ -81,7 +81,8 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
   console.log("  2. Advanced settings → Developer Mode ON");
   console.log("  3. Connectors → Create");
   console.log(`  4. Paste the MCP URL above${mcpEndpoint ? "" : " (start the tunnel first)"}`);
-  console.log("  5. Name it: LocalAnt");
+  console.log('  5. Set Authentication to "None"');
+  console.log("  6. Name it: LocalAnt");
   console.log("");
   console.log(`Then ask ChatGPT: ${c.cyan('"Run health check on my local app"')}`);
 

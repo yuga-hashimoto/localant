@@ -62,7 +62,7 @@ export function defaultAllowedDirectories(): string[] {
   return [
     path.join(home, "Projects"),
     path.join(home, "Developer"),
-    path.join(home, "Documents", APP_NAME),
+    path.join(home, "Documents"),
   ];
 }
 

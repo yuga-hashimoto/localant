@@ -270,7 +270,7 @@ function mountDashboardApi(
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
   r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
   r.get("/doctor", async (_q, s) => {
-    const tools = ["git", "node", "pnpm", "npm", "npx", "claude", "codex", "cloudflared", "ngrok", "adb", "docker"];
+    const tools = ["git", "node", "pnpm", "npm", "npx", "claude", "codex", "openclaw", "agy", "hermes", "opencode", "cloudflared", "ngrok", "adb", "docker"];
     const checks = await Promise.all(
       tools.map(async (name) => ({ name, available: await commandExists(name) })),
     );

@@ -103,7 +103,8 @@ Connect ChatGPT:
   2. Advanced settings → Developer Mode ON
   3. Connectors → Create
   4. Paste the MCP URL above
-  5. Name it: LocalAnt
+  5. Set Authentication to "None"
+  6. Name it: LocalAnt
 ```
 
 > **From source** (this repo): `pnpm install && pnpm build && node packages/cli/dist/bin.js setup`
@@ -114,8 +115,9 @@ Connect ChatGPT:
 2. **Advanced settings → Developer Mode ON**
 3. **Connectors → Create**
 4. Paste the **MCP URL** (`https://…/mcp?key=<token>`)
-5. Name it **LocalAnt**
-6. Ask ChatGPT: *"Run health check on my local app"*
+5. Set **Authentication** to **None**
+6. Name it **LocalAnt**
+7. Ask ChatGPT: *"Run health check on my local app"*
 
 The token is embedded in the URL so the connector authenticates even where
 custom headers aren't available. You can also send `Authorization: Bearer <token>`.

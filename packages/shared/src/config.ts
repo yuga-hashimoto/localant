@@ -101,7 +101,7 @@ export const SkillPermissionsSchema = z.object({
 export type SkillPermissions = z.infer<typeof SkillPermissionsSchema>;
 
 const CodingAgentConfig = z.object({
-  enabled: z.boolean().default(false),
+  enabled: z.boolean().default(true),
   command: z.string(),
   args: z.array(z.string()).default([]),
   planArgs: z.array(z.string()).default([]),
@@ -160,7 +160,7 @@ export const ConfigSchema = z.object({
     .record(z.string(), CodingAgentConfig)
     .default({
       "claude-code": {
-        enabled: false,
+        enabled: true,
         command: "claude",
         args: [],
         planArgs: ["-p"],
@@ -170,8 +170,48 @@ export const ConfigSchema = z.object({
         timeoutMs: 600_000,
       },
       codex: {
-        enabled: false,
+        enabled: true,
         command: "codex",
+        args: [],
+        planArgs: [],
+        executeArgs: [],
+        defaultPermissionMode: "plan",
+        maxTurns: 10,
+        timeoutMs: 600_000,
+      },
+      openclaw: {
+        enabled: true,
+        command: "openclaw",
+        args: [],
+        planArgs: [],
+        executeArgs: [],
+        defaultPermissionMode: "plan",
+        maxTurns: 10,
+        timeoutMs: 600_000,
+      },
+      "antigravity-cli": {
+        enabled: true,
+        command: "agy",
+        args: [],
+        planArgs: [],
+        executeArgs: [],
+        defaultPermissionMode: "plan",
+        maxTurns: 10,
+        timeoutMs: 600_000,
+      },
+      "hermes-agent": {
+        enabled: true,
+        command: "hermes",
+        args: [],
+        planArgs: [],
+        executeArgs: [],
+        defaultPermissionMode: "plan",
+        maxTurns: 10,
+        timeoutMs: 600_000,
+      },
+      opencode: {
+        enabled: true,
+        command: "opencode",
         args: [],
         planArgs: [],
         executeArgs: [],

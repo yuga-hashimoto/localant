@@ -280,7 +280,7 @@ const VIEWS = {
     const card=el('<div class="card"><h2>ChatGPT MCP endpoint</h2>'
       +'<pre id="ep">'+esc(endpoint)+'</pre>'
       +'<div class="row"><button class="btn" id="copyEp">Copy</button><button class="btn ghost" id="testEp">Test connection</button><span id="testOut" class="muted" style="font-size:12px"></span></div>'
-      +'<ol class="muted"><li>Open <a href="https://chatgpt.com/#settings/Connectors" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600;">ChatGPT Connectors Settings</a></li><li>Advanced settings → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
+      +'<ol class="muted"><li>Open <a href="https://chatgpt.com/#settings/Connectors" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600;">ChatGPT Connectors Settings</a></li><li><a href="https://chatgpt.com/#settings/Connectors/Advanced" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:600;">Advanced settings</a> → Developer Mode ON</li><li>Connectors → Create</li><li>Paste the URL above, name it LocalAnt</li><li>Set Authentication to "None" (the token is embedded in the URL)</li><li>Ask ChatGPT: "Run health check on my local app"</li></ol></div>');
     m.appendChild(card);
     document.getElementById('copyEp').onclick=()=>{ navigator.clipboard.writeText(endpoint); toast('Copied endpoint'); };
     const testBtn=document.getElementById('testEp');
@@ -303,7 +303,7 @@ const VIEWS = {
     try {
       const d=await api('doctor');
       const chips=d.tools.map(function(t){ return '<span class="tag" style="margin:2px;'+(t.available?'':'opacity:.5')+'">'+(t.available?'✓':'✗')+' '+esc(t.name)+'</span>'; }).join(' ');
-      document.getElementById('envOut').innerHTML='<p>node '+esc(d.node)+' · '+esc(d.platform)+(d.skillExecOk?'':' <span class="risk2">(Node 22+ recommended for skills)</span>')+'</p><div class="row">'+chips+'</div><p class="muted" style="font-size:12px;margin-top:8px">✓ = on PATH. Install <code>cloudflared</code>/<code>ngrok</code> for tunnels, <code>claude</code>/<code>codex</code> for agents.</p>';
+      document.getElementById('envOut').innerHTML='<p>node '+esc(d.node)+' · '+esc(d.platform)+(d.skillExecOk?'':' <span class="risk2">(Node 22+ recommended for skills)</span>')+'</p><div class="row">'+chips+'</div><p class="muted" style="font-size:12px;margin-top:8px">✓ = on PATH. Install <code>cloudflared</code>/<code>ngrok</code> for tunnels, <code>claude</code>/<code>codex</code>/<code>openclaw</code>/<code>agy</code>/<code>hermes</code>/<code>opencode</code> for agents.</p>';
     } catch(e){ document.getElementById('envOut').textContent='Could not load environment.'; }
   },
 
