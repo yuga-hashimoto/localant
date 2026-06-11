@@ -1,4 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { createLogger, type Config } from "@localant/shared";
 import { commandExists } from "../util/exec.js";
 
@@ -239,21 +242,53 @@ export class TunnelManager {
     });
   }
 
+  private findSshKey(): string | undefined {
+    try {
+      const home = os.homedir();
+      const sshDir = path.join(home, ".ssh");
+      const keyFiles = ["id_ed25519", "id_rsa", "id_ecdsa", "id_dsa"];
+      for (const file of keyFiles) {
+        const p = path.join(sshDir, file);
+        if (fs.existsSync(p)) {
+          return p;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return undefined;
+  }
+
   private startServeo(port: number): Promise<TunnelInfo> {
     return new Promise((resolve) => {
       this.info = { provider: "serveo", status: "starting" };
       const cfg = this.config().tunnel;
       const subdomain = cfg.subdomain ? `${cfg.subdomain}:` : "";
-      const args = ["-R", `${subdomain}80:127.0.0.1:${port}`, "-o", "StrictHostKeyChecking=no", "serveo.net"];
+      const args = [
+        "-R",
+        `${subdomain}80:127.0.0.1:${port}`,
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "IdentitiesOnly=yes"
+      ];
+      const keyPath = this.findSshKey();
+      if (keyPath) {
+        args.push("-i", keyPath);
+      }
+      args.push("serveo.net");
+      console.log(`[DEBUG] Spawning ssh command: ssh ${args.join(" ")}`);
       const child = spawn("ssh", args, { shell: false });
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
+        console.log(`[DEBUG] ssh output: ${text.trim()}`);
 
         // 登録警告URLを検出
         const regMatch = text.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
         if (regMatch && this.info.status !== "error") {
           const registerUrl = regMatch[0];
+          console.log(`[DEBUG] Detected SSH key registration required: ${registerUrl}`);
           log.warn(`SSH key registration required: ${registerUrl}`);
 
           this.info = {
@@ -274,12 +309,14 @@ export class TunnelManager {
             // ignore
           }
           this.child = undefined;
+          console.log("[DEBUG] Resolving startServeo with registration error");
           resolve(this.info);
           return;
         }
 
         // ポートフォワーディング失敗を検出
         if (text.includes("remote port forwarding failed") && this.info.status !== "error") {
+          console.log("[DEBUG] Detected remote port forwarding failed");
           log.warn("Serveo port forwarding failed. Subdomain might be in use.");
           this.info = {
             provider: "serveo",
@@ -299,28 +336,38 @@ export class TunnelManager {
             // ignore
           }
           this.child = undefined;
+          console.log("[DEBUG] Resolving startServeo with port forwarding error");
           resolve(this.info);
           return;
         }
 
         const m = text.match(/https:\/\/(?!console\b)[a-z0-9-]+\.serveo\.net/i);
         if (m && this.info.status !== "running" && this.info.status !== "error") {
+          console.log(`[DEBUG] Detected serveo URL: ${m[0]}`);
           this.info = { provider: "serveo", url: m[0], status: "running" };
+          console.log("[DEBUG] Resolving startServeo as running");
           resolve(this.info);
         }
       };
       child.stdout.on("data", onData);
       child.stderr.on("data", onData);
       child.on("error", (e) => {
+        console.log(`[DEBUG] ssh process spawned/execution error: ${e.message}`);
         this.info = { provider: "serveo", status: "error", error: e.message };
         resolve(this.info);
       });
+      child.on("close", (code) => {
+        console.log(`[DEBUG] ssh process closed with code ${code}`);
+      });
       this.timeoutId = setTimeout(() => {
+        console.log(`[DEBUG] Serveo timeout triggered. Status: ${this.info.status}`);
         if (this.info.status !== "running" && this.info.status !== "error") {
           if (cfg.subdomain) {
+            console.log(`[DEBUG] Subdomain configured (${cfg.subdomain}), resolving as running`);
             this.info = { provider: "serveo", url: cfg.publicUrl || `https://${cfg.subdomain}.serveo.net`, status: "running" };
             resolve(this.info);
           } else {
+            console.log("[DEBUG] No subdomain configured, resolving as error");
             this.info = { provider: "serveo", status: "error", error: "Timed out waiting for serveo URL." };
             resolve(this.info);
           }

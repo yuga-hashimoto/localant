@@ -16,13 +16,20 @@ export interface StartOptions {
 
 async function verifyTunnelReachable(url: string): Promise<boolean> {
   const target = `${url.replace(/\/$/, "")}/healthz`;
+  console.log(`[DEBUG] Fetching healthz target: ${target}`);
   try {
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const timer = setTimeout(() => {
+      console.log("[DEBUG] healthz fetch timeout triggered, aborting...");
+      ctrl.abort();
+    }, 5000);
+    console.log("[DEBUG] Sending fetch request...");
     const resp = await fetch(target, { signal: ctrl.signal, redirect: "manual" });
+    console.log(`[DEBUG] Fetch response received. Status: ${resp.status}`);
     clearTimeout(timer);
     return resp.ok && resp.status === 200;
-  } catch {
+  } catch (err: any) {
+    console.log(`[DEBUG] Fetch failed with error: ${err.message || err}`);
     return false;
   }
 }
@@ -98,11 +105,16 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
         });
 
         console.log(c.gray("Retrying tunnel connection..."));
+        console.log("[DEBUG] Stopping existing tunnel...");
         gw.tunnel.stop();
+        console.log("[DEBUG] Starting tunnel...");
         const retriedTunnel = await gw.tunnel.start(servers.gatewayPort);
+        console.log(`[DEBUG] Tunnel start completed. Status: ${retriedTunnel.status}, URL: ${retriedTunnel.url}`);
 
         if (retriedTunnel.status === "running" && retriedTunnel.url) {
+          console.log("[DEBUG] Verifying tunnel reachability...");
           const isReachable = await verifyTunnelReachable(retriedTunnel.url);
+          console.log(`[DEBUG] Tunnel reachability verification result: ${isReachable}`);
           if (isReachable) {
             mcpEndpoint = `${retriedTunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
             console.log(ok("Tunnel connected successfully!\n"));
