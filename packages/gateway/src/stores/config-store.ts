@@ -18,7 +18,11 @@ export class ConfigStore {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(p.configFile)) {
-      this.save(defaultConfig());
+      const config = defaultConfig();
+      config.tunnel.provider = "localtunnel";
+      const rand = crypto.randomBytes(16).toString("hex");
+      config.tunnel.subdomain = `localant-${rand}`;
+      this.save(config);
     }
     if (!fs.existsSync(p.tokenFile)) {
       const token = crypto.randomBytes(32).toString("base64url");

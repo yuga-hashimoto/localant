@@ -121,19 +121,45 @@ The token is embedded in the URL so the connector authenticates even where
 custom headers aren't available. You can also send `Authorization: Bearer <token>`.
 See [docs/chatgpt-setup.md](docs/chatgpt-setup.md).
 
+> **Tip — set a fixed URL so you never recreate the connector.** The default
+> Quick Tunnel URL changes on every restart. Configure a fixed tunnel (ngrok
+> static domain, a custom subdomain, or your own domain) in the dashboard
+> **Settings** tab or with `localant config set tunnel.domain <domain>`. The
+> auth token is persistent, so a stable URL means you connect ChatGPT **once**.
+> Full instructions: [docs/chatgpt-setup.md → Keep a fixed URL](docs/chatgpt-setup.md#keep-a-fixed-url-dont-recreate-the-connector-every-time).
+
 ## Security model
 
-| Risk | Meaning | Approval |
-|------|---------|----------|
-| 0 | read-only | none |
-| 1 | safe write draft | config (default none) |
-| 2 | file modification | **required** |
-| 3 | shell / agent / network write | **required** |
-| 4 | destructive / publish / deploy | **double approval** |
+LocalAnt has three security modes (set `security.mode` in config or the
+dashboard Settings tab):
 
-- No raw shell by default — only `shell_run_allowed_command` against an allowlist.
-- Filesystem access limited to **allowed directories**; sensitive paths
-  (`~/.ssh`, `~/.aws`, `/etc`, …) are always blocked; symlink escapes are caught.
+| Mode | Filesystem / shell | Approval gates | For |
+|------|--------------------|----------------|-----|
+| **`open`** (default) | deny-list — everything allowed except the sensitive blocklist + core blocked tokens | only risk-4 (destructive/publish) | personal single-user machines |
+| `strict` | allow-list — only allowed directories & commands | per risk level (see below) | shared / multi-user environments |
+| `yolo` | deny-list (same as `open`) | none at all | trusted automation only |
+
+The default is **`open`**: a deny-list model for personal use. There is no
+directory or command allow-list to maintain — ChatGPT can read/write anywhere
+and run any command **except** the always-blocked items below.
+
+**Strict-mode approval matrix:**
+
+| Risk | Meaning | Approval (strict) | Approval (open) |
+|------|---------|-------------------|-----------------|
+| 0 | read-only | none | none |
+| 1 | safe write draft | config (default none) | none |
+| 2 | file modification | **required** | none |
+| 3 | shell / agent / network write | **required** | none |
+| 4 | destructive / publish / deploy | **double approval** | **double approval** |
+
+**Always enforced, in every mode (including `open` and `yolo`):**
+
+- Sensitive paths (`~/.ssh`, `~/.aws`, `~/.gnupg`, `/etc`, Keychains, …) are
+  **never** readable or writable; symlink escapes are caught.
+- Core blocked commands — `sudo`, `su`, `dd`, `mkfs`, `fdisk`, `diskutil`,
+  `shutdown`, `reboot` — and `rm -rf` / `chmod 777` are **always rejected** and
+  cannot be removed from the blocklist.
 - Secrets live in an encrypted local vault and are **redacted** from tool
   output and the audit log.
 - Generated/installed skills are **disabled by default** until you review them.
@@ -142,9 +168,26 @@ Full details: [SECURITY.md](SECURITY.md).
 
 ## Dashboard
 
-A local-only dashboard (`http://127.0.0.1:8788`) shows status, the MCP endpoint
-(with copy button), pending approvals, the audit log, skills (enable/disable),
-projects, secret names, and coding agents.
+A local-only dashboard (`http://127.0.0.1:8788`) is a full control panel — every
+setting that's available on the CLI is editable from the web, and vice versa.
+A live status badge and a pending-approvals counter update automatically.
+
+- **Home** — status, MCP endpoint (copy), tunnel start/stop/restart, **Test
+  connection** (fetches the public URL to confirm ChatGPT can reach you), health
+  check.
+- **Settings** — security mode (open/strict/yolo), risk policy, **auth token
+  reveal/rotate** (rotation takes effect with no restart), tunnel provider +
+  fixed-URL config with **Save & restart**, gateway/dashboard ports, allowed
+  directories/commands, blocked tokens (core tokens shown but locked), **bridged
+  MCP servers** (add/test/remove downstream stdio servers), and a raw JSON editor
+  with validation.
+- **Skills** — create, enable/disable, inspect permissions (modal), uninstall.
+- **Agents** — enable/disable (e.g. Codex), **launch plan/execute tasks** and
+  live-tail their logs.
+- **Audit** — full-text search and click-through to the full input/output of any
+  entry.
+- **Projects** — register/remove. **Secrets** — add/remove with reveal toggle
+  (names only). Plus a live **Approvals** queue.
 
 ## Skills
 

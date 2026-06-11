@@ -68,7 +68,12 @@ export class CodingAgentManager {
     }
     const project = this.project(projectId);
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
-    const args = [...cfg.args, ...cfg.planArgs, prompt];
+    const args = [...cfg.args, ...cfg.planArgs];
+    const isYolo = this.config().security.mode === "yolo";
+    if (isYolo && !args.includes("--danger")) {
+      args.push("--danger");
+    }
+    args.push(prompt);
     const res = await execFileSafe(cfg.command, args, {
       cwd: project.path,
       timeoutMs: cfg.timeoutMs,
@@ -115,7 +120,12 @@ export class CodingAgentManager {
 
     const id = nanoid(8);
     const prompt = `Implement the following task. Run tests/validation when done.\n\n${task}`;
-    const args = [...cfg.args, ...cfg.executeArgs, prompt];
+    const args = [...cfg.args, ...cfg.executeArgs];
+    const isYolo = this.config().security.mode === "yolo";
+    if (isYolo && !args.includes("--danger")) {
+      args.push("--danger");
+    }
+    args.push(prompt);
     const child = spawn(cfg.command, args, { cwd: project.path, shell: false });
     const rec: RunningTask = {
       id,
@@ -150,6 +160,17 @@ export class CodingAgentManager {
   getTask(id: string) {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
+    return this.summarizeTask(t);
+  }
+
+  /** All tasks (most recent first), without child handles or logs. */
+  listTasks() {
+    return [...this.tasks.values()]
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((t) => this.summarizeTask(t));
+  }
+
+  private summarizeTask(t: RunningTask) {
     return {
       id: t.id,
       agent: t.agent,

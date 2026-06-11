@@ -1,9 +1,12 @@
 import http from "node:http";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort, APP_VERSION } from "@localant/shared";
-import type { Gateway } from "@localant/gateway";
+import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema } from "@localant/shared";
+import { commandExists, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
 
@@ -57,6 +60,24 @@ function createRateLimiter(limit: number, windowMs: number): (key: string) => bo
   };
 }
 
+/** Locate a bundled asset across the dev-tree and published-package layouts. */
+function findAsset(file: string): string | undefined {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.join(__dirname, "..", "..", "..", "assets", file),
+    path.join(__dirname, "..", "assets", file),
+    path.join(__dirname, "assets", file),
+    path.join(process.cwd(), "assets", file),
+  ];
+  return candidates.find((c) => fs.existsSync(c));
+}
+
+function serveAsset(file: string, res: Response): void {
+  const found = findAsset(file);
+  if (found) res.sendFile(found);
+  else res.status(404).end();
+}
+
 export interface Servers {
   gateway: http.Server;
   dashboard?: http.Server;
@@ -72,7 +93,10 @@ export interface Servers {
  */
 export async function startHttpServers(gw: Gateway): Promise<Servers> {
   const cfg = gw.config();
-  const token = gw.configStore.getToken();
+  // Read the token fresh on every check so rotating it from the dashboard/CLI
+  // takes effect immediately, without restarting the gateway.
+  const currentToken = (): string => gw.configStore.getToken();
+  const pendingCodes = new Map<string, { redirectUri: string; createdAt: number }>();
 
   // ---------- Public gateway app ----------
   const app = express();
@@ -83,7 +107,7 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
 
   const requireAuth = (req: Request, res: Response): boolean => {
     const provided = extractToken(req);
-    if (!provided || !tokenMatches(provided, token)) {
+    if (!provided || !tokenMatches(provided, currentToken())) {
       res.status(401).json({ error: "Unauthorized. Provide the auth token via Authorization: Bearer <token> or ?key=<token>." });
       return false;
     }
@@ -121,6 +145,47 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   app.get("/mcp", methodNotAllowed);
   app.delete("/mcp", methodNotAllowed);
 
+  // OAuth 認可エンドポイント
+  app.get("/oauth/authorize", (req, res) => {
+    const { redirect_uri, state } = req.query;
+    if (!redirect_uri) {
+      return res.status(400).send("Missing redirect_uri");
+    }
+    const rt = gw.runtimeInfo();
+    if (!rt.dashboard) {
+      return res.status(500).send("Dashboard is not running, cannot authorize.");
+    }
+    const target = `${rt.dashboard}/#oauth/approve?state=${encodeURIComponent(String(state || ""))}&redirect_uri=${encodeURIComponent(String(redirect_uri))}`;
+    res.redirect(target);
+  });
+
+  // OAuth トークンエンドポイント
+  app.post("/oauth/token", express.urlencoded({ extended: true }), (req, res) => {
+    const body = req.body || {};
+    const { grant_type, code } = body;
+    if (grant_type !== "authorization_code") {
+      return res.status(400).json({ error: "unsupported_grant_type" });
+    }
+    if (!code) {
+      return res.status(400).json({ error: "invalid_request", error_description: "Missing code" });
+    }
+    const pending = pendingCodes.get(code);
+    if (!pending) {
+      return res.status(400).json({ error: "invalid_grant", error_description: "Invalid or expired code" });
+    }
+    if (Date.now() - pending.createdAt > 600_000) {
+      pendingCodes.delete(code);
+      return res.status(400).json({ error: "invalid_grant", error_description: "Code expired" });
+    }
+    pendingCodes.delete(code);
+
+    res.json({
+      access_token: currentToken(),
+      token_type: "Bearer",
+      expires_in: 315360000,
+    });
+  });
+
   const gatewayPort = await findAvailablePort(cfg.gateway.port, cfg.gateway.host);
   if (gatewayPort !== cfg.gateway.port) {
     log.info(`port ${cfg.gateway.port} is busy — falling back to ${gatewayPort}`);
@@ -150,7 +215,11 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
       next();
     });
 
-    mountDashboardApi(dash, gw, dashToken);
+    mountDashboardApi(dash, gw, dashToken, pendingCodes);
+    dash.get("/favicon.png", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/favicon.ico", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/hero.png", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/icon.svg", (_req, res) => serveAsset("icon.svg", res));
     dash.get("/", (_req, res) => res.type("html").send(dashboardHtml(dashToken)));
     dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");
     log.info(`dashboard listening on http://127.0.0.1:${dashboardPort}`);
@@ -164,8 +233,27 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
  * Dashboard API — bound to 127.0.0.1 only and additionally gated by a
  * per-process token (defends against CSRF / DNS-rebinding from a browser tab).
  */
-function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string): void {
+function mountDashboardApi(
+  app: express.Express,
+  gw: Gateway,
+  dashToken: string,
+  pendingCodes: Map<string, { redirectUri: string; createdAt: number }>,
+): void {
   const r = express.Router();
+
+  r.post("/oauth/approve", (q, s) => {
+    const { redirect_uri } = q.body;
+    if (!redirect_uri) {
+      s.status(400).json({ error: "Missing redirect_uri" });
+      return;
+    }
+    const code = crypto.randomBytes(16).toString("hex");
+    pendingCodes.set(code, {
+      redirectUri: redirect_uri,
+      createdAt: Date.now(),
+    });
+    s.json({ code });
+  });
 
   // Require the dashboard token on every /api/* call. The token is embedded in
   // the served HTML, so the legitimate same-origin page always has it; a
@@ -181,18 +269,49 @@ function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string)
 
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
   r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
+  r.get("/doctor", async (_q, s) => {
+    const tools = ["git", "node", "pnpm", "npm", "npx", "claude", "codex", "cloudflared", "ngrok", "adb", "docker"];
+    const checks = await Promise.all(
+      tools.map(async (name) => ({ name, available: await commandExists(name) })),
+    );
+    const nodeMajor = Number(process.versions.node.split(".")[0]);
+    s.json({
+      node: process.version,
+      nodeOk: nodeMajor >= 20,
+      skillExecOk: nodeMajor >= 22,
+      platform: process.platform,
+      tools: checks,
+    });
+  });
   r.get("/config", (_q, s) => s.json(gw.config()));
   r.get("/mcp-endpoint", (_q, s) => {
     const t = gw.tunnel.current();
     s.json({ endpoint: t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null, tunnel: t });
   });
+  r.get("/token", (_q, s) => s.json({ token: gw.configStore.getToken() }));
+  r.post("/token/rotate", (_q, s) => {
+    const token = gw.configStore.rotateToken();
+    s.json({ token });
+  });
   r.get("/approvals", (_q, s) => s.json(gw.approvals.listPending()));
   r.post("/approvals/:id/approve", (q, s) => s.json(gw.approvals.approve(q.params.id, q.body?.scope === "session" ? "session" : "once") ?? { error: "not found" }));
   r.post("/approvals/:id/deny", (q, s) => s.json(gw.approvals.deny(q.params.id) ?? { error: "not found" }));
-  r.get("/audit", (_q, s) => s.json(gw.audit.list(100)));
+  r.get("/audit", (q, s) => {
+    const query = typeof q.query.q === "string" ? q.query.q.trim() : "";
+    s.json(query ? gw.audit.search(query, 100) : gw.audit.list(100));
+  });
+  r.get("/audit/:id", (q, s) => {
+    const entry = gw.audit.get(q.params.id);
+    if (!entry) {
+      s.status(404).json({ error: "Audit entry not found." });
+      return;
+    }
+    s.json(entry);
+  });
   r.get("/skills", (_q, s) =>
-    s.json(
-      gw.skills.list().map((sk) => ({
+    s.json({
+      skillsDir: gw.paths.skillsDir,
+      skills: gw.skills.list().map((sk) => ({
         name: sk.manifest.name,
         version: sk.manifest.version,
         description: sk.manifest.description,
@@ -200,10 +319,69 @@ function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string)
         generated: sk.generated,
         riskLevel: sk.manifest.riskLevel,
         valid: sk.valid,
+        bundled: !sk.dir.startsWith(gw.paths.skillsDir),
         tools: sk.manifest.tools.map((t) => t.name),
       })),
-    ),
+    }),
   );
+  r.get("/skills/:name", (q, s) => {
+    const sk = gw.skills.get(q.params.name);
+    if (!sk) {
+      s.status(404).json({ error: `Skill not found: ${q.params.name}` });
+      return;
+    }
+    s.json({
+      ...sk,
+      bundled: !sk.dir.startsWith(gw.paths.skillsDir),
+      validation: gw.skills.validate(q.params.name),
+    });
+  });
+  r.post("/skills", (q, s) => {
+    try {
+      const { name, description, riskLevel, requirements } = q.body ?? {};
+      if (!name || !description) {
+        s.status(400).json({ error: "name and description are required." });
+        return;
+      }
+      const sk = gw.skills.generate({ name, description, riskLevel, requirements });
+      s.json({ ...sk, note: "Skill generated DISABLED. Review permissions, then enable it." });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/skills/install", async (q, s) => {
+    try {
+      const url = q.body?.url;
+      if (!url) {
+        s.status(400).json({ error: "url is required." });
+        return;
+      }
+      const res = await gw.skills.installFromGit(url);
+      s.json({ ...res, note: "Cloned DISABLED. Review permissions, then enable it." });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/skills/:name/run", async (q, s) => {
+    try {
+      const { tool, input } = q.body ?? {};
+      if (!tool) {
+        s.status(400).json({ error: "tool is required." });
+        return;
+      }
+      const result = await gw.skills.run(q.params.name, tool, input ?? {});
+      s.json({ result });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/skills/:name", (q, s) => {
+    try {
+      s.json({ removed: gw.skills.uninstall(q.params.name) });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.post("/skills/:name/enable", (q, s) => {
     try {
       s.json(gw.skills.setEnabled(q.params.name, true));
@@ -211,11 +389,231 @@ function mountDashboardApi(app: express.Express, gw: Gateway, dashToken: string)
       s.status(400).json({ error: (e as Error).message });
     }
   });
-  r.post("/skills/:name/disable", (q, s) => s.json(gw.skills.setEnabled(q.params.name, false)));
+  r.post("/skills/:name/disable", (q, s) => {
+    try {
+      s.json(gw.skills.setEnabled(q.params.name, false));
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.get("/projects", (_q, s) => s.json(gw.projects.list()));
+  r.post("/projects", (q, s) => {
+    try {
+      const { path: projectPath, name } = q.body ?? {};
+      if (!projectPath) {
+        s.status(400).json({ error: "path is required." });
+        return;
+      }
+      s.json(gw.projects.register(projectPath, name));
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/projects/:id", (q, s) => s.json({ removed: gw.projects.unregister(q.params.id) }));
   r.get("/secrets", (_q, s) => s.json({ names: gw.vault.list() }));
+  r.post("/secrets", (q, s) => {
+    try {
+      const { name, value } = q.body;
+      if (!name || !value) {
+        s.status(400).json({ error: "Name and value are required." });
+        return;
+      }
+      gw.vault.set(name, value);
+      s.json({ ok: true });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/secrets/:name", (q, s) => {
+    try {
+      const ok = gw.vault.remove(q.params.name);
+      s.json({ ok });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/config", (q, s) => {
+    try {
+      const current = gw.config();
+      const next = mergeConfig(current, q.body);
+      const parsed = ConfigSchema.parse(next);
+      const saved = gw.saveConfig(parsed);
+      s.json(saved);
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
   r.get("/agents", async (_q, s) => s.json(await gw.agents.list()));
+  r.post("/agents/:name/enable", async (q, s) => setAgentEnabled(gw, q.params.name, true, s));
+  r.post("/agents/:name/disable", async (q, s) => setAgentEnabled(gw, q.params.name, false, s));
+  r.post("/agents/run", async (q, s) => {
+    try {
+      const { agent, projectId, task, mode } = q.body ?? {};
+      if (!agent || !projectId || !task) {
+        s.status(400).json({ error: "agent, projectId and task are required." });
+        return;
+      }
+      if (mode === "execute") {
+        s.json(await gw.agents.startTask(agent, projectId, task));
+      } else {
+        s.json(await gw.agents.plan(agent, projectId, task));
+      }
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.get("/agents/tasks", (_q, s) => s.json(gw.agents.listTasks()));
+  r.get("/agents/tasks/:id/logs", (q, s) => {
+    try {
+      s.json({ logs: gw.agents.getLogs(q.params.id) });
+    } catch (e) {
+      s.status(404).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/agents/tasks/:id/stop", (q, s) => {
+    try {
+      s.json(gw.agents.stopTask(q.params.id));
+    } catch (e) {
+      s.status(404).json({ error: (e as Error).message });
+    }
+  });
+
+  r.get("/mcp-servers", (_q, s) => {
+    const servers = gw.config().mcpServers;
+    s.json(
+      Object.entries(servers).map(([name, cfg]) => ({
+        name,
+        command: cfg.command,
+        args: cfg.args,
+        transport: cfg.transport,
+        enabled: cfg.enabled,
+      })),
+    );
+  });
+  r.post("/mcp-servers", (q, s) => {
+    try {
+      const { name, command, args, enabled } = q.body ?? {};
+      if (!name || !command) {
+        s.status(400).json({ error: "name and command are required." });
+        return;
+      }
+      const cfg = gw.config();
+      const argList = Array.isArray(args) ? args : typeof args === "string" && args.trim() ? args.trim().split(/\s+/) : [];
+      gw.saveConfig({
+        ...cfg,
+        mcpServers: {
+          ...cfg.mcpServers,
+          [name]: { command, args: argList, transport: "stdio", enabled: enabled !== false },
+        },
+      });
+      s.json({ ok: true });
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
+    }
+  });
+  r.delete("/mcp-servers/:name", (q, s) => {
+    const cfg = gw.config();
+    if (!cfg.mcpServers[q.params.name]) {
+      s.status(404).json({ error: `Unknown MCP server: ${q.params.name}` });
+      return;
+    }
+    const next = { ...cfg.mcpServers };
+    delete next[q.params.name];
+    gw.saveConfig({ ...cfg, mcpServers: next });
+    s.json({ removed: true });
+  });
+  r.post("/mcp-servers/:name/enable", (q, s) => setMcpServerEnabled(gw, q.params.name, true, s));
+  r.post("/mcp-servers/:name/disable", (q, s) => setMcpServerEnabled(gw, q.params.name, false, s));
+  r.post("/mcp-servers/:name/test", async (q, s) => {
+    try {
+      const tools = await gw.bridge.listTools(q.params.name);
+      s.json({ ok: true, tools: tools.map((t) => t.name) });
+    } catch (e) {
+      s.json({ ok: false, reason: (e as Error).message });
+    }
+  });
+
+  r.get("/tunnel", (_q, s) => s.json(gw.tunnel.current()));
+  r.post("/tunnel/test", async (_q, s) => {
+    const t = gw.tunnel.current();
+    if (!t.url) {
+      s.json({ reachable: false, reason: "No tunnel URL — start the tunnel first." });
+      return;
+    }
+    const target = `${t.url.replace(/\/$/, "")}/healthz`;
+    const started = Date.now();
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const resp = await fetch(target, { signal: ctrl.signal });
+      clearTimeout(timer);
+      s.json({ reachable: resp.ok, status: resp.status, ms: Date.now() - started, url: target });
+    } catch (e) {
+      s.json({ reachable: false, ms: Date.now() - started, url: target, reason: (e as Error).message });
+    }
+  });
+  r.post("/tunnel/restart", async (_q, s) => {
+    try {
+      s.json(await gw.restartTunnel());
+    } catch (e) {
+      s.status(500).json({ error: (e as Error).message });
+    }
+  });
+  r.post("/tunnel/stop", (_q, s) => {
+    gw.tunnel.stop();
+    s.json(gw.tunnel.current());
+  });
+  r.post("/tunnel/start", async (_q, s) => {
+    try {
+      s.json(await gw.tunnel.start(gw.gatewayPort()));
+    } catch (e) {
+      s.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   app.use("/api", r);
+}
+
+/** Toggle a coding agent's `enabled` flag in config; 404 if the agent is unknown. */
+async function setAgentEnabled(gw: Gateway, name: string, enabled: boolean, s: Response): Promise<void> {
+  const cfg = gw.config();
+  const agent = cfg.codingAgents[name];
+  if (!agent) {
+    s.status(404).json({ error: `Unknown coding agent: ${name}` });
+    return;
+  }
+  gw.saveConfig({
+    ...cfg,
+    codingAgents: { ...cfg.codingAgents, [name]: { ...agent, enabled } },
+  });
+  s.json(await gw.agents.list());
+}
+
+/** Toggle a downstream MCP server's `enabled` flag in config; 404 if unknown. */
+function setMcpServerEnabled(gw: Gateway, name: string, enabled: boolean, s: Response): void {
+  const cfg = gw.config();
+  const server = cfg.mcpServers[name];
+  if (!server) {
+    s.status(404).json({ error: `Unknown MCP server: ${name}` });
+    return;
+  }
+  gw.saveConfig({
+    ...cfg,
+    mcpServers: { ...cfg.mcpServers, [name]: { ...server, enabled } },
+  });
+  s.json({ ok: true, enabled });
+}
+
+function mergeConfig(current: any, update: any): any {
+  const next = { ...current };
+  for (const key of Object.keys(update)) {
+    if (update[key] !== null && typeof update[key] === "object" && !Array.isArray(update[key])) {
+      next[key] = mergeConfig(next[key] || {}, update[key]);
+    } else {
+      next[key] = update[key];
+    }
+  }
+  return next;
 }
 
 function listen(app: express.Express, port: number, host: string): Promise<http.Server> {

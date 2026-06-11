@@ -242,6 +242,20 @@ export class SkillRuntime {
     return state;
   }
 
+  /** Clone a skill repo into the skills directory (saved disabled). */
+  async installFromGit(url: string): Promise<{ installed: string; valid: { valid: boolean; errors: string[] } }> {
+    const name = (url.split("/").pop() ?? "skill").replace(/\.git$/, "");
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) {
+      throw new Error(`Cannot derive a safe skill name from '${url}'. Expected the repo to end in a kebab-case name.`);
+    }
+    const dest = path.join(this.paths.skillsDir, name);
+    if (fs.existsSync(dest)) throw new Error(`Skill '${name}' already exists.`);
+    const res = await execFileSafe("git", ["clone", "--depth", "1", url, dest], { timeoutMs: 120_000 });
+    if (res.code !== 0) throw new Error(`git clone failed: ${res.stderr || res.stdout}`.trim());
+    const s = this.get(name);
+    return { installed: name, valid: s ? this.validate(name) : { valid: false, errors: ["manifest missing"] } };
+  }
+
   uninstall(name: string): boolean {
     const skill = this.get(name);
     if (!skill) return false;

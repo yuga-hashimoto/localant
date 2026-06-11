@@ -3,8 +3,31 @@
 The full threat model and controls live in [../SECURITY.md](../SECURITY.md).
 Highlights:
 
-- **Default deny** for filesystem, shell, network, secrets, browser, adb, git, agent.
-- **Risk levels 0–4**; risk 2+ requires local approval, risk 4 requires double approval.
+## Modes
+
+- **`open`** (default) — deny-list model for personal single-user machines.
+  No directory/command allow-list; everything is permitted except the sensitive
+  blocklist and core blocked tokens. Only risk-4 (destructive/publish) actions
+  need approval.
+- **`strict`** — allow-list model for shared/multi-user environments. Only
+  allowed directories and commands; risk 2+ requires approval.
+- **`yolo`** — deny-list with no approval gates at all. Trusted automation only.
+
+Switch modes in the dashboard **Settings** tab or with
+`localant config set security.mode <mode>`.
+
+## Always enforced (every mode)
+
+- **Sensitive-path blocklist** (`~/.ssh`, `~/.aws`, `~/.gnupg`, `/etc`, `/var`,
+  Keychains, `C:\Windows`, …) — never readable/writable, even in `open`/`yolo`.
+- **Core blocked commands** — `sudo`, `su`, `dd`, `mkfs`, `fdisk`, `diskutil`,
+  `shutdown`, `reboot`, plus `rm -rf` / `chmod 777` — always rejected and cannot
+  be removed from the blocklist.
+
+## Other controls
+
+- **Risk levels 0–4**; in `strict`, risk 2+ requires local approval, risk 4
+  requires double approval. In `open`, only risk 4 requires approval.
 - **Local approval** via dashboard, CLI (`approvals`), or `approval_*` tools —
   ChatGPT's confirmation is never trusted alone.
 - **Path/symlink guards** and a sensitive-path blocklist (`~/.ssh`, `~/.aws`,
@@ -22,4 +45,6 @@ Highlights:
 - Keep the MCP URL/token private; rotate by deleting `token` in the config dir
   and restarting (you'll re-add the connector).
 - Review skills before enabling; check the permission manifest and risk level.
-- Keep `allowedDirectories` tight — add project dirs, not your whole home.
+- In `strict` mode, keep `allowedDirectories` tight — add project dirs, not your
+  whole home. In `open` mode the allow-list is ignored; rely on the blocklist.
+- On a shared machine, switch to `strict`.
