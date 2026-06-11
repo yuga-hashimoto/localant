@@ -33,7 +33,7 @@ LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashbo
   ├─ Shell · Filesystem · Git (deny-list by default · allow-list in strict mode)
   ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
   ├─ Browser (Playwright, isolated profile) · Android (ADB)
-  ├─ Articles (Zenn / Qiita / note) · Custom Skills
+  ├─ Articles (Zenn / Qiita / note, via skill) · Custom Skills
   └─ Adapters: OpenClaw · Desktop Commander · any MCP server
 ```
 

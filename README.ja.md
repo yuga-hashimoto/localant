@@ -34,7 +34,7 @@ LocalAnt  ── ゲートウェイ · リスクエンジン · 承認キュー 
   ├─ シェル · ファイルシステム · Git（既定は deny-list・strict モードで allow-list）
   ├─ Claude Code / Codex（計画 → 承認 → 実行 → 検証 → 差分）
   ├─ ブラウザ（Playwright・分離プロファイル）· Android（ADB）
-  ├─ 記事（Zenn / Qiita / note）· カスタムスキル
+  ├─ 記事（Zenn / Qiita / note・スキルで提供）· カスタムスキル
   └─ アダプタ: OpenClaw · Desktop Commander · 任意の MCP サーバ
 ```
 
