@@ -67,15 +67,13 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
       } else {
         if (!opts.quiet) process.stdout.write(c.red("failed (unreachable)\n"));
         const m = (tunnel.error || "").match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
-        registrationUrl = m ? m[0] : await getServeoRegistrationUrl();
+        registrationUrl = m ? m[0] : (cfg.tunnel.provider === "serveo" ? await getServeoRegistrationUrl() : undefined);
       }
     } else {
       if (!opts.quiet) process.stdout.write(c.yellow("unavailable\n"));
       console.log(warn(tunnel.error ?? "Tunnel not started."));
       const m = (tunnel.error || "").match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
-      if (m) {
-        registrationUrl = m[0];
-      }
+      registrationUrl = m ? m[0] : (cfg.tunnel.provider === "serveo" ? await getServeoRegistrationUrl() : undefined);
     }
 
     // もしキー登録が必要であれば、登録するまでCLI上で待機ループに入る

@@ -2,7 +2,6 @@ import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import readline from "node:readline";
 
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 const wrap = (code: number) => (s: string) => (useColor ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -88,40 +87,9 @@ export function ensureSshKey(): Promise<void> {
       resolve();
     });
 
-    child.on("close", async (code) => {
+    child.on("close", (code) => {
       if (code === 0) {
         console.log(ok("SSH key generated successfully at ~/.ssh/id_ed25519"));
-
-        try {
-          const pubKeyPath = `${keyPath}.pub`;
-          const fingerprintOutput = execSync(`ssh-keygen -lf "${pubKeyPath}"`, { encoding: "utf8" });
-          const m = fingerprintOutput.match(/SHA256:([^\s]+)/);
-          if (m) {
-            const fingerprint = `SHA256:${m[1]}`;
-            const registerUrl = `https://console.serveo.net/ssh/keys?add=${encodeURIComponent(fingerprint)}`;
-
-            console.log("\n" + c.bold("🔑 Action Required: Register SSH Key with Serveo"));
-            console.log(c.cyan(`To request custom subdomains, serveo.net requires SSH key registration.`));
-            console.log(c.cyan(`Opening registration page in your default browser:`));
-            console.log(`  ${registerUrl}\n`);
-
-            openBrowser(registerUrl);
-
-            const rl = readline.createInterface({
-              input: process.stdin,
-              output: process.stdout,
-            });
-            await new Promise<void>((res) => {
-              rl.question(c.bold("Press [Enter] after you have registered the key to continue..."), () => {
-                rl.close();
-                res();
-              });
-            });
-            console.log(ok("Continuing setup…\n"));
-          }
-        } catch (err) {
-          console.log(warn(`Could not determine SSH fingerprint: ${(err as Error).message}`));
-        }
       } else {
         console.log(warn(`ssh-keygen exited with code ${code}`));
         console.log(warn("If you plan to use the serveo tunnel, please run 'ssh-keygen' manually."));
