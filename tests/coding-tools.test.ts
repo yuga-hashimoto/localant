@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createGateway } from "@localant/gateway";
@@ -44,7 +45,10 @@ describe("bash tool", () => {
 
   it("respects cwd PathGuard (blocklisted path rejected)", async () => {
     const g = gw();
-    const res = await g.executeTool("bash", { command: "ls", cwd: "/etc" }, { caller: "test" });
+    // ~/.ssh is in the sensitive blocklist on every platform (unlike /etc, which
+    // doesn't exist on Windows).
+    const blocked = path.join(os.homedir(), ".ssh");
+    const res = await g.executeTool("bash", { command: "ls", cwd: blocked }, { caller: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/blocklist|allowed/i);
   });

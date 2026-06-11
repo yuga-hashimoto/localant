@@ -78,7 +78,10 @@ describe("Gateway tool pipeline", () => {
 
   it("rejects filesystem access outside the allowlist", async () => {
     const g = gw();
-    const res = await g.executeTool("fs_read_file", { path: "/etc/hosts" }, { caller: "test" });
+    // ~/.ssh is in the sensitive blocklist on every platform (unlike /etc/hosts,
+    // which does not exist on Windows and would surface as ENOENT instead).
+    const blocked = path.join(os.homedir(), ".ssh", "id_rsa");
+    const res = await g.executeTool("fs_read_file", { path: blocked }, { caller: "test" });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/allowed directories|blocklist/i);
   });
