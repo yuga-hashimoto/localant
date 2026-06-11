@@ -5,4 +5,4 @@
  * process (see CONTRIBUTING.md → Releasing). Importing the version from here
  * avoids hardcoded, drifting `"1.0.0"` strings scattered across packages.
  */
-export const APP_VERSION = "1.0.2";
+export const APP_VERSION = "1.1.0";

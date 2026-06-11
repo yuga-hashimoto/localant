@@ -6,6 +6,48 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-06-11
+
+### Added
+- **ChatGPT-native local coding-agent runtime.** Codex / Claude Code / OpenCode
+  style tools so ChatGPT can read, search, edit, run, test and diff a local
+  project over MCP — all behind the existing approval/audit/redaction pipeline,
+  PathGuard and CommandGuard. Existing tool names are preserved.
+  - Editing: `read`/`write`/`edit`/`multi_edit`/`apply_patch`/`grep`/`glob` plus
+    `move_file`/`copy_file`/`create_directory`/`delete_file` and aliases.
+  - Shell: `bash` (real shell via `bash -c`, screened by CommandGuard + PathGuard,
+    risk 3) and tracked background processes (`shell_run_background`/
+    `shell_get_output`/`shell_stop`), `command_exists`.
+  - Git: `git_add`/`git_reset`/`git_reset_hard`/`git_stash`/`git_clean_preview`/
+    `git_apply_patch`/`git_get_current_branch`/`git_is_dirty` + checkout aliases.
+  - Project validation: `project_run_tests`/`lint`/`typecheck`/`format`/`build`/
+    `validation` and `project_get_package_scripts` (package-manager auto-detect).
+  - Code intelligence: real TypeScript LanguageService LSP (`lsp_document_symbols`/
+    `go_to_definition`/`find_references`/`hover`/`rename`) + `lsp_diagnostics`.
+  - Agent delegation: `agent_run` + `agent_*` aliases over `coding_agent_*`.
+  - Control: `secret_set`/`secret_get_names`/`secret_remove`, `tunnel_start`/
+    `stop`/`restart`, `permission_get`/`set`, `risk_policy_get`/`set`,
+    `approval_request`.
+- **`coding` tool profile** (minimal ⊂ coding ⊂ full) and CLI `localant tools
+  list` / `localant tools profile <name>`, plus `localant agents` / `localant mcp`
+  commands and new dashboard API routes.
+- **Streamable HTTP MCP** downstream transport and `mcp_import_*` (import MCP
+  servers from Claude Code / Codex / OpenCode configs; imported servers start
+  disabled).
+
+### Changed
+- **Config/data directory moved to `~/.localant`** on every platform (override
+  with `LOCALANT_HOME`). A pre-1.x install under `~/Library/Application
+  Support/LocalAnt` / `~/.config/LocalAnt` is migrated automatically on first run
+  (token, vault key, secrets, config, serveo registration, audit preserved).
+
+### Removed
+- Tools that merely duplicate ChatGPT's native abilities — `websearch`,
+  `webfetch`, `todowrite`/`todo_*`/`plan_*`/`task_*`, `question`/`ask_user`.
+  LocalAnt exposes only what it *uniquely* provides (local files, shell, git,
+  toolchain, LSP, browser, device, agents). `approval_approve`/`approval_deny`
+  are kept out of the `coding` profile so ChatGPT cannot self-approve.
+
 ### Security
 - **Dashboard CSRF / DNS-rebinding protection**: `/api/*` now requires a
   per-process token embedded only in the served HTML, and rejects non-local

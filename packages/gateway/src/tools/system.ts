@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { ConfigSchema } from "@localant/shared";
+import { ConfigSchema, APP_VERSION } from "@localant/shared";
 import type { Gateway } from "../gateway.js";
 
-const VERSION = "1.0.0";
+const VERSION = APP_VERSION;
 
 export function registerSystemTools(gw: Gateway): void {
   const r = gw.registry;
