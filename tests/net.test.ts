@@ -19,8 +19,19 @@ afterEach(() => {
 
 describe("findAvailablePort", () => {
   it("returns the preferred port when it is free", async () => {
-    const port = await findAvailablePort(49230, "127.0.0.1");
-    expect(port).toBe(49230);
+    // Discover a genuinely free port at runtime (a hardcoded port can be taken
+    // by an unrelated process on the test machine).
+    const free = await new Promise<number>((resolve, reject) => {
+      const s = net.createServer();
+      s.once("error", reject);
+      s.listen(0, "127.0.0.1", () => {
+        const addr = s.address();
+        const p = typeof addr === "object" && addr ? addr.port : 0;
+        s.close(() => resolve(p));
+      });
+    });
+    const port = await findAvailablePort(free, "127.0.0.1");
+    expect(port).toBe(free);
   });
 
   it("falls back to the next free port when the preferred one is busy", async () => {

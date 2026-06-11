@@ -1,14 +1,19 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { Config } from "@localant/shared";
 import { createLogger } from "@localant/shared";
 
 const log = createLogger("mcp-bridge");
 
+interface Closable {
+  close: () => Promise<void>;
+}
+
 interface BridgeServer {
   name: string;
   client: Client;
-  transport: StdioClientTransport;
+  transport: Closable;
   tools: { name: string; description?: string; inputSchema?: Record<string, unknown> }[];
   connected: boolean;
 }
@@ -21,7 +26,10 @@ interface BridgeServer {
 export class McpBridge {
   private servers = new Map<string, BridgeServer>();
 
-  constructor(private readonly config: () => Config) {}
+  constructor(
+    private readonly config: () => Config,
+    private readonly resolveSecret?: (name: string) => string | undefined,
+  ) {}
 
   /** Connect to a registered stdio server lazily. */
   private async connect(name: string): Promise<BridgeServer> {
@@ -33,10 +41,24 @@ export class McpBridge {
     if (!cfg.enabled) throw new Error(`MCP server '${name}' is disabled.`);
 
     const client = new Client({ name: "localant-bridge", version: "1.0.0" });
-    const transport = new StdioClientTransport({ command: cfg.command, args: cfg.args });
+    let transport: Closable;
+    if (cfg.transport === "streamable-http") {
+      if (!cfg.url) throw new Error(`MCP server '${name}' has no url.`);
+      const headers: Record<string, string> = { ...(cfg.headers ?? {}) };
+      if (cfg.bearerTokenSecretName && this.resolveSecret) {
+        const token = this.resolveSecret(cfg.bearerTokenSecretName);
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+      }
+      transport = new StreamableHTTPClientTransport(new URL(cfg.url), {
+        requestInit: Object.keys(headers).length ? { headers } : undefined,
+      }) as unknown as Closable;
+    } else {
+      if (!cfg.command) throw new Error(`MCP server '${name}' has no command.`);
+      transport = new StdioClientTransport({ command: cfg.command, args: cfg.args }) as unknown as Closable;
+    }
 
     try {
-      await client.connect(transport);
+      await client.connect(transport as unknown as Parameters<Client["connect"]>[0]);
       const tools = await this.listToolsFrom(client);
 
       const server: BridgeServer = { name, client, transport, tools, connected: true };

@@ -53,6 +53,29 @@ export class GitManager {
     return this.git(repo, ["restore", "--", file]);
   }
 
+  add(repo: string, paths: string[]): Promise<string> {
+    const args = paths.length ? paths : ["-A"];
+    return this.git(repo, ["add", ...args]);
+  }
+  reset(repo: string, mode: "soft" | "mixed" | "hard", ref = "HEAD"): Promise<string> {
+    return this.git(repo, ["reset", `--${mode}`, ref]);
+  }
+  stash(repo: string, message?: string): Promise<string> {
+    return this.git(repo, ["stash", "push", ...(message ? ["-m", message] : [])]);
+  }
+  /** Preview what `git clean` would remove (never deletes). */
+  cleanPreview(repo: string): Promise<string> {
+    return this.git(repo, ["clean", "-nd"]);
+  }
+  async applyPatch(repo: string, patch: string): Promise<string> {
+    const cwd = this.guard.assertAccess(repo, "write");
+    const check = await execFileSafe("git", ["apply", "--check", "-"], { cwd, input: patch, timeoutMs: 30_000 });
+    if (check.code !== 0) throw new Error(`git apply --check failed: ${check.stderr || check.stdout}`.trim());
+    const res = await execFileSafe("git", ["apply", "-"], { cwd, input: patch, timeoutMs: 30_000 });
+    if (res.code !== 0) throw new Error(`git apply failed: ${res.stderr || res.stdout}`.trim());
+    return "applied";
+  }
+
   async isDirty(repo: string): Promise<boolean> {
     const out = await this.listChangedFiles(repo);
     return out.trim().length > 0;

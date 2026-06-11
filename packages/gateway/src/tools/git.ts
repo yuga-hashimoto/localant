@@ -92,4 +92,79 @@ export function registerGitTools(gw: Gateway): void {
     summarize: (i) => `git restore ${i.file}`,
     handler: async (i) => ({ output: await gw.git.restoreFile(resolveRepo(gw, i.repo), i.file) }),
   });
+
+  r.register({
+    name: "git_add",
+    description: "Stage files (git add). Stages everything when no paths given.",
+    risk: 2,
+    inputSchema: z.object({ repo: z.string(), paths: z.array(z.string()).default([]) }),
+    summarize: (i) => `git add ${i.paths.length ? i.paths.join(" ") : "-A"}`,
+    handler: async (i) => ({ output: await gw.git.add(resolveRepo(gw, i.repo), i.paths) }),
+  });
+
+  r.register({
+    name: "git_reset",
+    description: "git reset --soft|--mixed|--hard. Hard reset is destructive (risk 4).",
+    // The schema can't change risk per-call, so register hard as a separate
+    // risk-4 path; this tool covers soft/mixed only.
+    risk: 2,
+    inputSchema: z.object({
+      repo: z.string(),
+      mode: z.enum(["soft", "mixed"]).default("mixed"),
+      ref: z.string().default("HEAD"),
+    }),
+    summarize: (i) => `git reset --${i.mode} ${i.ref}`,
+    handler: async (i) => ({ output: await gw.git.reset(resolveRepo(gw, i.repo), i.mode, i.ref) }),
+  });
+
+  r.register({
+    name: "git_reset_hard",
+    description: "git reset --hard (DESTRUCTIVE: discards commits and working-tree changes).",
+    risk: 4,
+    inputSchema: z.object({ repo: z.string(), ref: z.string().default("HEAD") }),
+    summarize: (i) => `git reset --hard ${i.ref}`,
+    handler: async (i) => ({ output: await gw.git.reset(resolveRepo(gw, i.repo), "hard", i.ref) }),
+  });
+
+  r.register({
+    name: "git_stash",
+    description: "Stash working-tree changes (git stash push).",
+    risk: 2,
+    inputSchema: z.object({ repo: z.string(), message: z.string().optional() }),
+    summarize: () => `git stash`,
+    handler: async (i) => ({ output: await gw.git.stash(resolveRepo(gw, i.repo), i.message) }),
+  });
+
+  r.register({
+    name: "git_clean_preview",
+    description: "Preview files that 'git clean' would remove (does NOT delete anything).",
+    risk: 0,
+    inputSchema: repoArg,
+    handler: async (i) => ({ output: await gw.git.cleanPreview(resolveRepo(gw, i.repo)) }),
+  });
+
+  r.register({
+    name: "git_apply_patch",
+    description: "Apply a unified diff to the repo (git apply, with a dry-run check first).",
+    risk: 2,
+    inputSchema: z.object({ repo: z.string(), patch: z.string() }),
+    summarize: () => `git apply patch`,
+    handler: async (i) => ({ output: await gw.git.applyPatch(resolveRepo(gw, i.repo), i.patch) }),
+  });
+
+  r.register({
+    name: "git_get_current_branch",
+    description: "Get the current branch name.",
+    risk: 0,
+    inputSchema: repoArg,
+    handler: async (i) => ({ branch: await gw.git.currentBranch(resolveRepo(gw, i.repo)) }),
+  });
+
+  r.register({
+    name: "git_is_dirty",
+    description: "Report whether the working tree has uncommitted changes.",
+    risk: 0,
+    inputSchema: repoArg,
+    handler: async (i) => ({ dirty: await gw.git.isDirty(resolveRepo(gw, i.repo)) }),
+  });
 }

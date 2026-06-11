@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
-import { APP_VERSION, ConfigSchema } from "@localant/shared";
+import { APP_VERSION, ConfigSchema, isToolInProfile } from "@localant/shared";
 import { c, ok, warn, fail, openBrowser, promptYesNo } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
@@ -372,6 +372,116 @@ configCmd
       console.log(fail(`Invalid configuration: ${(e as Error).message}`));
     }
   });
+
+// ---------- tools ----------
+const toolsCmd = program.command("tools").description("Inspect and switch the exposed tool profile");
+toolsCmd
+  .command("list")
+  .description("List tools exposed under the active profile")
+  .action(() => {
+    const gw = createGateway();
+    const profile = gw.config().tools.profile;
+    const tools = gw.registry.list().filter((t) => isToolInProfile(t.name, profile));
+    console.log(c.bold(`Profile: ${profile} (${tools.length} tools)`));
+    for (const t of tools) console.log(`  ${t.name} ${c.gray(`[risk ${t.risk}]`)}`);
+  });
+toolsCmd
+  .command("profile [name]")
+  .description("Show or set the tool profile (minimal|coding|full)")
+  .action((name?: string) => {
+    const gw = createGateway();
+    if (!name) {
+      console.log(`Current tool profile: ${c.bold(gw.config().tools.profile)}`);
+      return;
+    }
+    if (!["minimal", "coding", "full"].includes(name)) {
+      return console.log(fail("Profile must be one of: minimal, coding, full"));
+    }
+    gw.saveConfig({ ...gw.config(), tools: { profile: name as "minimal" | "coding" | "full" } });
+    console.log(ok(`Tool profile set to '${name}'. Restart the gateway for it to take effect.`));
+  });
+
+// ---------- agents ----------
+const agentsCmd = program.command("agents").description("Manage local coding agents");
+agentsCmd.command("list").action(async () => {
+  const gw = createGateway();
+  for (const a of await gw.agents.list()) {
+    console.log(`${c.bold(a.agent)} ${a.available ? ok("available") : c.gray("not installed")}`);
+  }
+});
+agentsCmd
+  .command("detect")
+  .description("Detect which configured agents have their CLI installed")
+  .action(async () => {
+    const gw = createGateway();
+    for (const a of await gw.agents.list()) console.log(`${a.agent}: ${a.available ? "yes" : "no"}`);
+  });
+agentsCmd
+  .command("run <agent> <projectId> <task>")
+  .option("--execute", "execute (default: plan only)")
+  .action(async (agent, projectId, task, o) => {
+    const gw = createGateway();
+    try {
+      const res = o.execute
+        ? await gw.agents.startTask(agent, projectId, task, { createBranch: true })
+        : await gw.agents.plan(agent, projectId, task);
+      console.log(JSON.stringify(res, null, 2));
+    } catch (e) {
+      console.log(fail((e as Error).message));
+    }
+  });
+agentsCmd.command("logs <taskId>").action((taskId) => {
+  const gw = createGateway();
+  console.log(gw.agents.getLogs(taskId));
+});
+agentsCmd.command("stop <taskId>").action((taskId) => {
+  const gw = createGateway();
+  console.log(JSON.stringify(gw.agents.stopTask(taskId)));
+});
+
+// ---------- mcp ----------
+const mcpCmd = program.command("mcp").description("Manage downstream MCP servers");
+mcpCmd.command("list").action(() => {
+  const gw = createGateway();
+  const servers = gw.config().mcpServers;
+  const names = Object.keys(servers);
+  if (!names.length) return console.log("No MCP servers registered.");
+  for (const name of names) {
+    const s = servers[name]!;
+    console.log(`${c.bold(name)} ${c.gray(`[${s.transport}]`)} ${s.enabled ? ok("enabled") : c.gray("disabled")}`);
+  }
+});
+mcpCmd.command("test <name>").action(async (name) => {
+  const gw = createGateway();
+  try {
+    const tools = await gw.bridge.listTools(name);
+    console.log(ok(`${name}: ${tools.length} tools`));
+    for (const t of tools) console.log(`  ${t.name}`);
+  } catch (e) {
+    console.log(fail((e as Error).message));
+  }
+});
+mcpCmd
+  .command("import-all")
+  .description("Import MCP servers from Claude Code / Codex / OpenCode configs (disabled by default)")
+  .action(async () => {
+    const gw = createGateway();
+    const res = await gw.executeTool("mcp_import_all_agent_configs", {}, { caller: "cli" });
+    console.log(JSON.stringify(res.data ?? res.error, null, 2));
+  });
+
+// ---------- todos ----------
+const todosCmd = program.command("todos").description("Inspect ChatGPT's working todo list");
+todosCmd.command("list").action(() => {
+  const gw = createGateway();
+  const todos = gw.todos.listTodos();
+  if (!todos.length) return console.log("No todos.");
+  for (const t of todos) console.log(`[${t.status}] ${t.content}`);
+});
+todosCmd.command("clear").action(() => {
+  const gw = createGateway();
+  console.log(ok(`Cleared ${gw.todos.clearTodos().cleared} todos.`));
+});
 
 function ensureWorkspace(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });

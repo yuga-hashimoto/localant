@@ -629,9 +629,10 @@ const VIEWS = {
       +'<div class="field"><label>Tool profile</label>'
         +'<select id="toolProfile" style="width:160px">'
           +'<option value="minimal"'+(((c.tools&&c.tools.profile)||'minimal')==='minimal'?' selected':'')+'>minimal (default)</option>'
+          +'<option value="coding"'+((c.tools&&c.tools.profile)==='coding'?' selected':'')+'>coding</option>'
           +'<option value="full"'+((c.tools&&c.tools.profile)==='full'?' selected':'')+'>full</option>'
         +'</select>'
-        +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files/projects, and the control plane. Sharper tool selection. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
+        +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files/projects, and the control plane. <b>coding</b>: use ChatGPT as a local coding agent — read/edit/apply_patch, grep/glob, bash, git, project validation, todo/plan, agent delegation. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
       +'</div>'
       +'</div>'
 

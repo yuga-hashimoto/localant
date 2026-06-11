@@ -112,12 +112,27 @@ const CodingAgentConfig = z.object({
 });
 export type CodingAgentConfig = z.infer<typeof CodingAgentConfig>;
 
-const McpServerConfig = z.object({
-  command: z.string(),
-  args: z.array(z.string()).default([]),
-  transport: z.enum(["stdio"]).default("stdio"),
-  enabled: z.boolean().default(false),
-});
+const McpServerConfig = z
+  .object({
+    transport: z.enum(["stdio", "streamable-http"]).default("stdio"),
+    // stdio transport
+    command: z.string().optional(),
+    args: z.array(z.string()).default([]),
+    // streamable-http transport
+    url: z.string().optional(),
+    headers: z.record(z.string(), z.string()).optional(),
+    bearerTokenSecretName: z.string().optional(),
+    enabled: z.boolean().default(false),
+  })
+  .superRefine((cfg, ctx) => {
+    if (cfg.transport === "stdio" && !cfg.command) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "stdio transport requires `command`" });
+    }
+    if (cfg.transport === "streamable-http" && !cfg.url) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "streamable-http transport requires `url`" });
+    }
+  });
+export type McpServerConfigT = z.infer<typeof McpServerConfig>;
 
 export const ConfigSchema = z.object({
   version: z.literal(1).default(1),
@@ -226,7 +241,7 @@ export const ConfigSchema = z.object({
       // small core (Shell / coding Agent / Skill pillars + read-only fs/project
       // + control plane); `full` advertises every registered tool. See
       // tool-profiles.ts. Defaults to `minimal` to keep tool-selection sharp.
-      profile: z.enum(["minimal", "full"]).default("minimal"),
+      profile: z.enum(["minimal", "coding", "full"]).default("minimal"),
     })
     .default({ profile: "minimal" }),
   mcpServers: z.record(z.string(), McpServerConfig).default({}),

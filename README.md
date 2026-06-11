@@ -74,6 +74,50 @@ and audit.
 - 🌐 **3-minute setup** with Cloudflare Tunnel / ngrok and clipboard copy.
 - 🔌 **Adapters** for OpenClaw, Desktop Commander, and arbitrary MCP servers.
 
+## ChatGPT as a local coding agent
+
+LocalAnt is also a **ChatGPT-native local coding-agent runtime**. ChatGPT can
+read, search, edit, run, test, and diff a project on your machine through MCP —
+behind the same approval / audit / security pipeline as everything else.
+
+It exposes the standard **Codex / Claude Code / OpenCode**-style tool names:
+
+| Category | Tools |
+|----------|-------|
+| Read / search | `read` · `read_file_range` · `grep` · `glob` · `list_files` · `get_file_info` |
+| Edit | `write` · `edit` · `multi_edit` · `apply_patch` · `move_file` · `copy_file` · `create_directory` · `delete_file` |
+| Run | `bash` · `shell_run_background` · `shell_get_output` · `shell_stop` · `command_exists` |
+| Git | `git_status` · `git_diff` · `git_add` · `git_commit` · `git_restore` · `git_stash` · `git_reset` · `git_apply_patch` · `git_is_dirty` |
+| Validate | `project_run_tests` · `project_run_lint` · `project_run_typecheck` · `project_run_build` · `project_run_validation` · `project_get_package_scripts` |
+| Plan | `todowrite` · `todo_list` · `plan_create` · `task_create` |
+| Human | `question` · `ask_user` · `approval_request` |
+| Web / LSP | `webfetch` · `websearch` · `lsp_status` · `lsp_diagnostics` |
+| Delegate | `agent_run` (claude-code · codex · opencode · openclaw · antigravity-cli · hermes-agent) |
+
+`bash` runs through a real shell (pipelines and `&&` work) **but** every command
+is screened by CommandGuard (blocked tokens, `rm -rf`, …), the `cwd` is validated
+by PathGuard, and the call is gated by the security mode (approval in `strict`,
+audited-but-ungated in `open`, ungated in `yolo` — with `CORE_BLOCKED_COMMAND_TOKENS`
+rejected even in `yolo`).
+
+**Tool profiles** keep the advertised surface sharp:
+
+- `minimal` — the small delegation core (shell / agent / skill + read-only fs).
+- `coding` — the full coding surface above (recommended for ChatGPT-as-coder).
+- `full` — every tool (browser, adb, skill authoring, destructive git, secrets).
+
+```bash
+localant tools profile coding   # switch profile
+localant tools list             # see what's exposed
+```
+
+Then just ask ChatGPT:
+
+> "Look at this repo, fix the bug, run `pnpm validate`, and show me the `git diff`."
+
+ChatGPT will check project/git state, `grep`/`glob` for the code, `edit`/`apply_patch`
+the fix, `bash` the validation, iterate on errors, and return `git_diff`.
+
 ## 3-minute setup
 
 ```bash
@@ -305,6 +349,10 @@ localant approvals list | approve <id> [--session] | deny <id>
 localant skills list | info <name> | enable <name> | disable <name> | install <git-url> | validate <name> | publish <name>
 localant projects list | add <path> [--name <n>] | remove <id>
 localant secrets set <name> [value] | list | remove <name>
+localant tools list | profile <minimal|coding|full>
+localant agents list | detect | run <agent> <projectId> <task> [--execute] | logs <taskId> | stop <taskId>
+localant mcp list | test <name> | import-all
+localant todos list | clear
 ```
 
 ## Architecture

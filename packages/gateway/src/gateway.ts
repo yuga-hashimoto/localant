@@ -16,8 +16,10 @@ import { ConfigStore } from "./stores/config-store.js";
 import { SecretVault } from "./stores/secret-vault.js";
 import { AuditLog } from "./stores/audit-log.js";
 import { ApprovalStore } from "./stores/approval-store.js";
+import { TodoStore } from "./stores/todo-store.js";
 import { PathGuard } from "./security/path-guard.js";
 import { CommandGuard } from "./security/command-guard.js";
+import { LspService } from "./managers/lsp-service.js";
 import { FsManager } from "./managers/fs-manager.js";
 import { GitManager } from "./managers/git-manager.js";
 import { ShellManager } from "./managers/shell-manager.js";
@@ -56,10 +58,12 @@ export class Gateway {
   readonly vault: SecretVault;
   readonly audit: AuditLog;
   readonly approvals: ApprovalStore;
+  readonly todos: TodoStore;
   readonly pathGuard: PathGuard;
   readonly commandGuard: CommandGuard;
   readonly fs: FsManager;
   readonly git: GitManager;
+  readonly lsp: LspService;
   readonly shell: ShellManager;
   readonly projects: ProjectRegistry;
   readonly skills: SkillRuntime;
@@ -101,6 +105,7 @@ export class Gateway {
     this.audit = new AuditLog(this.paths);
     this.audit.setSecretsProvider(() => this.vault.allValues());
     this.approvals = new ApprovalStore(this.paths);
+    this.todos = new TodoStore(this.paths);
 
     this.pathGuard = new PathGuard(this.cfg.security.allowedDirectories);
     this.pathGuard.setMode(this.cfg.security.mode);
@@ -109,6 +114,7 @@ export class Gateway {
 
     this.fs = new FsManager(this.pathGuard, this.paths, () => this.cfg);
     this.git = new GitManager(this.pathGuard);
+    this.lsp = new LspService(this.pathGuard);
     this.shell = new ShellManager(this.commandGuard, this.pathGuard, () => this.cfg);
     this.projects = new ProjectRegistry(this.paths, this.pathGuard);
     this.skills = new SkillRuntime(this.paths, (names) => this.resolveSecrets(names));
@@ -120,7 +126,10 @@ export class Gateway {
         this.applyConfig();
       }
     );
-    this.bridge = new McpBridge(() => this.cfg);
+    this.bridge = new McpBridge(
+      () => this.cfg,
+      (name) => this.vault.get(name),
+    );
   }
 
   config(): Config {

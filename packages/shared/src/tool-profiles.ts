@@ -1,30 +1,25 @@
 /**
  * Tool exposure profiles.
  *
- * The gateway registers ~140 built-in tools, but exposing all of them to an MCP
- * client (ChatGPT) hurts tool-selection accuracy and bloats every request. The
- * design intent is the opposite: keep the advertised surface small and push the
- * actual work onto three delegation pillars —
+ * The gateway registers ~200 built-in tools, but exposing all of them to an MCP
+ * client (ChatGPT) hurts tool-selection accuracy and bloats every request. Three
+ * profiles trade surface area against capability:
  *
- *   1. Shell        — run commands (`shell_run_allowed_command`, …)
- *   2. coding Agent — hand a task to Claude Code / Codex / etc.
- *   3. Skill        — invoke a packaged skill
- *
- * plus the things those pillars cannot do for themselves: a read-only filesystem
- * path (cheaper than spinning up an agent just to read a file), read-only project
- * context, the MCP bridge (connect downstream MCP servers and proxy their tools),
- * and the control plane (status, approvals, audit).
- *
- *  - `minimal` (default): only the core surface listed in {@link MINIMAL_PROFILE_TOOLS}.
- *  - `full`: every registered tool (browser, adb, git, article publishers, MCP
- *    adapters, filesystem writes, skill authoring, …).
+ *  - `minimal` (legacy default): the small delegation core — shell allowlist,
+ *    coding agent, skill, read-only fs/project, MCP bridge, control plane.
+ *  - `coding`: the surface needed to use ChatGPT itself as a coding agent —
+ *    read/write/edit/multi_edit/apply_patch, grep/glob, bash, git, project
+ *    validation, todo/task/plan, question, agent delegation, MCP, webfetch,
+ *    basic browser.
+ *  - `full`: every registered tool (browser full, adb, skill authoring, config
+ *    mutation, secret management, destructive git, …).
  */
-export type ToolProfile = "minimal" | "full";
+export type ToolProfile = "minimal" | "coding" | "full";
 
 /**
  * The set of tool names exposed in the `minimal` profile. Everything else is
- * reachable only in the `full` profile — or, preferably, via shell / a coding
- * agent / a skill.
+ * reachable only in the `coding` / `full` profiles — or, preferably, via shell /
+ * a coding agent / a skill.
  */
 export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   // --- Control plane / status (cannot be delegated) ---
@@ -87,10 +82,7 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "project_status",
   "project_detect_stack",
 
-  // --- MCP bridge: connect downstream MCP servers and proxy their tools ---
-  // Lets LocalAnt act as a hub — register an external stdio MCP server and call
-  // its tools through mcp_server_run_tool. Kept in the minimal surface because
-  // connecting a server is a deliberate, opt-in action.
+  // --- MCP bridge ---
   "mcp_server_list",
   "mcp_server_register",
   "mcp_server_unregister",
@@ -99,7 +91,140 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "mcp_server_run_tool",
 ]);
 
+/**
+ * The set of tool names exposed in the `coding` profile. This is the surface a
+ * person would want when driving ChatGPT as a local coding agent: read/search,
+ * edit, run, validate, commit, plan, delegate. It is a superset of the minimal
+ * status/approval/audit/project/MCP surface plus the standard Codex / Claude
+ * Code-style tool names.
+ */
+export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
+  ...MINIMAL_PROFILE_TOOLS,
+
+  // --- Filesystem / code editing (standard names + aliases) ---
+  "read",
+  "read_file",
+  "read_file_range",
+  "write",
+  "write_file",
+  "edit",
+  "edit_file",
+  "multi_edit",
+  "apply_patch",
+  "list_files",
+  "glob",
+  "grep",
+  "search_content",
+  "search_files",
+  "get_file_info",
+  "create_directory",
+  "move_file",
+  "copy_file",
+  "delete_file",
+  "diff_file",
+
+  // --- Shell / bash ---
+  "bash",
+  "shell_run",
+  "shell_run_background",
+  "shell_get_output",
+  "shell_stop",
+  "bash_output",
+  "kill_shell",
+  "command_exists",
+
+  // --- Git ---
+  "git_status",
+  "git_diff",
+  "git_diff_file",
+  "git_list_changed_files",
+  "git_log",
+  "git_branch",
+  "git_checkout",
+  "git_checkout_new_branch",
+  "git_add",
+  "git_commit",
+  "git_restore",
+  "git_stash",
+  "git_clean_preview",
+  "git_apply_patch",
+  "git_create_patch",
+  "git_get_current_branch",
+  "git_is_dirty",
+
+  // --- Project / validation ---
+  "project_register",
+  "project_get_package_scripts",
+  "project_install_deps",
+  "project_run_tests",
+  "project_run_lint",
+  "project_run_typecheck",
+  "project_run_format",
+  "project_run_build",
+  "project_run_validation",
+
+  // --- Todo / task / plan ---
+  "todowrite",
+  "todo_list",
+  "todo_update",
+  "todo_clear",
+  "task_create",
+  "task_update",
+  "task_list",
+  "task_result",
+  "plan_create",
+  "plan_update",
+  "plan_get",
+
+  // --- Question / human interaction ---
+  "question",
+  "ask_user",
+  "approval_request",
+  "approval_approve",
+  "approval_deny",
+
+  // --- Agent delegation (aliases over coding_agent_*) ---
+  "agent_list",
+  "agent_status",
+  "agent_run",
+  "agent_plan",
+  "agent_continue",
+  "agent_stop",
+  "agent_get_logs",
+  "agent_get_result",
+  "agent_get_diff",
+  "agent_run_validation",
+
+  // --- Web ---
+  "webfetch",
+  "websearch",
+  "web_open",
+  "web_extract_text",
+  "web_screenshot",
+
+  // --- Basic browser ---
+  "browser_open",
+  "browser_close",
+  "browser_screenshot",
+  "browser_extract_text",
+  "browser_get_url",
+  "browser_wait",
+
+  // --- MCP import ---
+  "mcp_import_claude_config",
+  "mcp_import_codex_config",
+  "mcp_import_opencode_config",
+  "mcp_import_all_agent_configs",
+
+  // --- Tunnel control ---
+  "tunnel_start",
+  "tunnel_stop",
+  "tunnel_restart",
+]);
+
 /** Whether a tool is exposed under the given profile. `full` exposes everything. */
 export function isToolInProfile(name: string, profile: ToolProfile): boolean {
-  return profile === "full" || MINIMAL_PROFILE_TOOLS.has(name);
+  if (profile === "full") return true;
+  if (profile === "coding") return CODING_PROFILE_TOOLS.has(name);
+  return MINIMAL_PROFILE_TOOLS.has(name);
 }

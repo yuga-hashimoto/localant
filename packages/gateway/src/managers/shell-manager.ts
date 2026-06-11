@@ -45,6 +45,46 @@ export class ShellManager {
     return this.runArgv(normalized, cwd);
   }
 
+  /**
+   * Run an arbitrary command through a real shell (`bash -c`) so pipelines,
+   * redirection and `&&` chaining work — but only after CommandGuard has
+   * rejected blocked tokens / `rm -rf` across every pipeline segment, and after
+   * PathGuard has validated `cwd`. Output is capped and the call is timed.
+   */
+  async runBash(
+    command: string,
+    opts: { cwd?: string; timeoutMs?: number; maxOutputBytes?: number } = {},
+  ): Promise<{
+    code: number | null;
+    stdout: string;
+    stderr: string;
+    command: string;
+    cwd: string;
+    durationMs: number;
+    timedOut: boolean;
+  }> {
+    const normalized = this.guard.assertNotBlocked(command);
+    const cwd = this.resolveCwd(opts.cwd);
+    const sec = this.config().security;
+    const shell = process.platform === "win32" ? "cmd" : "bash";
+    const shellArgs = process.platform === "win32" ? ["/c", normalized] : ["-c", normalized];
+    const started = Date.now();
+    const res = await execFileSafe(shell, shellArgs, {
+      cwd,
+      timeoutMs: opts.timeoutMs ?? sec.commandTimeoutMs,
+      maxOutputBytes: opts.maxOutputBytes ?? sec.maxOutputBytes,
+    });
+    return {
+      code: res.code,
+      stdout: res.stdout,
+      stderr: res.stderr,
+      command: normalized,
+      cwd,
+      durationMs: Date.now() - started,
+      timedOut: res.timedOut,
+    };
+  }
+
   private async runArgv(normalized: string, cwd?: string) {
     const { tokens } = parseCommand(normalized);
     const [file, ...args] = splitArgs(normalized);

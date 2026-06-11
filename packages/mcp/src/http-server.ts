@@ -291,6 +291,39 @@ function mountDashboardApi(
     );
   });
 
+  // --- Tool profile ---
+  r.get("/tools/profile", (_q, s) => s.json({ profile: gw.config().tools.profile }));
+  r.post("/tools/profile/:name", (q, s) => {
+    const name = q.params.name;
+    if (!["minimal", "coding", "full"].includes(name)) {
+      return s.status(400).json({ error: "profile must be minimal|coding|full" });
+    }
+    gw.saveConfig({ ...gw.config(), tools: { profile: name as "minimal" | "coding" | "full" } });
+    s.json({ profile: name, note: "Restart the gateway for the MCP surface to refresh." });
+  });
+
+  // --- Agents detect ---
+  r.get("/agents/detect", async (_q, s) => s.json(await gw.agents.list()));
+
+  // --- MCP import-all ---
+  r.post("/mcp-servers/import-all", async (_q, s) => {
+    const res = await gw.executeTool("mcp_import_all_agent_configs", {}, { caller: "dashboard" });
+    s.json(res.data ?? { error: res.error });
+  });
+
+  // --- Todos / plans / questions / processes ---
+  r.get("/todos", (_q, s) => s.json({ todos: gw.todos.listTodos() }));
+  r.get("/plans", (_q, s) => s.json({ plans: gw.todos.listPlans() }));
+  r.get("/questions", (_q, s) => s.json({ questions: gw.todos.listQuestions() }));
+  r.post("/questions/:id/answer", (q, s) => {
+    try {
+      s.json(gw.todos.answerQuestion(q.params.id, String(q.body?.answer ?? "")));
+    } catch (e) {
+      s.status(404).json({ error: (e as Error).message });
+    }
+  });
+  r.get("/processes", (_q, s) => s.json({ processes: gw.shell.listProcesses() }));
+
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
   r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
   r.get("/doctor", async (_q, s) => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isToolInProfile, MINIMAL_PROFILE_TOOLS, defaultConfig } from "@localant/shared";
+import { isToolInProfile, MINIMAL_PROFILE_TOOLS, CODING_PROFILE_TOOLS, defaultConfig } from "@localant/shared";
 
 describe("tool profiles", () => {
   it("defaults the config to the minimal profile", () => {
@@ -46,5 +46,23 @@ describe("tool profiles", () => {
   it("full profile admits every tool", () => {
     expect(isToolInProfile("git_commit", "full")).toBe(true);
     expect(isToolInProfile("anything_at_all", "full")).toBe(true);
+  });
+
+  it("coding profile exposes the coding tools", () => {
+    for (const name of ["bash", "read", "write", "edit", "multi_edit", "apply_patch", "grep", "glob", "git_diff", "project_run_validation", "todowrite", "question", "agent_run"]) {
+      expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
+    }
+  });
+
+  it("coding profile is a superset of minimal", () => {
+    for (const name of MINIMAL_PROFILE_TOOLS) {
+      expect(CODING_PROFILE_TOOLS.has(name), `coding missing minimal tool ${name}`).toBe(true);
+    }
+  });
+
+  it("coding profile still hides destructive/authoring tools", () => {
+    for (const name of ["git_reset_hard", "secret_remove", "skill_create", "adb_tap", "browser_evaluate"]) {
+      expect(isToolInProfile(name, "coding"), name).toBe(false);
+    }
   });
 });

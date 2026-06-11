@@ -56,10 +56,30 @@ human approves it; once-approvals are consumed after a single use.
 
 ## Shell safety
 
-- Allowlist prefix matching; pipeline/redirection/chaining/substitution rejected.
-- Hard blocklist enforced even after approval.
-- No shell interpreter — validated commands are split to argv and executed
-  directly with a timeout and output cap.
+LocalAnt exposes two shell paths:
+
+- **`shell_run_allowed_command`** (allowlist) — allowlist prefix matching;
+  pipeline/redirection/chaining/substitution rejected; commands split to argv and
+  executed directly (no shell interpreter), with a timeout and output cap.
+- **`bash`** (arbitrary, risk 3) — runs through a real shell (`bash -c`) so
+  pipelines and `&&` work, but **only after**:
+  - **CommandGuard** rejects blocked tokens (`sudo`, `su`, `dd`, `mkfs`,
+    `fdisk`, `diskutil`, `shutdown`, `reboot`, …) across *every* pipeline
+    segment, and rejects `rm -rf` / `chmod 777`;
+  - **PathGuard** validates the `cwd`;
+  - the security **mode policy** gates it (see below).
+
+In **all** modes `CORE_BLOCKED_COMMAND_TOKENS` and `rm -rf` are rejected — even
+in `yolo`, and even after approval. Background processes (`shell_run_background`)
+go through the same guard.
+
+### Mode behaviour for `bash` (risk 3)
+
+| Mode | `bash` behaviour |
+|------|------------------|
+| `strict` | requires approval; only allowlisted commands run without it |
+| `open` | runs without approval but **always audited**; only risk-4 needs approval |
+| `yolo` | runs without approval; blocklist + core tokens still rejected; audited |
 
 ## Secret safety
 
@@ -67,9 +87,10 @@ human approves it; once-approvals are consumed after a single use.
   random vault key** held in `vault.key` (mode `0600`) — independent of the auth
   token, so rotating the token never makes stored secrets undecryptable. Secrets
   written by older versions (token-derived key) are transparently migrated.
-- Listing returns **names only**; values are never displayed.
+- Listing returns **names only**; values are never displayed. `secret_set` stores
+  a value but **no tool ever returns it**; `secret_remove` is risk 4.
 - Tool output and audit entries are deep-redacted for known secret values and
-  token-shaped strings.
+  token-shaped strings — including `bash`/`webfetch`/coding-agent output.
 - Skills receive only the secret values they declare in their manifest, passed
   to an isolated subprocess — never the vault itself.
 
@@ -85,6 +106,14 @@ close that gap:
   a CORS preflight that is never granted — defeating CSRF.
 - **Host allowlisting**: requests whose `Host` header is not local
   (`localhost`, `127.0.0.1`, `::1`) are rejected, defeating DNS-rebinding.
+
+## Browser safety
+
+- Browser automation uses an **isolated profile by default** — never your
+  day-to-day logged-in Chrome profile. Using a login-capable profile is an
+  explicit opt-in (`browser_use_profile`) and exposes your sessions to
+  automation; treat it as a strong-approval action.
+- `browser_evaluate` (arbitrary in-page JS) is risk 4.
 
 ## Network safety
 

@@ -60,4 +60,47 @@ export function registerAdbTools(gw: Gateway): void {
       return { output: await adb(["install", "-r", resolved], i.serial) };
     },
   });
+
+  r.register({ name: "adb_uninstall", description: "Uninstall an app by package. Requires approval (risk 3).", risk: 3, inputSchema: dev.extend({ pkg: z.string() }), summarize: (i) => `adb uninstall ${i.pkg}`, handler: async (i) => ({ output: await adb(["uninstall", i.pkg], i.serial) }) });
+  r.register({ name: "adb_screen_size", description: "Get the device screen size.", risk: 0, inputSchema: dev, handler: async (i) => ({ output: await adb(["shell", "wm", "size"], i.serial) }) });
+  r.register({ name: "adb_current_package", description: "Get the current foreground package name.", risk: 0, inputSchema: dev, handler: async (i) => ({ output: await adb(["shell", "dumpsys", "window", "windows"], i.serial) }) });
+  r.register({ name: "adb_dump_ui", description: "Dump the current UI hierarchy (uiautomator).", risk: 1, inputSchema: dev, handler: async (i) => ({ output: await adb(["shell", "uiautomator", "dump", "/dev/tty"], i.serial) }) });
+  r.register({
+    name: "adb_pull",
+    description: "Pull a file from the device into the workspace directory. Risk 3.",
+    risk: 3,
+    inputSchema: dev.extend({ devicePath: z.string(), localName: z.string().optional() }),
+    summarize: (i) => `adb pull ${i.devicePath}`,
+    handler: async (i) => {
+      const dest = path.join(gw.paths.workspaceDir, i.localName ?? `adb-pull-${Date.now()}`);
+      gw.pathGuard.assertAccess(dest, "write");
+      return { output: await adb(["pull", i.devicePath, dest], i.serial), localPath: dest };
+    },
+  });
+  r.register({
+    name: "adb_push",
+    description: "Push a local file (inside an allowed directory) to the device. Risk 3.",
+    risk: 3,
+    inputSchema: dev.extend({ localPath: z.string(), devicePath: z.string() }),
+    summarize: (i) => `adb push ${i.localPath}`,
+    handler: async (i) => {
+      const resolved = gw.pathGuard.assertAccess(i.localPath, "read");
+      return { output: await adb(["push", resolved, i.devicePath], i.serial) };
+    },
+  });
+  r.register({
+    name: "adb_shell",
+    description: "Run an adb shell command. Dangerous commands (rm -rf, reboot, wipe, …) are rejected. Risk 3.",
+    risk: 3,
+    inputSchema: dev.extend({ command: z.string() }),
+    summarize: (i) => `adb shell ${i.command.slice(0, 60)}`,
+    handler: async (i) => {
+      const lower = i.command.toLowerCase();
+      const dangerous = ["rm -rf", "reboot", "wipe", "format", "dd ", "mkfs", "fastboot", "pm clear"];
+      if (dangerous.some((d) => lower.includes(d))) {
+        throw new Error(`adb_shell rejected: '${i.command}' contains a dangerous operation.`);
+      }
+      return { output: await adb(["shell", ...i.command.split(" ")], i.serial) };
+    },
+  });
 }
