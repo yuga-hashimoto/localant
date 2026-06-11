@@ -230,14 +230,14 @@ function tunnelControls(t){
   let regLink = '';
   let errMsg = t.error || '';
   if (t.error && t.error.indexOf('https://console.serveo.net') !== -1) {
-    const m = t.error.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
+    const m = t.error.match(/https:\\/\\/console\\.serveo\\.net\\/ssh\\/keys\\?add=[^\\s]+/i);
     if (m) {
       const url = m[0];
       regLink = '<div class="warnbox" style="border-color:var(--accent);background:rgba(79,140,255,0.1);color:#cce0ff">'
         + '🔑 <b>Action Required</b>: SSH key registration is required to use the serveo tunnel.<br>'
         + '<a href="' + esc(url) + '" target="_blank" class="btn sm" style="display:inline-block;margin-top:8px;text-decoration:none;background:var(--accent);color:#fff">Register Key on Serveo</a>'
         + '</div>';
-      errMsg = t.error.replace(url, '').replace(/Please register here:\s*$/, '');
+      errMsg = t.error.replace(url, '').replace(/Please register here:\\s*$/, '');
     }
   }
 
