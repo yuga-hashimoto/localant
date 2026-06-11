@@ -183,18 +183,6 @@ describe("dashboard api routes", () => {
     expect(res.status).toBe(400);
   });
 
-  it("registers and removes a project, rejecting bad paths", async () => {
-    const dir = path.join(apiBaseDir, "myproj");
-    fs.mkdirSync(dir);
-    const reg = await apiSend("projects", "POST", { path: dir, name: "myproj" });
-    expect(reg.status).toBe(200);
-    const id = ((await reg.json()) as { id: string }).id;
-    const bad = await apiSend("projects", "POST", { path: path.join(apiBaseDir, "does-not-exist") });
-    expect(bad.status).toBe(400);
-    const del = await apiSend(`projects/${id}`, "DELETE");
-    expect(((await del.json()) as { removed: boolean }).removed).toBe(true);
-  });
-
   it("reports and stops the tunnel", async () => {
     const cur = await apiGet("tunnel");
     expect(cur.status).toBe(200);
@@ -238,10 +226,10 @@ describe("dashboard api routes", () => {
     expect(missing.status).toBe(404);
   });
 
-  it("rejects an agent run with missing fields and unknown agent/project", async () => {
+  it("rejects an agent run with missing fields and unknown agent", async () => {
     const bad = await apiSend("agents/run", "POST", { agent: "codex" });
     expect(bad.status).toBe(400);
-    const unknown = await apiSend("agents/run", "POST", { agent: "nope", projectId: "x", task: "do" });
+    const unknown = await apiSend("agents/run", "POST", { agent: "nope", cwd: "/tmp", task: "do" });
     expect(unknown.status).toBe(400);
   });
 

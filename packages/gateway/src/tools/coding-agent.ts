@@ -24,9 +24,9 @@ export function registerCodingAgentTools(gw: Gateway): void {
     name: "coding_agent_plan",
     description: "Ask a coding agent to produce an implementation PLAN only (no file changes).",
     risk: 3,
-    inputSchema: z.object({ agent: z.string().default("claude-code"), projectId: z.string(), task: z.string() }),
-    summarize: (i) => `${i.agent} plan for ${i.projectId}`,
-    handler: (i) => gw.agents.plan(i.agent, i.projectId, i.task),
+    inputSchema: z.object({ agent: z.string().default("claude-code"), cwd: z.string(), task: z.string() }),
+    summarize: (i) => `${i.agent} plan for ${i.cwd}`,
+    handler: (i) => gw.agents.plan(i.agent, i.cwd, i.task),
   });
 
   r.register({
@@ -36,14 +36,14 @@ export function registerCodingAgentTools(gw: Gateway): void {
     risk: 3,
     inputSchema: z.object({
       agent: z.string().default("claude-code"),
-      projectId: z.string(),
+      cwd: z.string(),
       task: z.string(),
       branchName: z.string().optional(),
       createBranch: z.boolean().default(true),
     }),
-    summarize: (i) => `${i.agent} EXECUTE on ${i.projectId}`,
+    summarize: (i) => `${i.agent} EXECUTE on ${i.cwd}`,
     handler: (i) =>
-      gw.agents.startTask(i.agent, i.projectId, i.task, { createBranch: i.createBranch, branchName: i.branchName }),
+      gw.agents.startTask(i.agent, i.cwd, i.task, { createBranch: i.createBranch, branchName: i.branchName }),
   });
 
   r.register({
@@ -107,10 +107,10 @@ export function registerCodingAgentTools(gw: Gateway): void {
 
   r.register({
     name: "coding_agent_run_validation",
-    description: "Run the project's validate/test command and return the result.",
+    description: "Run a validate/test command in a working directory and return the result.",
     risk: 3,
-    inputSchema: z.object({ projectId: z.string() }),
-    summarize: (i) => `validate ${i.projectId}`,
-    handler: (i) => gw.agents.runValidation(i.projectId),
+    inputSchema: z.object({ cwd: z.string(), command: z.string().describe("e.g. 'pnpm validate'") }),
+    summarize: (i) => `validate ${i.cwd}`,
+    handler: (i) => gw.agents.runValidation(i.cwd, i.command),
   });
 }

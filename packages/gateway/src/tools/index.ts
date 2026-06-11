@@ -1,7 +1,6 @@
 import type { Gateway } from "../gateway.js";
 import { registerSystemTools } from "./system.js";
 import { registerAuditTools, registerApprovalTools } from "./audit-approval.js";
-import { registerProjectTools } from "./project.js";
 import { registerFilesystemTools } from "./filesystem.js";
 import { registerEditingTools } from "./editing.js";
 import { registerGitTools } from "./git.js";
@@ -24,7 +23,6 @@ export function registerAllTools(gw: Gateway): void {
   registerSystemTools(gw);
   registerAuditTools(gw);
   registerApprovalTools(gw);
-  registerProjectTools(gw);
   registerFilesystemTools(gw);
   registerEditingTools(gw);
   registerGitTools(gw);

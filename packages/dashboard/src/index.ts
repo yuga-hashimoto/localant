@@ -92,7 +92,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Projects","Secrets","Agents","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Agents","Settings"];
 let current = "Home";
 let toolSub = "tools";
 let pendingApprovals = 0;
@@ -408,34 +408,6 @@ const VIEWS = {
     },'Cloning');
   },
 
-  async Projects(m){
-    const ps=await api('projects');
-    m.innerHTML='<div class="card"><h2>Projects</h2><table><thead><tr><th>Name</th><th>Path</th><th>Stack</th><th></th></tr></thead><tbody id="pj"></tbody></table></div>'
-      +'<div class="card"><h2>Register project</h2>'
-        +'<div class="row" style="gap:12px;">'
-          +'<input type="text" id="pjPath" placeholder="absolute path (e.g. /Users/me/Projects/app)" style="flex:1;min-width:240px" />'
-          +'<input type="text" id="pjName" placeholder="name (optional)" style="width:180px" />'
-          +'<button class="btn" id="pjAdd">Register</button>'
-        +'</div><p class="muted" style="margin-top:8px;">In strict mode the path must be inside an allowed directory.</p></div>';
-    const tb=document.getElementById('pj');
-    if(!ps.length) tb.appendChild(el('<tr><td colspan=4 class="muted">No projects registered.</td></tr>'));
-    for(const p of ps){
-      const tr=el('<tr><td><b>'+esc(p.name)+'</b></td><td class="muted">'+esc(p.path)+'</td><td>'+esc((p.stack||[]).join(", "))+'</td><td></td></tr>');
-      const rm=el('<button class="btn danger sm" style="background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>');
-      rm.onclick=action(rm,async()=>{ if(confirm('Remove project "'+p.name+'"?')){ await api('projects/'+encodeURIComponent(p.id),{method:'DELETE'}); toast('Removed '+p.name); render(); } });
-      tr.lastElementChild.appendChild(rm);
-      tb.appendChild(tr);
-    }
-    document.getElementById('pjAdd').onclick=action(document.getElementById('pjAdd'),async()=>{
-      const pathVal=document.getElementById('pjPath').value.trim();
-      const name=document.getElementById('pjName').value.trim();
-      if(!pathVal){ toast('Path is required.','err'); return; }
-      await api('projects',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({path:pathVal,name:name||undefined})});
-      toast('Project registered');
-      render();
-    },'Registering');
-  },
-
   async Secrets(m){
     const s=await api('secrets');
     m.innerHTML='<div class="card"><h2>Secrets</h2><p class="muted">Names only — values are never displayed.</p>'
@@ -470,7 +442,6 @@ const VIEWS = {
   async Agents(m){
     const a=await api('agents');
     const tasks=await api('agents/tasks');
-    const projects=await api('projects');
     m.innerHTML='<div class="card"><h2>Coding agents</h2><table><thead><tr><th>Agent</th><th>CLI available</th><th>Command</th><th>Enabled</th></tr></thead><tbody id="ag"></tbody></table></div>';
     const tb=document.getElementById('ag');
     for(const x of a){
@@ -488,14 +459,11 @@ const VIEWS = {
     const runCard=el('<div class="card"><h2>Run a task</h2></div>');
     if(!runnable.length){
       runCard.appendChild(el('<p class="muted">Enable an agent above whose CLI is installed to run tasks from here.</p>'));
-    } else if(!projects.length){
-      runCard.appendChild(el('<p class="muted">Register a project in the Projects tab first.</p>'));
     } else {
       const agentOpts=runnable.map(function(x){return '<option value="'+esc(x.agent)+'">'+esc(x.agent)+'</option>';}).join('');
-      const projOpts=projects.map(function(p){return '<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>';}).join('');
       runCard.appendChild(el('<div class="row" style="gap:12px;margin-bottom:12px">'
         +'<select id="runAgent">'+agentOpts+'</select>'
-        +'<select id="runProject">'+projOpts+'</select>'
+        +'<input type="text" id="runCwd" placeholder="working directory (absolute path)" style="flex:1;min-width:240px" />'
         +'<select id="runMode"><option value="plan">plan (read-only)</option><option value="execute">execute (creates a branch)</option></select>'
         +'</div>'));
       runCard.appendChild(el('<textarea id="runTask" rows="3" placeholder="Describe the task…"></textarea>'));
@@ -503,11 +471,12 @@ const VIEWS = {
       runCard.appendChild(runBtn);
       runBtn.querySelector('#runBtn').onclick=action(runBtn.querySelector('#runBtn'),async()=>{
         const agent=document.getElementById('runAgent').value;
-        const projectId=document.getElementById('runProject').value;
+        const cwd=document.getElementById('runCwd').value.trim();
         const mode=document.getElementById('runMode').value;
         const task=document.getElementById('runTask').value.trim();
+        if(!cwd){ toast('Working directory is required.','err'); return; }
         if(!task){ toast('Describe the task first.','err'); return; }
-        await api('agents/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent,projectId,task,mode})});
+        await api('agents/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent,cwd,task,mode})});
         toast('Task '+mode+' started');
         render();
       },'Running');
@@ -632,7 +601,7 @@ const VIEWS = {
           +'<option value="coding"'+((c.tools&&c.tools.profile)==='coding'?' selected':'')+'>coding</option>'
           +'<option value="full"'+((c.tools&&c.tools.profile)==='full'?' selected':'')+'>full</option>'
         +'</select>'
-        +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files/projects, and the control plane. <b>coding</b>: use ChatGPT as a local coding agent — read/edit/apply_patch, grep/glob, bash, git, project validation, todo/plan, agent delegation. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
+        +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files, and the control plane. <b>coding</b>: use ChatGPT as a local coding agent — read/edit/apply_patch, grep/glob, bash, git, project validation, todo/plan, agent delegation. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
       +'</div>'
       +'</div>'
 

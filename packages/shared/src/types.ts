@@ -34,18 +34,6 @@ export interface ApprovalRequest {
   scope?: ApprovalScope;
 }
 
-export interface ProjectRecord {
-  id: string;
-  name: string;
-  path: string;
-  validateCommand?: string;
-  testCommand?: string;
-  defaultAgent?: string;
-  defaultBranch?: string;
-  stack?: string[];
-  registeredAt: string;
-}
-
 export interface ToolManifestEntry {
   name: string;
   description: string;
@@ -90,7 +78,7 @@ export interface RuntimeInfo {
 export interface CodingTask {
   id: string;
   agent: string;
-  projectId: string;
+  cwd: string;
   mode: "plan" | "execute";
   task: string;
   status: "queued" | "running" | "completed" | "failed" | "stopped";

@@ -362,26 +362,6 @@ skills.command("publish <name>").action(async (name) => {
   console.log(JSON.stringify(res, null, 2));
 });
 
-// ---------- projects ----------
-const projects = program.command("projects").description("Manage projects");
-projects.command("list").action(() => {
-  const gw = createGateway();
-  for (const p of gw.projects.list()) console.log(`${c.bold(p.name)} ${c.gray(p.path)} [${(p.stack ?? []).join(", ")}]`);
-});
-projects.command("add <path>").option("--name <name>").action((path, o) => {
-  const gw = createGateway();
-  try {
-    const p = gw.projects.register(path, o.name);
-    console.log(ok(`Registered ${p.name} (${p.id})`));
-  } catch (e) {
-    console.log(fail((e as Error).message));
-  }
-});
-projects.command("remove <id>").action((id) => {
-  const gw = createGateway();
-  console.log(gw.projects.unregister(id) ? ok("Removed") : fail("Not found"));
-});
-
 // ---------- secrets ----------
 const secrets = program.command("secrets").description("Manage secrets (values never displayed)");
 secrets.command("set <name>").argument("[value]", "secret value (or read from CLA_SECRET env)").action((name, value) => {
@@ -484,14 +464,14 @@ agentsCmd
     for (const a of await gw.agents.list()) console.log(`${a.agent}: ${a.available ? "yes" : "no"}`);
   });
 agentsCmd
-  .command("run <agent> <projectId> <task>")
+  .command("run <agent> <cwd> <task>")
   .option("--execute", "execute (default: plan only)")
-  .action(async (agent, projectId, task, o) => {
+  .action(async (agent, cwd, task, o) => {
     const gw = createGateway();
     try {
       const res = o.execute
-        ? await gw.agents.startTask(agent, projectId, task, { createBranch: true })
-        : await gw.agents.plan(agent, projectId, task);
+        ? await gw.agents.startTask(agent, cwd, task, { createBranch: true })
+        : await gw.agents.plan(agent, cwd, task);
       console.log(JSON.stringify(res, null, 2));
     } catch (e) {
       console.log(fail((e as Error).message));

@@ -18,7 +18,7 @@ const consoleLogs: string[] = [];
 
 async function loadPlaywright(): Promise<{ chromium: { launch: (o?: unknown) => Promise<PwBrowser> } }> {
   try {
-    // @ts-expect-error optional dependency resolved at runtime
+    // @ts-ignore optional dependency resolved at runtime (may be absent at build time)
     return (await import("playwright")) as { chromium: { launch: (o?: unknown) => Promise<PwBrowser> } };
   } catch {
     throw new Error(

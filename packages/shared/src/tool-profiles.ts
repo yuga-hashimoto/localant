@@ -6,7 +6,7 @@
  * profiles trade surface area against capability:
  *
  *  - `minimal` (legacy default): the small delegation core — shell allowlist,
- *    coding agent, skill, read-only fs/project, MCP bridge, control plane.
+ *    coding agent, skill, read-only fs, MCP bridge, control plane.
  *  - `coding`: the surface needed to use ChatGPT itself as a coding agent —
  *    read/write/edit/multi_edit/apply_patch, grep/glob, bash, git, project
  *    validation, todo/task/plan, question, agent delegation, MCP, webfetch,
@@ -76,12 +76,6 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "fs_search_content",
   "fs_get_file_info",
 
-  // --- Read-only project context ---
-  "project_list",
-  "project_get",
-  "project_status",
-  "project_detect_stack",
-
   // --- MCP bridge ---
   "mcp_server_list",
   "mcp_server_register",
@@ -95,7 +89,7 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
  * The set of tool names exposed in the `coding` profile. This is the surface a
  * person would want when driving ChatGPT as a local coding agent: read/search,
  * edit, run, validate, commit, plan, delegate. It is a superset of the minimal
- * status/approval/audit/project/MCP surface plus the standard Codex / Claude
+ * status/approval/audit/MCP surface plus the standard Codex / Claude
  * Code-style tool names.
  */
 export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
@@ -153,7 +147,6 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "git_is_dirty",
 
   // --- Project / validation ---
-  "project_register",
   "project_get_package_scripts",
   "project_install_deps",
   "project_run_tests",

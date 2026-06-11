@@ -69,8 +69,8 @@ and audit.
 - 🧩 **Skill system**: create, validate, enable, run, install-from-git,
   publish, and **generate skills from ChatGPT** (always saved disabled).
 - 🤖 **Coding agents**: drive Claude Code / Codex (plan → approve → execute →
-  validate → diff) on registered projects.
-- 🖥️ **Local dashboard**: status, approvals, audit, skills, projects, secrets, agents.
+  validate → diff) on any working directory.
+- 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
 - 🌐 **3-minute setup** with Cloudflare Tunnel / ngrok and clipboard copy.
 - 🔌 **Adapters** for OpenClaw, Desktop Commander, and arbitrary MCP servers.
 
@@ -286,15 +286,15 @@ requires approval). See [docs/skills.md](docs/skills.md).
 
 ## How to connect Claude Code
 
-Enable an agent in config (`codingAgents.claude-code.enabled = true`), register a
-project, then:
+Enable an agent in config (`codingAgents.claude-code.enabled = true`), then point
+it at a working directory:
 
 ```text
-coding_agent_plan(agent:"claude-code", projectId:"my-app", task:"Plan SEO improvements")
+coding_agent_plan(agent:"claude-code", cwd:"/Users/me/Documents/my-app", task:"Plan SEO improvements")
 # review the plan, approve, then:
-coding_agent_start_task(agent:"claude-code", projectId:"my-app", task:"Implement the plan")
+coding_agent_start_task(agent:"claude-code", cwd:"/Users/me/Documents/my-app", task:"Implement the plan")
 # creates a work branch, runs the agent, then:
-coding_agent_get_diff(taskId) · coding_agent_run_validation(projectId)
+coding_agent_get_diff(taskId) · coding_agent_run_validation(cwd, command:"pnpm validate")
 ```
 
 Execution is risk-3 (approval required), runs on a fresh branch, warns on a dirty
@@ -353,10 +353,9 @@ localant tunnel status
 localant dashboard | logs
 localant approvals list | approve <id> [--session] | deny <id>
 localant skills list | info <name> | enable <name> | disable <name> | install <git-url> | validate <name> | publish <name>
-localant projects list | add <path> [--name <n>] | remove <id>
 localant secrets set <name> [value] | list | remove <name>
 localant tools list | profile <minimal|coding|full>
-localant agents list | detect | run <agent> <projectId> <task> [--execute] | logs <taskId> | stop <taskId>
+localant agents list | detect | run <agent> <cwd> <task> [--execute] | logs <taskId> | stop <taskId>
 localant mcp list | test <name> | import-all
 ```
 

@@ -1,14 +1,13 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { nanoid } from "nanoid";
-import type { CodingAgentConfig, Config, ProjectRecord } from "@localant/shared";
+import type { CodingAgentConfig, Config } from "@localant/shared";
 import { commandExists, execFileSafe } from "../util/exec.js";
 import type { GitManager } from "./git-manager.js";
-import type { ProjectRegistry } from "./project-registry.js";
 
 interface RunningTask {
   id: string;
   agent: string;
-  projectId: string;
+  cwd: string;
   mode: "plan" | "execute";
   task: string;
   status: "running" | "completed" | "failed" | "stopped";
@@ -23,14 +22,14 @@ interface RunningTask {
 /**
  * Drives local AI coding agents (Claude Code, Codex, custom). Plans are
  * non-mutating; execution requires approval upstream, creates a work branch,
- * and is followed by validation + diff review.
+ * and is followed by validation + diff review. Tasks operate directly on a
+ * working-directory path — no project registration is required.
  */
 export class CodingAgentManager {
   private readonly tasks = new Map<string, RunningTask>();
 
   constructor(
     private readonly config: () => Config,
-    private readonly projects: ProjectRegistry,
     private readonly git: GitManager,
   ) {}
 
@@ -38,12 +37,6 @@ export class CodingAgentManager {
     const cfg = this.config().codingAgents[agent];
     if (!cfg) throw new Error(`Unknown coding agent: ${agent}`);
     return cfg;
-  }
-
-  private project(projectId: string): ProjectRecord {
-    const p = this.projects.get(projectId);
-    if (!p) throw new Error(`Unknown project: ${projectId}. Register it first.`);
-    return p;
   }
 
   async list(): Promise<{ agent: string; enabled: boolean; available: boolean; command: string }[]> {
@@ -60,13 +53,12 @@ export class CodingAgentManager {
   }
 
   /** Produce a plan only — no file modification. */
-  async plan(agent: string, projectId: string, task: string): Promise<{ taskId: string; output: string }> {
+  async plan(agent: string, cwd: string, task: string): Promise<{ taskId: string; output: string }> {
     const cfg = this.agentConfig(agent);
     if (!cfg.enabled) throw new Error(`Agent '${agent}' is disabled in config.`);
     if (!(await commandExists(cfg.command))) {
       throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
     }
-    const project = this.project(projectId);
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
     const args = [...cfg.args, ...cfg.planArgs];
     const isYolo = this.config().security.mode === "yolo";
@@ -75,7 +67,7 @@ export class CodingAgentManager {
     }
     args.push(prompt);
     const res = await execFileSafe(cfg.command, args, {
-      cwd: project.path,
+      cwd,
       timeoutMs: cfg.timeoutMs,
       maxOutputBytes: 200_000,
     });
@@ -83,7 +75,7 @@ export class CodingAgentManager {
     this.tasks.set(id, {
       id,
       agent,
-      projectId,
+      cwd,
       mode: "plan",
       task,
       status: res.code === 0 ? "completed" : "failed",
@@ -98,24 +90,23 @@ export class CodingAgentManager {
   /** Start an execution task. Creates a work branch first. */
   async startTask(
     agent: string,
-    projectId: string,
+    cwd: string,
     task: string,
     opts: { createBranch?: boolean; branchName?: string } = {},
   ): Promise<{ taskId: string; branch?: string; warning?: string }> {
     const cfg = this.agentConfig(agent);
     if (!cfg.enabled) throw new Error(`Agent '${agent}' is disabled in config.`);
     if (!(await commandExists(cfg.command))) throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
-    const project = this.project(projectId);
 
     let warning: string | undefined;
-    if (await this.git.isDirty(project.path)) {
+    if (await this.git.isDirty(cwd)) {
       warning = "Working tree was dirty before the task started. Existing changes may be mixed in.";
     }
 
     let branch: string | undefined;
     if (opts.createBranch !== false) {
       branch = opts.branchName ?? `cla/${agent}-${Date.now()}`;
-      await this.git.createBranch(project.path, branch);
+      await this.git.createBranch(cwd, branch);
     }
 
     const id = nanoid(8);
@@ -126,11 +117,11 @@ export class CodingAgentManager {
       args.push("--danger");
     }
     args.push(prompt);
-    const child = spawn(cfg.command, args, { cwd: project.path, shell: false });
+    const child = spawn(cfg.command, args, { cwd, shell: false });
     const rec: RunningTask = {
       id,
       agent,
-      projectId,
+      cwd,
       mode: "execute",
       task,
       status: "running",
@@ -174,7 +165,7 @@ export class CodingAgentManager {
     return {
       id: t.id,
       agent: t.agent,
-      projectId: t.projectId,
+      cwd: t.cwd,
       mode: t.mode,
       task: t.task,
       status: t.status,
@@ -202,22 +193,19 @@ export class CodingAgentManager {
   async continueTask(id: string, task: string): Promise<{ taskId: string; branch?: string }> {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
-    return this.startTask(t.agent, t.projectId, task, { createBranch: false });
+    return this.startTask(t.agent, t.cwd, task, { createBranch: false });
   }
 
   async getDiff(id: string): Promise<string> {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
-    const project = this.project(t.projectId);
-    return this.git.diff(project.path);
+    return this.git.diff(t.cwd);
   }
 
-  async runValidation(projectId: string): Promise<{ command: string; code: number | null; output: string }> {
-    const project = this.project(projectId);
-    const command = project.validateCommand ?? project.testCommand;
-    if (!command) throw new Error("No validate/test command configured for this project.");
+  async runValidation(cwd: string, command: string): Promise<{ command: string; code: number | null; output: string }> {
+    if (!command) throw new Error("No validate/test command provided.");
     const [file, ...args] = command.split(" ");
-    const res = await execFileSafe(file!, args, { cwd: project.path, timeoutMs: 300_000, maxOutputBytes: 200_000 });
+    const res = await execFileSafe(file!, args, { cwd, timeoutMs: 300_000, maxOutputBytes: 200_000 });
     return { command, code: res.code, output: (res.stdout + res.stderr).slice(0, 50_000) };
   }
 }

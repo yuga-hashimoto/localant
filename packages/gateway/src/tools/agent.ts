@@ -18,18 +18,18 @@ export function registerAgentRunTool(gw: Gateway): void {
     risk: 3,
     inputSchema: z.object({
       agent: z.string().default("claude-code"),
-      projectId: z.string(),
+      cwd: z.string().describe("Absolute path to the working directory / repo to run the agent in."),
       task: z.string(),
       mode: z.enum(["plan", "execute"]).default("plan"),
       createBranch: z.boolean().default(true),
       branchName: z.string().optional(),
     }),
-    summarize: (i) => `${i.agent} ${i.mode} on ${i.projectId}`,
+    summarize: (i) => `${i.agent} ${i.mode} on ${i.cwd}`,
     handler: (i) => {
       if (i.mode === "plan") {
-        return gw.agents.plan(i.agent, i.projectId, i.task);
+        return gw.agents.plan(i.agent, i.cwd, i.task);
       }
-      return gw.agents.startTask(i.agent, i.projectId, i.task, {
+      return gw.agents.startTask(i.agent, i.cwd, i.task, {
         createBranch: i.createBranch,
         branchName: i.branchName,
       });

@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-12
+
+### Removed
+- **Project registry.** The `ProjectRegistry`, all `project_register` /
+  `project_list` / `project_get` / `project_status` / `project_unregister` /
+  `project_set_*` / `project_detect_stack` tools, the `/projects` dashboard API,
+  the dashboard **Projects** tab and the `localant projects` CLI command have
+  been removed. Coding-agent tasks no longer require registering a project first
+  — they operate directly on a working-directory path.
+
+### Changed (breaking)
+- **Coding-agent tools now take a path instead of a project id.** `agent_run`,
+  `coding_agent_plan` and `coding_agent_start_task` accept `cwd` (absolute
+  working-directory path) in place of `projectId`. `coding_agent_run_validation`
+  now takes `cwd` + an explicit `command`. The `/agents/run` API uses `cwd`.
+- **Validation / LSP tools take `path`.** `project_run_tests` / `lint` /
+  `typecheck` / `format` / `build` / `validation`, `project_get_package_scripts`,
+  `project_install_deps` and `lsp_diagnostics` accept `path` (a directory) in
+  place of `projectId`. `git_*` `repo` arguments are plain paths.
+- **`fs_list_allowed_directories` is mode-aware.** In `open`/`yolo` mode it
+  reports that filesystem access is not restricted to the listed directories
+  (only the sensitive blocklist applies), so connected agents no longer
+  self-restrict to the advertised allowlist.
+
 ## [1.1.0] - 2026-06-11
 
 ### Added

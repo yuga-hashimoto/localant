@@ -44,10 +44,9 @@ export function registerLspTools(gw: Gateway): void {
     name: "lsp_diagnostics",
     description: "Run TypeScript diagnostics (tsc --noEmit) for a project path. Falls back to install guidance if tsc is missing.",
     risk: 0,
-    inputSchema: z.object({ projectId: z.string() }),
+    inputSchema: z.object({ path: z.string().describe("Path to the project directory") }),
     handler: async (i) => {
-      const project = gw.projects.get(i.projectId);
-      const dir = project ? project.path : i.projectId;
+      const dir = i.path;
       gw.pathGuard.assertAccess(dir, "read");
       if (!(await commandExists("tsc")) && !(await commandExists("npx"))) {
         return { error: "tsc not found.", hint: "Install TypeScript (`npm i -D typescript`)." };

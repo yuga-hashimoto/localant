@@ -443,20 +443,6 @@ function mountDashboardApi(
       s.status(400).json({ error: (e as Error).message });
     }
   });
-  r.get("/projects", (_q, s) => s.json(gw.projects.list()));
-  r.post("/projects", (q, s) => {
-    try {
-      const { path: projectPath, name } = q.body ?? {};
-      if (!projectPath) {
-        s.status(400).json({ error: "path is required." });
-        return;
-      }
-      s.json(gw.projects.register(projectPath, name));
-    } catch (e) {
-      s.status(400).json({ error: (e as Error).message });
-    }
-  });
-  r.delete("/projects/:id", (q, s) => s.json({ removed: gw.projects.unregister(q.params.id) }));
   r.get("/secrets", (_q, s) => s.json({ names: gw.vault.list() }));
   r.post("/secrets", (q, s) => {
     try {
@@ -495,15 +481,15 @@ function mountDashboardApi(
   r.post("/agents/:name/disable", async (q, s) => setAgentEnabled(gw, q.params.name, false, s));
   r.post("/agents/run", async (q, s) => {
     try {
-      const { agent, projectId, task, mode } = q.body ?? {};
-      if (!agent || !projectId || !task) {
-        s.status(400).json({ error: "agent, projectId and task are required." });
+      const { agent, cwd, task, mode } = q.body ?? {};
+      if (!agent || !cwd || !task) {
+        s.status(400).json({ error: "agent, cwd and task are required." });
         return;
       }
       if (mode === "execute") {
-        s.json(await gw.agents.startTask(agent, projectId, task));
+        s.json(await gw.agents.startTask(agent, cwd, task));
       } else {
-        s.json(await gw.agents.plan(agent, projectId, task));
+        s.json(await gw.agents.plan(agent, cwd, task));
       }
     } catch (e) {
       s.status(400).json({ error: (e as Error).message });

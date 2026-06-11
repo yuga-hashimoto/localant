@@ -218,7 +218,7 @@ describe("project validation", () => {
   it("project_get_package_scripts reads scripts", async () => {
     const g = gw();
     fs.writeFileSync(path.join(proj, "package.json"), JSON.stringify({ scripts: { test: "echo ok" } }));
-    const res = await g.executeTool("project_get_package_scripts", { projectId: proj }, { caller: "test" });
+    const res = await g.executeTool("project_get_package_scripts", { path: proj }, { caller: "test" });
     expect(res.ok).toBe(true);
     expect((res.data as { scripts: Record<string, string> }).scripts.test).toBe("echo ok");
   });
@@ -227,7 +227,7 @@ describe("project validation", () => {
     const g = gw();
     fs.writeFileSync(path.join(proj, "package.json"), JSON.stringify({ scripts: { validate: "echo VALIDATED" } }));
     fs.writeFileSync(path.join(proj, "package-lock.json"), "{}");
-    const res = await g.executeTool("project_run_validation", { projectId: proj }, { caller: "test" });
+    const res = await g.executeTool("project_run_validation", { path: proj }, { caller: "test" });
     expect(res.ok).toBe(true);
     expect(JSON.stringify(res.data)).toContain("VALIDATED");
   });

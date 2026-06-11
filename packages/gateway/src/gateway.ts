@@ -22,7 +22,6 @@ import { LspService } from "./managers/lsp-service.js";
 import { FsManager } from "./managers/fs-manager.js";
 import { GitManager } from "./managers/git-manager.js";
 import { ShellManager } from "./managers/shell-manager.js";
-import { ProjectRegistry } from "./managers/project-registry.js";
 import { SkillRuntime } from "./managers/skill-runtime.js";
 import { CodingAgentManager } from "./managers/coding-agent-manager.js";
 import { TunnelManager } from "./managers/tunnel-manager.js";
@@ -63,7 +62,6 @@ export class Gateway {
   readonly git: GitManager;
   readonly lsp: LspService;
   readonly shell: ShellManager;
-  readonly projects: ProjectRegistry;
   readonly skills: SkillRuntime;
   readonly agents: CodingAgentManager;
   readonly tunnel: TunnelManager;
@@ -113,9 +111,8 @@ export class Gateway {
     this.git = new GitManager(this.pathGuard);
     this.lsp = new LspService(this.pathGuard);
     this.shell = new ShellManager(this.commandGuard, this.pathGuard, () => this.cfg);
-    this.projects = new ProjectRegistry(this.paths, this.pathGuard);
     this.skills = new SkillRuntime(this.paths, (names) => this.resolveSecrets(names));
-    this.agents = new CodingAgentManager(() => this.cfg, this.projects, this.git);
+    this.agents = new CodingAgentManager(() => this.cfg, this.git);
     this.tunnel = new TunnelManager(
       () => this.cfg,
       (patch) => {

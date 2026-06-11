@@ -6,10 +6,23 @@ export function registerFilesystemTools(gw: Gateway): void {
 
   r.register({
     name: "fs_list_allowed_directories",
-    description: "List directories the gateway is allowed to access.",
+    description:
+      "List filesystem access policy. In 'strict' mode access is limited to the returned directories; in 'open'/'yolo' mode there is no directory restriction (only the sensitive blocklist applies) and you may read/write anywhere outside it.",
     risk: 0,
     inputSchema: z.object({}).strip(),
-    handler: () => ({ allowed: gw.pathGuard.allowed() }),
+    handler: () => {
+      const mode = gw.config().security.mode;
+      const allowed = gw.pathGuard.allowed();
+      if (mode === "strict") {
+        return { mode, restricted: true, allowed };
+      }
+      return {
+        mode,
+        restricted: false,
+        note: `Filesystem access is NOT restricted to these directories in '${mode}' mode. Only the sensitive blocklist (credentials, system paths) is enforced — you may read and write anywhere outside it. The list below is only a hint of common project locations.`,
+        allowed,
+      };
+    },
   });
 
   r.register({
