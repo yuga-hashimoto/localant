@@ -1,19 +1,26 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { ConfigSchema, type Config, defaultConfig, appPaths, type AppPaths } from "@localant/shared";
+import { ConfigSchema, type Config, defaultConfig, appPaths, migrateLegacyConfigDir, type AppPaths } from "@localant/shared";
 
 /** Loads, persists and initializes on-disk configuration and identity files. */
 export class ConfigStore {
   readonly paths: AppPaths;
+  /** True only when using the real default location (not an explicit test base). */
+  private readonly isDefaultLocation: boolean;
 
   constructor(base?: string) {
     this.paths = appPaths(base);
+    this.isDefaultLocation = base === undefined;
   }
 
   /** Create config dir tree and default files if missing. Idempotent. */
   ensureInitialized(): void {
     const p = this.paths;
+    // Before creating anything, migrate a pre-1.x install into ~/.localant.
+    if (this.isDefaultLocation) {
+      migrateLegacyConfigDir(p.root);
+    }
     for (const dir of [p.root, path.dirname(p.auditLog), p.skillsDir, p.backupsDir, p.workspaceDir, p.logsDir]) {
       fs.mkdirSync(dir, { recursive: true });
     }

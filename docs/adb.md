@@ -39,7 +39,7 @@ pipeline.
 > "Take a screenshot of my connected Android device."
 
 ChatGPT calls `adb_list_devices`, then `adb_screenshot`. The file lands in the
-workspace directory (`~/Library/Application Support/LocalAnt/workspace`).
+workspace directory (`~/.localant/workspace`).
 
 ## FAQ
 

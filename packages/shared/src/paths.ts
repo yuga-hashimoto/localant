@@ -1,15 +1,30 @@
+import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
 const APP_NAME = "LocalAnt";
 
 /**
- * Resolve the per-OS configuration directory.
+ * Resolve the configuration/data directory.
+ *
+ * A single home-directory dotfolder (`~/.localant`) on every platform — this
+ * matches the ecosystem LocalAnt integrates with (`~/.claude`, `~/.codex`,
+ * `~/.opencode`) and is easy to find/inspect. Override with `LOCALANT_HOME`.
+ */
+export function configDir(): string {
+  const override = process.env.LOCALANT_HOME;
+  if (override && override.trim()) return path.resolve(override.trim());
+  return path.join(os.homedir(), ".localant");
+}
+
+/**
+ * Pre-1.x per-OS location, retained only so existing installs can be migrated
+ * once into {@link configDir}.
  * - macOS:   ~/Library/Application Support/LocalAnt
  * - Windows: %APPDATA%/LocalAnt
  * - Linux:   $XDG_CONFIG_HOME/LocalAnt or ~/.config/LocalAnt
  */
-export function configDir(): string {
+export function legacyConfigDir(): string {
   const home = os.homedir();
   switch (process.platform) {
     case "darwin":
@@ -19,6 +34,33 @@ export function configDir(): string {
     default: {
       const xdg = process.env.XDG_CONFIG_HOME;
       return path.join(xdg && xdg.trim() ? xdg : path.join(home, ".config"), APP_NAME);
+    }
+  }
+}
+
+/**
+ * One-time migration: if `target` does not yet exist but the legacy per-OS
+ * directory does, move the legacy data into `target` (preserving token, vault
+ * key, secrets, config, serveo registration, audit log). Returns true if data
+ * was migrated. Never clobbers an existing `target`.
+ */
+export function migrateLegacyConfigDir(target: string): boolean {
+  const legacy = legacyConfigDir();
+  if (target === legacy) return false;
+  if (fs.existsSync(target)) return false;
+  if (!fs.existsSync(legacy)) return false;
+  try {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.renameSync(legacy, target);
+    return true;
+  } catch {
+    // Cross-device rename can fail; fall back to a recursive copy + remove.
+    try {
+      fs.cpSync(legacy, target, { recursive: true });
+      fs.rmSync(legacy, { recursive: true, force: true });
+      return true;
+    } catch {
+      return false;
     }
   }
 }

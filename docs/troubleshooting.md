@@ -92,7 +92,12 @@ Then ask ChatGPT to retry.
 
 ### Config directory location
 
-| OS | Path |
+`~/.localant` on every platform (override with the `LOCALANT_HOME` env var).
+
+A pre-1.x install under the old per-OS location is migrated automatically on
+first run:
+
+| OS | Legacy path (auto-migrated) |
 |----|------|
 | macOS | `~/Library/Application Support/LocalAnt` |
 | Linux | `~/.config/LocalAnt` |

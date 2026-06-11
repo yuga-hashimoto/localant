@@ -378,8 +378,9 @@ See [docs/architecture.md](docs/architecture.md).
 
 - **Does ChatGPT get a raw shell?** No. Only allowlisted commands run without
   approval; anything else needs an explicit local approval.
-- **Where is my config?** `~/Library/Application Support/LocalAnt` (macOS),
-  `~/.config/LocalAnt` (Linux), `%APPDATA%/LocalAnt` (Windows).
+- **Where is my config?** `~/.localant` on every platform (override with the
+  `LOCALANT_HOME` env var). A pre-1.x install under `~/Library/Application
+  Support/LocalAnt` / `~/.config/LocalAnt` is migrated automatically on first run.
 - **Do I need Claude Code/Codex/adb/Playwright?** Only for those specific tool
   families; they degrade gracefully with install guidance.
 - **Is the tunnel safe?** A public tunnel exposes the gateway; the auth token is
