@@ -217,6 +217,8 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
 
     mountDashboardApi(dash, gw, dashToken, pendingCodes);
     dash.get("/favicon.png", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/favicon.ico", (_req, res) => serveAsset("hero.png", res));
+    dash.get("/hero.png", (_req, res) => serveAsset("hero.png", res));
     dash.get("/icon.svg", (_req, res) => serveAsset("icon.svg", res));
     dash.get("/", (_req, res) => res.type("html").send(dashboardHtml(dashToken)));
     dashboardServer = await listen(dash, dashboardPort, "127.0.0.1");

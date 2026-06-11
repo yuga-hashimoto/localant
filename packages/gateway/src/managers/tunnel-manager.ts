@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import crypto from "node:crypto";
 import { createLogger, type Config } from "@localant/shared";
 import { commandExists } from "../util/exec.js";
 
@@ -19,7 +20,10 @@ export class TunnelManager {
   private child?: ChildProcess;
   private info: TunnelInfo = { provider: "none", status: "stopped" };
 
-  constructor(private readonly config: () => Config) {}
+  constructor(
+    private readonly config: () => Config,
+    private readonly updateConfig?: (patch: Partial<Config>) => void,
+  ) {}
 
   current(): TunnelInfo {
     return this.info;
@@ -140,7 +144,70 @@ export class TunnelManager {
     });
   }
 
-  private startLocaltunnel(port: number): Promise<TunnelInfo> {
+  private async startLocaltunnel(port: number): Promise<TunnelInfo> {
+    const maxDurationMs = 5 * 60 * 1000; // 5 minutes
+    const intervalMs = 10000; // 10 seconds
+    const startTime = Date.now();
+    let attempt = 0;
+
+    while (true) {
+      attempt++;
+      log.info(`Starting localtunnel attempt ${attempt}...`);
+      try {
+        const tunnelInfo = await this.tryStartLocaltunnelOnce(port);
+        
+        if (tunnelInfo.status === "running" && tunnelInfo.url) {
+          const cfg = this.config().tunnel;
+          const assignedUrl = tunnelInfo.url;
+          const assignedSubdomain = assignedUrl.match(/https:\/\/([a-z0-9-]+)\./i)?.[1];
+          const requestedSubdomain = cfg.subdomain;
+
+          if (requestedSubdomain && assignedSubdomain && assignedSubdomain !== requestedSubdomain) {
+            // First attempt: generate a new random subdomain and update config.json
+            if (attempt === 1 && this.updateConfig) {
+              log.warn(`Subdomain conflict detected (${requestedSubdomain} vs ${assignedSubdomain}). Regenerating subdomain.`);
+              const rand = crypto.randomBytes(16).toString("hex");
+              const newSubdomain = `localant-${rand}`;
+              
+              this.updateConfig({
+                tunnel: {
+                  ...cfg,
+                  subdomain: newSubdomain,
+                }
+              });
+              
+              this.stop();
+              await new Promise((r) => setTimeout(r, 1000));
+              continue;
+            } else {
+              // Subsequent attempts (e.g. restart): wait 10 seconds for session release
+              log.warn(`Subdomain conflict (possibly previous session remaining). Retrying in 10s...`);
+              this.stop();
+              if (Date.now() - startTime >= maxDurationMs) {
+                return { provider: "localtunnel", status: "error", error: "Subdomain conflict. Timed out waiting for subdomain to release." };
+              }
+              await new Promise((r) => setTimeout(r, intervalMs));
+              continue;
+            }
+          }
+
+          return tunnelInfo;
+        }
+
+        throw new Error(tunnelInfo.error || "Unknown error starting tunnel");
+      } catch (err: any) {
+        log.warn(`Localtunnel start failed: ${err.message}. Retrying in 10s...`);
+        this.stop();
+        if (Date.now() - startTime >= maxDurationMs) {
+          this.info = { provider: "localtunnel", status: "error", error: `Timed out trying to start tunnel: ${err.message}` };
+          return this.info;
+        }
+        await new Promise((r) => setTimeout(r, intervalMs));
+      }
+    }
+  }
+
+  private tryStartLocaltunnelOnce(port: number): Promise<TunnelInfo> {
     return new Promise((resolve) => {
       this.info = { provider: "localtunnel", status: "starting" };
       const cfg = this.config().tunnel;
@@ -152,7 +219,7 @@ export class TunnelManager {
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
-        const m = text.match(/https:\/\/[a-z0-9-]+\.localtunnel\.me/i);
+        const m = text.match(/https:\/\/[a-z0-9-]+\.(localtunnel\.me|loca\.lt)/i);
         if (m && this.info.status !== "running") {
           this.info = { provider: "localtunnel", url: m[0], status: "running" };
           resolve(this.info);
@@ -167,7 +234,7 @@ export class TunnelManager {
       setTimeout(() => {
         if (this.info.status !== "running") {
           if (cfg.subdomain) {
-            this.info = { provider: "localtunnel", url: cfg.publicUrl || `https://${cfg.subdomain}.localtunnel.me`, status: "running" };
+            this.info = { provider: "localtunnel", url: cfg.publicUrl || `https://${cfg.subdomain}.loca.lt`, status: "running" };
             resolve(this.info);
           } else {
             this.info = { provider: "localtunnel", status: "error", error: "Timed out waiting for localtunnel URL." };

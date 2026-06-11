@@ -112,7 +112,13 @@ export class Gateway {
     this.projects = new ProjectRegistry(this.paths, this.pathGuard);
     this.skills = new SkillRuntime(this.paths, (names) => this.resolveSecrets(names));
     this.agents = new CodingAgentManager(() => this.cfg, this.projects, this.git);
-    this.tunnel = new TunnelManager(() => this.cfg);
+    this.tunnel = new TunnelManager(
+      () => this.cfg,
+      (patch) => {
+        this.cfg = this.configStore.update(patch);
+        this.applyConfig();
+      }
+    );
     this.bridge = new McpBridge(() => this.cfg);
   }
 

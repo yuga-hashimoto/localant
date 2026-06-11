@@ -35,7 +35,7 @@ export function dashboardHtml(token = ""): string {
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="icon" type="image/svg+xml" href="/icon.svg" />
+<link rel="icon" type="image/png" href="/favicon.png" />
 <title>LocalAnt — Dashboard</title>
 <style>
   :root { --bg:#0b0f17; --panel:#131a26; --panel2:#1b2433; --text:#e6edf3; --muted:#8b98a9; --accent:#4f8cff; --danger:#ff5f56; --ok:#3fb950; --warn:#d29922; --border:#243049; }
@@ -103,7 +103,7 @@ export function dashboardHtml(token = ""): string {
 <div id="toast"></div>
 <div id="modalOverlay"><div class="modal" id="modalBox"></div></div>
 <header>
-  <span class="logo">${LOGO_SVG}</span>
+  <span class="logo"><img src="/hero.png" height="26" alt="LocalAnt" /></span>
   <h1>LocalAnt</h1>
   <span class="pill" id="statusPill">connecting…</span>
   <span class="pill" id="tunnelPill"></span>
