@@ -648,7 +648,7 @@ const VIEWS = {
         +'<select id="tunProvider" style="width:160px">'
           +['cloudflared','ngrok','localtunnel','serveo','none'].map(function(p){return '<option value="'+p+'"'+((tun.provider||'cloudflared')===p?' selected':'')+'>'+p+'</option>';}).join('')
         +'</select></div>'
-      +'<div class="field"><label>Custom subdomain (localtunnel / serveo — no registration)</label><input type="text" id="tunSubdomain" value="'+esc(tun.subdomain||'')+'" placeholder="e.g. my-localant-mcp" /></div>'
+      +'<div class="field"><label>Custom subdomain (localtunnel: no signup · serveo: one-time SSH key registration for a fixed URL)</label><input type="text" id="tunSubdomain" value="'+esc(tun.subdomain||'')+'" placeholder="e.g. my-localant-mcp" /></div>'
       +'<div class="field"><label>Token / authtoken (cloudflared tunnel token / ngrok authtoken)</label><div class="row" style="gap:8px"><input type="password" id="tunToken" value="'+esc(tun.token||'')+'" placeholder="Cloudflare Tunnel token or ngrok authtoken" style="flex:1" /><button class="btn ghost sm" id="tunTokenShow">Show</button></div></div>'
       +'<div class="field"><label>Custom domain (ngrok static domain)</label><input type="text" id="tunDomain" value="'+esc(tun.domain||'')+'" placeholder="e.g. my-app.ngrok-free.app" /></div>'
       +'<div class="field"><label>Public URL (override — used as-is)</label><input type="text" id="tunUrl" value="'+esc(tun.publicUrl||'')+'" placeholder="e.g. https://my-domain.com" /></div>'

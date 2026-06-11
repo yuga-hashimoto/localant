@@ -1,7 +1,4 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { createLogger, type Config } from "@localant/shared";
 import { commandExists } from "../util/exec.js";
 
@@ -22,6 +19,10 @@ export class TunnelManager {
   private child?: ChildProcess;
   private info: TunnelInfo = { provider: "none", status: "stopped" };
   private timeoutId?: NodeJS.Timeout;
+  /** Set by stop() so an intentional shutdown is never auto-reconnected. */
+  private stopped = false;
+  /** Pending serveo reconnect attempt, cleared on stop(). */
+  private reconnectTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly config: () => Config,
@@ -33,6 +34,7 @@ export class TunnelManager {
   }
 
   async start(port: number): Promise<TunnelInfo> {
+    this.stopped = false;
     const cfg = this.config().tunnel;
     if (cfg.publicUrl) {
       this.info = { provider: "user-provided", url: cfg.publicUrl, status: "running" };
@@ -242,163 +244,168 @@ export class TunnelManager {
     });
   }
 
-  private findSshKey(): string | undefined {
-    try {
-      const home = os.homedir();
-      const sshDir = path.join(home, ".ssh");
-      const keyFiles = ["id_ed25519", "id_rsa", "id_ecdsa", "id_dsa"];
-      for (const file of keyFiles) {
-        const p = path.join(sshDir, file);
-        if (fs.existsSync(p)) {
-          return p;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return undefined;
-  }
-
   private startServeo(port: number): Promise<TunnelInfo> {
+    // Resolve the caller's promise exactly once on first outcome, then keep the
+    // tunnel alive in the background by reconnecting if the ssh process dies.
     return new Promise((resolve) => {
-      this.info = { provider: "serveo", status: "starting" };
-      const cfg = this.config().tunnel;
-      const subdomain = cfg.subdomain ? `${cfg.subdomain}:` : "";
-      const args = [
-        "-R",
-        `${subdomain}80:127.0.0.1:${port}`,
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "IdentitiesOnly=yes"
-      ];
-      const keyPath = this.findSshKey();
-      if (keyPath) {
-        args.push("-i", keyPath);
-      }
-      args.push("serveo.net");
-      console.log(`[DEBUG] Spawning ssh command: ssh ${args.join(" ")}`);
-      const child = spawn("ssh", args, { shell: false });
-      this.child = child;
-      const onData = (buf: Buffer) => {
-        const text = buf.toString("utf8");
-        console.log(`[DEBUG] ssh output: ${text.trim()}`);
-
-        // 登録警告URLを検出
-        const regMatch = text.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
-        if (regMatch && this.info.status !== "error") {
-          const registerUrl = regMatch[0];
-          console.log(`[DEBUG] Detected SSH key registration required: ${registerUrl}`);
-          log.warn(`SSH key registration required: ${registerUrl}`);
-
-          this.info = {
-            provider: "serveo",
-            status: "error",
-            error: `SSH key not registered with serveo.net. Please register here: ${registerUrl}`,
-          };
-          if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = undefined;
-          }
-          try {
-            child.stdout?.removeAllListeners();
-            child.stderr?.removeAllListeners();
-            child.removeAllListeners();
-            child.kill("SIGTERM");
-          } catch {
-            // ignore
-          }
-          this.child = undefined;
-          console.log("[DEBUG] Resolving startServeo with registration error");
-          resolve(this.info);
-          return;
-        }
-
-        // ポートフォワーディング失敗を検出
-        if (text.includes("remote port forwarding failed") && this.info.status !== "error") {
-          console.log("[DEBUG] Detected remote port forwarding failed");
-          log.warn("Serveo port forwarding failed. Subdomain might be in use.");
-          this.info = {
-            provider: "serveo",
-            status: "error",
-            error: "Serveo port forwarding failed. Subdomain might be in use. Please try restarting the tunnel in a few seconds.",
-          };
-          if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = undefined;
-          }
-          try {
-            child.stdout?.removeAllListeners();
-            child.stderr?.removeAllListeners();
-            child.removeAllListeners();
-            child.kill("SIGTERM");
-          } catch {
-            // ignore
-          }
-          this.child = undefined;
-          console.log("[DEBUG] Resolving startServeo with port forwarding error");
-          resolve(this.info);
-          return;
-        }
-
-        // serveo.net または serveousercontent.com のURLを検出
-        const m = text.match(/https:\/\/(?!console\b)([a-z0-9-]+)\.(?:serveo\.net|serveousercontent\.com)/i);
-        if (m && this.info.status !== "running" && this.info.status !== "error") {
-          // 公開用URLは常に serveo.net を使用
-          const publicUrl = `https://${m[1]}.serveo.net`;
-          console.log(`[DEBUG] Detected serveo URL: ${m[0]} → public URL: ${publicUrl}`);
-          this.info = { provider: "serveo", url: publicUrl, status: "running" };
-          if (this.timeoutId) {
-            clearTimeout(this.timeoutId);
-            this.timeoutId = undefined;
-          }
-          console.log("[DEBUG] Resolving startServeo as running");
-          resolve(this.info);
-        }
-      };
-      child.stdout.on("data", onData);
-      child.stderr.on("data", onData);
-      child.on("error", (e) => {
-        console.log(`[DEBUG] ssh process spawned/execution error: ${e.message}`);
-        this.info = { provider: "serveo", status: "error", error: e.message };
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
         resolve(this.info);
-      });
-      child.on("close", (code) => {
-        console.log(`[DEBUG] ssh process closed with code ${code}`);
-      });
-      this.timeoutId = setTimeout(() => {
-        console.log(`[DEBUG] Serveo timeout triggered. Status: ${this.info.status}`);
-        if (this.info.status !== "running" && this.info.status !== "error") {
-          if (cfg.subdomain) {
-            console.log(`[DEBUG] Subdomain configured (${cfg.subdomain}), resolving as running`);
-            this.info = { provider: "serveo", url: cfg.publicUrl || `https://${cfg.subdomain}.serveo.net`, status: "running" };
-            resolve(this.info);
-          } else {
-            console.log("[DEBUG] No subdomain configured, resolving as error");
-            this.info = { provider: "serveo", status: "error", error: "Timed out waiting for serveo URL." };
-            resolve(this.info);
-          }
-        }
-      }, 20_000);
+      };
+      this.spawnServeo(port, settle);
     });
   }
 
-  stop(): void {
+  /**
+   * Spawn the serveo ssh tunnel and wire up its handlers. On unexpected exit
+   * (network drop, serveo restart, idle timeout) it schedules a reconnect so a
+   * long-running gateway never ends up alive-but-unreachable. `settle` is
+   * invoked once the first connection result is known.
+   */
+  private spawnServeo(port: number, settle: () => void): void {
+    if (this.stopped) return;
+    this.info = { provider: "serveo", status: "starting" };
+    const cfg = this.config().tunnel;
+    const subdomain = cfg.subdomain ? `${cfg.subdomain}:` : "";
+    const args = [
+      "-R",
+      `${subdomain}80:127.0.0.1:${port}`,
+      "-o",
+      "StrictHostKeyChecking=no",
+      // Detect dead connections quickly and exit so we can reconnect.
+      "-o",
+      "ServerAliveInterval=30",
+      "-o",
+      "ServerAliveCountMax=3",
+      "-o",
+      "ExitOnForwardFailure=yes",
+      "serveo.net",
+    ];
+    const child = spawn("ssh", args, { shell: false });
+    this.child = child;
+    // A fatal config error (subdomain taken / key not registered) must not be
+    // retried in a tight loop — only transient drops should reconnect.
+    let fatal = false;
+
+    const onData = (buf: Buffer) => {
+      const text = buf.toString("utf8");
+
+      // ポートフォワーディング失敗を検出
+      if (text.includes("remote port forwarding failed") && this.info.status !== "error") {
+        log.warn("Serveo port forwarding failed. Subdomain might be in use.");
+        fatal = true;
+        this.info = {
+          provider: "serveo",
+          status: "error",
+          error: "Serveo port forwarding failed. Subdomain might be in use. Please try restarting the tunnel in a few seconds.",
+        };
+        this.clearTunnelTimeout();
+        this.killChild();
+        settle();
+        return;
+      }
+
+      // 固定サブドメインの利用には SSH 公開鍵の登録が必要。未登録だと毎回ランダムな
+      // ホストが割り当てられ、再起動のたびに URL が変わってしまう（ChatGPT コネクタが壊れる）。
+      // 登録用 URL を添えてエラーにし、ユーザーに一度きりの登録を促す。
+      if (
+        cfg.subdomain &&
+        /register your SSH public key/i.test(text) &&
+        this.info.status !== "running" &&
+        this.info.status !== "error"
+      ) {
+        const consoleUrl = text.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=\S+/i)?.[0];
+        fatal = true;
+        this.info = {
+          provider: "serveo",
+          status: "error",
+          error:
+            `Serveo requires a one-time SSH key registration to reserve the fixed subdomain "${cfg.subdomain}". ` +
+            (consoleUrl
+              ? `Open ${consoleUrl} and sign in with Google/GitHub, then restart the tunnel.`
+              : "Visit https://console.serveo.net/ssh/keys and register your SSH public key, then restart the tunnel."),
+        };
+        this.clearTunnelTimeout();
+        settle();
+        return;
+      }
+
+      // Serveo が出力する転送 URL をそのまま使う。実際の公開ホストは
+      // <subdomain>.serveousercontent.com で、ここを .serveo.net に書き換えると
+      // 警告ページ (302) に飛んでしまい /healthz が到達不能になる。
+      const m = text.match(/Forwarding HTTP traffic from (https:\/\/\S+)/i);
+      if (m && this.info.status !== "running" && this.info.status !== "error") {
+        this.info = { provider: "serveo", url: m[1], status: "running" };
+        this.clearTunnelTimeout();
+        settle();
+      }
+    };
+
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    child.on("error", (e) => {
+      this.info = { provider: "serveo", status: "error", error: e.message };
+      settle();
+    });
+    child.on("close", () => {
+      if (this.stopped || fatal) return;
+      // The ssh process exited unexpectedly while we should be serving — the
+      // gateway is still up, so reconnect to restore the public URL.
+      log.warn("Serveo tunnel dropped; reconnecting in 3s…");
+      this.child = undefined;
+      this.reconnectTimer = setTimeout(() => this.spawnServeo(port, settle), 3000);
+    });
+
+    this.clearTunnelTimeout();
+    this.timeoutId = setTimeout(() => {
+      if (this.info.status !== "running" && this.info.status !== "error") {
+        if (cfg.subdomain) {
+          this.info = {
+            provider: "serveo",
+            url: cfg.publicUrl || `https://${cfg.subdomain}.serveousercontent.com`,
+            status: "running",
+          };
+          settle();
+        } else {
+          this.info = { provider: "serveo", status: "error", error: "Timed out waiting for serveo URL." };
+          settle();
+        }
+      }
+    }, 20_000);
+  }
+
+  private clearTunnelTimeout(): void {
     if (this.timeoutId) {
       clearTimeout(this.timeoutId);
       this.timeoutId = undefined;
     }
+  }
+
+  private killChild(): void {
+    if (!this.child) return;
+    try {
+      this.child.stdout?.removeAllListeners();
+      this.child.stderr?.removeAllListeners();
+      this.child.removeAllListeners();
+      this.child.kill("SIGTERM");
+    } catch {
+      // ignore
+    }
+    this.child = undefined;
+  }
+
+  stop(): void {
+    this.stopped = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+    this.clearTunnelTimeout();
     if (this.child) {
       log.info("stopping tunnel");
-      try {
-        this.child.stdout?.removeAllListeners();
-        this.child.stderr?.removeAllListeners();
-        this.child.removeAllListeners();
-        this.child.kill("SIGTERM");
-      } catch {
-        // ignore
-      }
-      this.child = undefined;
+      this.killChild();
     }
     this.info = { provider: this.info.provider, status: "stopped" };
   }
