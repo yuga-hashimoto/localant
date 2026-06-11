@@ -1,4 +1,8 @@
 import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import readline from "node:readline";
+import { execSync } from "node:child_process";
 import { createGateway, type Gateway } from "@localant/gateway";
 import { startHttpServers } from "@localant/mcp";
 import { c, ok, warn, copyToClipboard, openBrowser, urlBox } from "./util.js";
@@ -10,21 +14,109 @@ export interface StartOptions {
   quiet?: boolean;
 }
 
+async function verifyTunnelReachable(url: string): Promise<boolean> {
+  const target = `${url.replace(/\/$/, "")}/healthz`;
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 5000);
+    const resp = await fetch(target, { signal: ctrl.signal, redirect: "manual" });
+    clearTimeout(timer);
+    return resp.ok && resp.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+async function getServeoRegistrationUrl(): Promise<string | undefined> {
+  try {
+    const home = os.homedir();
+    const pubKeyPath = path.join(home, ".ssh", "id_ed25519.pub");
+    if (fs.existsSync(pubKeyPath)) {
+      const output = execSync(`ssh-keygen -lf "${pubKeyPath}"`, { encoding: "utf8" });
+      const m = output.match(/SHA256:([^\s]+)/);
+      if (m) {
+        const fingerprint = `SHA256:${m[1]}`;
+        return `https://console.serveo.net/ssh/keys?add=${encodeURIComponent(fingerprint)}`;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return undefined;
+}
+
 /** Start the gateway, HTTP servers and (optionally) the tunnel; block forever. */
 export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void> {
   const cfg = gw.config();
   const servers = await startHttpServers(gw);
 
   let mcpEndpoint: string | undefined;
+  let tunnelSuccess = false;
+  let registrationUrl: string | undefined;
+
   if (!opts.noTunnel && cfg.tunnel.provider !== "none") {
     if (!opts.quiet) process.stdout.write(c.gray("Starting tunnel… "));
     const tunnel = await gw.tunnel.start(servers.gatewayPort);
+
     if (tunnel.status === "running" && tunnel.url) {
-      mcpEndpoint = `${tunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
-      if (!opts.quiet) process.stdout.write(c.green("ok\n"));
-    } else if (!opts.quiet) {
-      process.stdout.write(c.yellow("unavailable\n"));
+      const isReachable = await verifyTunnelReachable(tunnel.url);
+      if (isReachable) {
+        mcpEndpoint = `${tunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
+        if (!opts.quiet) process.stdout.write(c.green("ok\n"));
+        tunnelSuccess = true;
+      } else {
+        if (!opts.quiet) process.stdout.write(c.red("failed (unreachable)\n"));
+        const m = (tunnel.error || "").match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
+        registrationUrl = m ? m[0] : await getServeoRegistrationUrl();
+      }
+    } else {
+      if (!opts.quiet) process.stdout.write(c.yellow("unavailable\n"));
       console.log(warn(tunnel.error ?? "Tunnel not started."));
+      const m = (tunnel.error || "").match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
+      if (m) {
+        registrationUrl = m[0];
+      }
+    }
+
+    // もしキー登録が必要であれば、登録するまでCLI上で待機ループに入る
+    if (registrationUrl) {
+      console.log("\n" + c.bold("🔑 Action Required: Register SSH Key with Serveo"));
+      console.log(c.cyan("To request custom subdomains, serveo.net requires SSH key registration."));
+      console.log(c.cyan("Opening registration page in your default browser:"));
+      console.log(`  ${registrationUrl}\n`);
+
+      openBrowser(registrationUrl);
+
+      const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout,
+      });
+
+      while (!tunnelSuccess) {
+        await new Promise<void>((res) => {
+          rl.question(c.bold("Press [Enter] after you have registered the key on the website to retry..."), () => {
+            res();
+          });
+        });
+
+        console.log(c.gray("Retrying tunnel connection..."));
+        gw.tunnel.stop();
+        const retriedTunnel = await gw.tunnel.start(servers.gatewayPort);
+
+        if (retriedTunnel.status === "running" && retriedTunnel.url) {
+          const isReachable = await verifyTunnelReachable(retriedTunnel.url);
+          if (isReachable) {
+            mcpEndpoint = `${retriedTunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
+            console.log(ok("Tunnel connected successfully!\n"));
+            tunnelSuccess = true;
+          } else {
+            console.log(warn("Tunnel still not reachable (redirected). Please ensure you clicked 'Add Key' in the browser."));
+          }
+        } else {
+          console.log(warn(`Tunnel failed: ${retriedTunnel.error ?? "Unknown error"}`));
+        }
+      }
+      rl.close();
     }
   }
 
@@ -42,7 +134,11 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
     const copied = await copyToClipboard(mcpEndpoint);
     if (copied && !opts.quiet) console.log(ok("MCP endpoint copied to clipboard"));
   }
-  if (cfg.dashboard.enabled && !opts.noOpen) openBrowser(dashUrl);
+
+  // トンネルの接続が完全に成功している場合（またはトンネル無しの設定の場合）のみ、ダッシュボードを開く
+  if (cfg.dashboard.enabled && !opts.noOpen) {
+    openBrowser(dashUrl);
+  }
 
   const shutdown = () => {
     gw.tunnel.stop();
@@ -86,8 +182,6 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
   console.log("");
   console.log(`Then ask ChatGPT: ${c.cyan('"Run health check on my local app"')}`);
 
-  // Quick Tunnel URLs are random and change on every restart, forcing the user
-  // to recreate the ChatGPT connector each time. Point them at a fixed URL.
   if (rt.tunnel?.url && /trycloudflare\.com/.test(rt.tunnel.url)) {
     console.log("");
     console.log(warn("This is a temporary Quick Tunnel URL — it changes on every restart,"));
