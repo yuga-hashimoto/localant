@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import fs from "node:fs";
+import { execFileSync } from "node:child_process";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
 import { APP_VERSION, ConfigSchema, isToolInProfile } from "@localant/shared";
@@ -7,7 +8,19 @@ import { c, ok, warn, fail, openBrowser, promptYesNo } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
 import { ensureServeoRegistration } from "./serveo-setup.js";
-import { autostartSupported, isAutostartEnabled, enableAutostart, disableAutostart } from "./autostart.js";
+import { autostartSupported, isAutostartEnabled, enableAutostart, disableAutostart, bounceAutostart } from "./autostart.js";
+
+/** True when `candidate` is a strictly higher semver than `current`. */
+function isNewerVersion(candidate: string, current: string): boolean {
+  const parse = (v: string) => v.replace(/^v/, "").split("-")[0]!.split(".").map((n) => parseInt(n, 10) || 0);
+  const a = parse(candidate);
+  const b = parse(current);
+  for (let i = 0; i < 3; i++) {
+    if ((a[i] ?? 0) > (b[i] ?? 0)) return true;
+    if ((a[i] ?? 0) < (b[i] ?? 0)) return false;
+  }
+  return false;
+}
 
 const program = new Command();
 program.name("LocalAnt").description("Use ChatGPT as the brain and your local computer as the hands.").version(APP_VERSION);
@@ -140,10 +153,64 @@ program.command("doctor").description("Check the environment").action(async () =
   process.exit(passed ? 0 : 1);
 });
 
-program.command("update").description("How to update").action(() => {
-  console.log("Update with:");
-  console.log(c.cyan("  npm install -g LocalAnt@latest"));
-});
+program
+  .command("update")
+  .description("Update LocalAnt to the latest published version and restart the running gateway")
+  .option("--check", "only check for a newer version; do not install")
+  .option("--pm <manager>", "package manager to use (npm|pnpm|yarn|bun)", "npm")
+  .action((o) => {
+    const current = APP_VERSION;
+    let latest: string;
+    try {
+      latest = execFileSync("npm", ["view", "localant", "version"], { encoding: "utf8" }).trim();
+    } catch {
+      return console.log(fail("Could not reach npm to check for updates. Are you online?"));
+    }
+    if (!isNewerVersion(latest, current)) {
+      return console.log(ok(`Already up to date (v${current}).`));
+    }
+    console.log(`Update available: ${c.gray("v" + current)} → ${c.cyan("v" + latest)}`);
+    if (o.check) {
+      return console.log(c.gray("Run `localant update` to install it."));
+    }
+
+    // Install the latest globally with the chosen package manager.
+    const pm = String(o.pm);
+    const installArgs: Record<string, string[]> = {
+      npm: ["install", "-g", "localant@latest"],
+      pnpm: ["add", "-g", "localant@latest"],
+      yarn: ["global", "add", "localant@latest"],
+      bun: ["add", "-g", "localant@latest"],
+    };
+    const args = installArgs[pm];
+    if (!args) return console.log(fail(`Unknown package manager '${pm}'. Use npm|pnpm|yarn|bun.`));
+    console.log(c.gray(`Installing localant@latest via ${pm} …`));
+    try {
+      execFileSync(pm, args, { stdio: "inherit" });
+    } catch {
+      return console.log(fail(`${pm} install failed. Try manually: ${pm} ${args.join(" ")}`));
+    }
+    console.log(ok(`Updated to v${latest}.`));
+
+    // Auto-switch: restart the running gateway so it serves the new version.
+    let restarted = false;
+    if (autostartSupported() && isAutostartEnabled()) {
+      // Re-point the LaunchAgent at the freshly installed binary (its path may
+      // have changed) by regenerating the plist via the NEW global `localant`,
+      // then bounce the launchd job.
+      try {
+        execFileSync("localant", ["autostart", "enable"], { stdio: "ignore" });
+      } catch {
+        /* keep the existing plist */
+      }
+      restarted = bounceAutostart();
+    }
+    if (restarted) {
+      console.log(ok("Restarted the running gateway — now serving the new version."));
+    } else {
+      console.log(c.gray("Restart the gateway to apply: localant restart"));
+    }
+  });
 
 program
   .command("uninstall")

@@ -346,7 +346,8 @@ them behind the gateway's safety pipeline.
 ## CLI
 
 ```bash
-localant setup | start | stop | restart | status | doctor | update | uninstall
+localant setup | start | stop | restart | status | doctor | uninstall
+localant update [--check] [--pm npm|pnpm|yarn|bun]   # update to the latest published version and restart
 localant token rotate | show   # re-issue the auth token (secrets preserved)
 localant tunnel status
 localant dashboard | logs

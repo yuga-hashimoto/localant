@@ -90,6 +90,29 @@ export function enableAutostart(logDir: string): string {
   return plistPath();
 }
 
+/**
+ * (Re)load and restart the launchd-managed gateway so it picks up a freshly
+ * installed binary. Loads the agent if it isn't loaded yet, then `kickstart -k`
+ * to restart it. Returns true if the bounce was issued.
+ */
+export function bounceAutostart(): boolean {
+  if (!autostartSupported() || !isAutostartEnabled()) return false;
+  const uid = process.getuid?.();
+  if (uid === undefined) return false;
+  const domain = `gui/${uid}`;
+  try {
+    try {
+      execFileSync("launchctl", ["bootstrap", domain, plistPath()], { stdio: "ignore" });
+    } catch {
+      // Already bootstrapped — fine.
+    }
+    execFileSync("launchctl", ["kickstart", "-k", `${domain}/${LABEL}`], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Remove the LaunchAgent and stop any running launchd-managed instance. */
 export function disableAutostart(): void {
   if (!autostartSupported()) return;
