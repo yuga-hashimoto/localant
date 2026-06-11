@@ -18,6 +18,7 @@ export interface TunnelInfo {
 export class TunnelManager {
   private child?: ChildProcess;
   private info: TunnelInfo = { provider: "none", status: "stopped" };
+  private timeoutId?: NodeJS.Timeout;
 
   constructor(
     private readonly config: () => Config,
@@ -93,7 +94,7 @@ export class TunnelManager {
         this.info = { provider: "cloudflared", status: "error", error: e.message };
         resolve(this.info);
       });
-      setTimeout(() => {
+      this.timeoutId = setTimeout(() => {
         if (this.info.status !== "running") {
           this.info = { provider: "cloudflared", status: "error", error: "Timed out waiting for tunnel URL." };
           resolve(this.info);
@@ -129,7 +130,7 @@ export class TunnelManager {
         this.info = { provider: "ngrok", status: "error", error: e.message };
         resolve(this.info);
       });
-      setTimeout(() => {
+      this.timeoutId = setTimeout(() => {
         if (this.info.status !== "running") {
           if (cfg.domain) {
             this.info = { provider: "ngrok", url: cfg.publicUrl || `https://${cfg.domain}`, status: "running" };
@@ -224,7 +225,7 @@ export class TunnelManager {
         this.info = { provider: "localtunnel", status: "error", error: e.message };
         resolve(this.info);
       });
-      setTimeout(() => {
+      this.timeoutId = setTimeout(() => {
         if (this.info.status !== "running") {
           if (cfg.subdomain) {
             this.info = { provider: "localtunnel", url: cfg.publicUrl || `https://${cfg.subdomain}.loca.lt`, status: "running" };
@@ -260,6 +261,19 @@ export class TunnelManager {
             status: "error",
             error: `SSH key not registered with serveo.net. Please register here: ${registerUrl}`,
           };
+          if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
+          }
+          try {
+            child.stdout?.removeAllListeners();
+            child.stderr?.removeAllListeners();
+            child.removeAllListeners();
+            child.kill("SIGTERM");
+          } catch {
+            // ignore
+          }
+          this.child = undefined;
           resolve(this.info);
           return;
         }
@@ -272,6 +286,19 @@ export class TunnelManager {
             status: "error",
             error: "Serveo port forwarding failed. Subdomain might be in use. Please try restarting the tunnel in a few seconds.",
           };
+          if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
+          }
+          try {
+            child.stdout?.removeAllListeners();
+            child.stderr?.removeAllListeners();
+            child.removeAllListeners();
+            child.kill("SIGTERM");
+          } catch {
+            // ignore
+          }
+          this.child = undefined;
           resolve(this.info);
           return;
         }
@@ -288,7 +315,7 @@ export class TunnelManager {
         this.info = { provider: "serveo", status: "error", error: e.message };
         resolve(this.info);
       });
-      setTimeout(() => {
+      this.timeoutId = setTimeout(() => {
         if (this.info.status !== "running" && this.info.status !== "error") {
           if (cfg.subdomain) {
             this.info = { provider: "serveo", url: cfg.publicUrl || `https://${cfg.subdomain}.serveo.net`, status: "running" };
@@ -303,9 +330,20 @@ export class TunnelManager {
   }
 
   stop(): void {
+    if (this.timeoutId) {
+      clearTimeout(this.timeoutId);
+      this.timeoutId = undefined;
+    }
     if (this.child) {
       log.info("stopping tunnel");
-      this.child.kill("SIGTERM");
+      try {
+        this.child.stdout?.removeAllListeners();
+        this.child.stderr?.removeAllListeners();
+        this.child.removeAllListeners();
+        this.child.kill("SIGTERM");
+      } catch {
+        // ignore
+      }
       this.child = undefined;
     }
     this.info = { provider: this.info.provider, status: "stopped" };
