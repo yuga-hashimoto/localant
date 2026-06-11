@@ -140,6 +140,7 @@ export const ConfigSchema = z.object({
       token: z.string().optional(),
       domain: z.string().optional(),
       subdomain: z.string().optional(),
+      subdomainConfirmed: z.boolean().default(false),
     })
     .default({ provider: "cloudflared" }),
   security: z
