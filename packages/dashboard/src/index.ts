@@ -113,7 +113,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
 let current = "Home";
 let pendingApprovals = 0;
 let logTimers = [];
@@ -740,6 +740,31 @@ const VIEWS = {
       toast('Config saved');
       render();
     });
+  },
+
+  async Tools(m){
+    const tools = await api('tools');
+    m.innerHTML = '<div class="card"><h2>Exposed Tools</h2>'
+      + '<p class="muted">List of all built-in and skill-provided tools registered in LocalAnt.</p>'
+      + '<table><thead><tr><th>Name</th><th>Risk</th><th>Description</th><th>Parameters</th></tr></thead><tbody id="tl"></tbody></table></div>';
+    const tb = document.getElementById('tl');
+    if(!tools.length){ tb.appendChild(el('<tr><td colspan=4 class="muted">No tools registered.</td></tr>')); return; }
+    for(const t of tools){
+      const params = Object.entries(t.inputSchema || {}).map(function(item) {
+        const name = item[0];
+        const info = item[1];
+        const desc = info.description ? (' - ' + esc(info.description)) : '';
+        return '<code>' + esc(name) + '</code>: <span class="muted">' + esc(info.type) + '</span>' + desc;
+      }).join('<br>') || '<span class="muted">none</span>';
+
+      const tr = el('<tr>'
+        + '<td><b>' + esc(t.name) + '</b></td>'
+        + '<td class="' + riskClass(t.risk) + '">risk ' + t.risk + '</td>'
+        + '<td>' + esc(t.description) + '</td>'
+        + '<td>' + params + '</td>'
+        + '</tr>');
+      tb.appendChild(tr);
+    }
   },
 };
 

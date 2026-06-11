@@ -267,6 +267,28 @@ function mountDashboardApi(
     next();
   });
 
+  r.get("/tools", (_q, s) => {
+    s.json(
+      gw.registry.list().map((t) => {
+        const shape = (t.inputSchema as any).shape ?? {};
+        const inputSchema: Record<string, { type: string; description?: string }> = {};
+        for (const [key, field] of Object.entries(shape)) {
+          const f = field as any;
+          inputSchema[key] = {
+            type: getZodTypeString(f),
+            description: f.description ?? f._def?.description ?? undefined,
+          };
+        }
+        return {
+          name: t.name,
+          description: t.description,
+          risk: t.risk,
+          inputSchema,
+        };
+      })
+    );
+  });
+
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
   r.get("/health", (_q, s) => s.json({ status: "ok", version: APP_VERSION, time: new Date().toISOString() }));
   r.get("/doctor", async (_q, s) => {
@@ -622,4 +644,25 @@ function listen(app: express.Express, port: number, host: string): Promise<http.
     server.on("error", reject);
     server.listen(port, host, () => resolve(server));
   });
+}
+
+function getZodTypeString(f: any): string {
+  if (!f || !f._def) return "unknown";
+  const typeName = f._def.typeName;
+  if (typeName === "ZodOptional") {
+    return `${getZodTypeString(f._def.innerType)} (optional)`;
+  }
+  if (typeName === "ZodNullable") {
+    return `${getZodTypeString(f._def.innerType)} (nullable)`;
+  }
+  if (typeName === "ZodArray") {
+    return `${getZodTypeString(f._def.type)}[]`;
+  }
+  if (typeName === "ZodEnum") {
+    return `enum (${f._def.values.join(" | ")})`;
+  }
+  if (typeName === "ZodEffects") {
+    return getZodTypeString(f._def.schema);
+  }
+  return typeName.replace(/^Zod/, "").toLowerCase();
 }

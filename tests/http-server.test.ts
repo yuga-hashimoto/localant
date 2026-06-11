@@ -294,4 +294,16 @@ describe("dashboard api routes", () => {
     expect(((await del.json()) as { removed: boolean }).removed).toBe(true);
     expect(apiGw.config().mcpServers["demo-mcp"]).toBeUndefined();
   });
+
+  it("lists exposed tools including parameter types", async () => {
+    const res = await apiGet("tools");
+    expect(res.status).toBe(200);
+    const list = (await res.json()) as { name: string; description: string; risk: number; inputSchema: Record<string, { type: string }> }[];
+    expect(list.length).toBeGreaterThan(0);
+    const getVersion = list.find((t) => t.name === "get_version")!;
+    expect(getVersion).toBeDefined();
+    expect(getVersion.description).toMatch(/version/i);
+    expect(getVersion.risk).toBe(0);
+  });
 });
+
