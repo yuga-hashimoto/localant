@@ -341,10 +341,17 @@ export class TunnelManager {
           return;
         }
 
-        const m = text.match(/https:\/\/(?!console\b)[a-z0-9-]+\.serveo\.net/i);
+        // serveo.net または serveousercontent.com のURLを検出
+        const m = text.match(/https:\/\/(?!console\b)([a-z0-9-]+)\.(?:serveo\.net|serveousercontent\.com)/i);
         if (m && this.info.status !== "running" && this.info.status !== "error") {
-          console.log(`[DEBUG] Detected serveo URL: ${m[0]}`);
-          this.info = { provider: "serveo", url: m[0], status: "running" };
+          // 公開用URLは常に serveo.net を使用
+          const publicUrl = `https://${m[1]}.serveo.net`;
+          console.log(`[DEBUG] Detected serveo URL: ${m[0]} → public URL: ${publicUrl}`);
+          this.info = { provider: "serveo", url: publicUrl, status: "running" };
+          if (this.timeoutId) {
+            clearTimeout(this.timeoutId);
+            this.timeoutId = undefined;
+          }
           console.log("[DEBUG] Resolving startServeo as running");
           resolve(this.info);
         }

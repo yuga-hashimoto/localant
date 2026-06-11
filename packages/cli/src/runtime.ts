@@ -25,9 +25,28 @@ async function verifyTunnelReachable(url: string): Promise<boolean> {
     }, 5000);
     console.log("[DEBUG] Sending fetch request...");
     const resp = await fetch(target, { signal: ctrl.signal, redirect: "manual" });
-    console.log(`[DEBUG] Fetch response received. Status: ${resp.status}`);
     clearTimeout(timer);
-    return resp.ok && resp.status === 200;
+
+    if (resp.ok && resp.status === 200) {
+      console.log(`[DEBUG] Fetch response: 200 OK — tunnel is reachable`);
+      return true;
+    }
+
+    // Serveo 無料プランでは警告ページ (serveousercontent.com) への 302 リダイレクトが発生する。
+    // これはトンネルが正常に動作していることを意味するため、reachable として扱う。
+    if (resp.status === 301 || resp.status === 302) {
+      const location = resp.headers.get("location") || "";
+      console.log(`[DEBUG] Fetch response: ${resp.status} redirect to: ${location}`);
+      if (location.includes("serveousercontent.com")) {
+        console.log("[DEBUG] Redirect to serveousercontent.com — tunnel IS working (free tier warning page)");
+        return true;
+      }
+      console.log("[DEBUG] Redirect to unknown destination — treating as unreachable");
+      return false;
+    }
+
+    console.log(`[DEBUG] Fetch response: ${resp.status} — treating as unreachable`);
+    return false;
   } catch (err: any) {
     console.log(`[DEBUG] Fetch failed with error: ${err.message || err}`);
     return false;
