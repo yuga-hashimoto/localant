@@ -30,7 +30,7 @@ ChatGPT
   ↓ Apps SDK / MCP Connector (Streamable HTTP /mcp)
 LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashboard
   ↓ Local PC
-  ├─ Shell (allowlisted) · Filesystem (allowlisted) · Git
+  ├─ Shell · Filesystem · Git (deny-list by default · allow-list in strict mode)
   ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
   ├─ Browser (Playwright, isolated profile) · Android (ADB)
   ├─ Articles (Zenn / Qiita / note) · Custom Skills
@@ -43,7 +43,7 @@ LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashbo
 
 A **local-first MCP Gateway** for ChatGPT. ChatGPT is the conversational UI and
 decision-maker; your PC is the execution environment. The gateway publishes a
-catalog of **140+ permissioned tools** over the Model Context Protocol, which
+catalog of **200+ permissioned tools** over the Model Context Protocol, which
 ChatGPT's Developer-Mode connectors can call.
 
 The design is inspired by OpenClaw (local gateway + skills + registry),
@@ -61,8 +61,9 @@ and audit.
 
 ## Features
 
-- 🔒 **Default-deny security**: allowlisted dirs/commands, blocklist, path &
-  symlink traversal prevention, secret vault + redaction.
+- 🔒 **Layered security**: deny-list by default (sensitive-path blocklist +
+  always-blocked commands), optional `strict` allow-list mode, path & symlink
+  traversal prevention, secret vault + redaction.
 - ✅ **Local approval queue**: risk-2+ tools require explicit approval in the
   dashboard or CLI — ChatGPT's confirmation is never trusted alone.
 - 🧾 **Full audit log**: every tool call recorded (with secrets redacted).
@@ -223,22 +224,28 @@ A local-only dashboard (`http://127.0.0.1:8788`) is a full control panel — eve
 setting that's available on the CLI is editable from the web, and vice versa.
 A live status badge and a pending-approvals counter update automatically.
 
+Tabs: **Home · Tools · Security · Approvals · Audit · Secrets · Agents ·
+Settings**.
+
 - **Home** — status, MCP endpoint (copy), tunnel start/stop/restart, **Test
   connection** (fetches the public URL to confirm ChatGPT can reach you), health
   check.
-- **Settings** — security mode (open/strict/yolo), risk policy, **auth token
-  reveal/rotate** (rotation takes effect with no restart), tunnel provider +
-  fixed-URL config with **Save & restart**, gateway/dashboard ports, allowed
-  directories/commands, blocked tokens (core tokens shown but locked), **bridged
-  MCP servers** (add/test/remove downstream stdio servers), and a raw JSON editor
-  with validation.
-- **Skills** — create, enable/disable, inspect permissions (modal), uninstall.
-- **Agents** — enable/disable (e.g. Codex), **launch plan/execute tasks** and
-  live-tail their logs.
+- **Tools** — browse every exposed tool, with **Skills** (create, enable/disable,
+  inspect permissions, uninstall) and **MCP** (add/test/remove downstream stdio
+  servers) sub-tabs.
+- **Security** — read-only view of the active mode, allowed directories/commands
+  (strict mode only), always-blocked command tokens, and the risk policy.
+- **Approvals** — live pending-approval queue (approve/deny, per-session option).
 - **Audit** — full-text search and click-through to the full input/output of any
   entry.
-- **Secrets** — add/remove with reveal toggle (names only). Plus a live
-  **Approvals** queue.
+- **Secrets** — add/remove with reveal toggle (names only).
+- **Agents** — enable/disable (e.g. Codex), **launch plan/execute tasks** against
+  a working directory and live-tail their logs.
+- **Settings** — security mode (open/strict/yolo), risk policy, **tool profile**,
+  **auth token reveal/rotate** (rotation takes effect with no restart), tunnel
+  provider + fixed-URL config with **Save & restart**, gateway/dashboard ports,
+  allowed directories/commands, blocked tokens (core tokens shown but locked),
+  and a raw JSON editor with validation.
 
 ## Skills
 
@@ -259,7 +266,7 @@ CLI (`localant skills ...`). See [docs/skills.md](docs/skills.md).
 ### How to create a skill
 
 ```ts
-import { defineSkill, z } from "@LocalAnt/skill-sdk";
+import { defineSkill, z } from "@localant/skill-sdk";
 
 export default defineSkill({
   name: "hello-world",
@@ -307,11 +314,15 @@ Same flow with `agent:"codex"` once `codingAgents.codex.enabled = true` and the
 
 ## Article publishing
 
+Article publishing is provided by the bundled **`article-publisher` skill**
+(disabled by default — enable it with `skill_enable` / `localant skills enable
+article-publisher` first):
+
 - **Zenn**: GitHub-repo method — writes `articles/<slug>.md` with
   `published:false`, can open a PR branch. (`zenn_*`)
 - **Qiita**: official API with `QIITA_TOKEN` from the vault; private-first.
   (`qiita_*`)
-- **note**: draft-first local files; publishing requires the note-mcp adapter.
+- **note**: local drafts only (note has no official public write API).
   (`note_*`)
 
 Publish actions are **risk 4 (double approval)**. See [docs/articles.md](docs/articles.md).
@@ -349,7 +360,8 @@ them behind the gateway's safety pipeline.
 localant setup | start | stop | restart | status | doctor | uninstall
 localant update [--check] [--pm npm|pnpm|yarn|bun]   # update to the latest published version and restart
 localant token rotate | show   # re-issue the auth token (secrets preserved)
-localant tunnel status
+localant tunnel status | start | stop
+localant config show | set <key> <value>   # e.g. localant config set security.mode open
 localant dashboard | logs
 localant approvals list | approve <id> [--session] | deny <id>
 localant skills list | info <name> | enable <name> | disable <name> | install <git-url> | validate <name> | publish <name>
@@ -376,8 +388,11 @@ See [docs/architecture.md](docs/architecture.md).
 
 ## FAQ
 
-- **Does ChatGPT get a raw shell?** No. Only allowlisted commands run without
-  approval; anything else needs an explicit local approval.
+- **Does ChatGPT get a raw shell?** Depends on the mode. In `strict` mode only
+  allow-listed commands run without approval; anything else needs explicit local
+  approval. In the default `open` mode (and `yolo`) `bash` runs arbitrary
+  commands — but the always-blocked tokens (`sudo`, `rm -rf`, `dd`, …) are
+  rejected in every mode and PathGuard still blocks sensitive paths.
 - **Where is my config?** `~/.localant` on every platform (override with the
   `LOCALANT_HOME` env var). A pre-1.x install under `~/Library/Application
   Support/LocalAnt` / `~/.config/LocalAnt` is migrated automatically on first run.
