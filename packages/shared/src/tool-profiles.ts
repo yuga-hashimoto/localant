@@ -195,6 +195,17 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "agent_get_diff",
   "agent_run_validation",
 
+  // --- LSP / code intelligence ---
+  "lsp_status",
+  "lsp_list_servers",
+  "lsp_diagnostics",
+  "lsp_document_symbols",
+  "lsp_go_to_definition",
+  "lsp_find_references",
+  "lsp_hover",
+  "lsp_workspace_symbols",
+  "lsp_rename_symbol",
+
   // --- Web ---
   "webfetch",
   "websearch",

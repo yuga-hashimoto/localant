@@ -49,7 +49,7 @@ describe("tool profiles", () => {
   });
 
   it("coding profile exposes the coding tools", () => {
-    for (const name of ["bash", "read", "write", "edit", "multi_edit", "apply_patch", "grep", "glob", "git_diff", "project_run_validation", "todowrite", "question", "agent_run"]) {
+    for (const name of ["bash", "read", "write", "edit", "multi_edit", "apply_patch", "grep", "glob", "git_diff", "project_run_validation", "todowrite", "question", "agent_run", "lsp_diagnostics", "lsp_document_symbols", "webfetch"]) {
       expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
     }
   });
