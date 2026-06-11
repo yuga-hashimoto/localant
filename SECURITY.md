@@ -90,7 +90,7 @@ go through the same guard.
 - Listing returns **names only**; values are never displayed. `secret_set` stores
   a value but **no tool ever returns it**; `secret_remove` is risk 4.
 - Tool output and audit entries are deep-redacted for known secret values and
-  token-shaped strings — including `bash`/`webfetch`/coding-agent output.
+  token-shaped strings — including `bash` and coding-agent output.
 - Skills receive only the secret values they declare in their manifest, passed
   to an isolated subprocess — never the vault itself.
 

@@ -49,7 +49,7 @@ describe("tool profiles", () => {
   });
 
   it("coding profile exposes the coding tools", () => {
-    for (const name of ["bash", "read", "write", "edit", "multi_edit", "apply_patch", "grep", "glob", "git_diff", "project_run_validation", "todowrite", "question", "agent_run", "lsp_diagnostics", "lsp_document_symbols", "webfetch"]) {
+    for (const name of ["bash", "read", "write", "edit", "multi_edit", "apply_patch", "grep", "glob", "git_diff", "project_run_validation", "agent_run", "lsp_diagnostics", "lsp_document_symbols", "approval_request"]) {
       expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
     }
   });
@@ -60,9 +60,10 @@ describe("tool profiles", () => {
     }
   });
 
-  it("coding profile still hides destructive/authoring tools", () => {
-    // websearch intentionally excluded: ChatGPT does its own web search.
-    for (const name of ["git_reset_hard", "secret_remove", "skill_create", "adb_tap", "browser_evaluate", "websearch"]) {
+  it("coding profile hides destructive/authoring tools and ChatGPT-duplicates", () => {
+    // websearch/webfetch/todowrite/question excluded: ChatGPT does those natively.
+    // approval_approve excluded: ChatGPT must not self-approve.
+    for (const name of ["git_reset_hard", "secret_remove", "skill_create", "adb_tap", "browser_evaluate", "websearch", "webfetch", "todowrite", "question", "approval_approve", "approval_deny"]) {
       expect(isToolInProfile(name, "coding"), name).toBe(false);
     }
   });

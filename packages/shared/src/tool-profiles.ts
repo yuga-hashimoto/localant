@@ -163,25 +163,13 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "project_run_build",
   "project_run_validation",
 
-  // --- Todo / task / plan ---
-  "todowrite",
-  "todo_list",
-  "todo_update",
-  "todo_clear",
-  "task_create",
-  "task_update",
-  "task_list",
-  "task_result",
-  "plan_create",
-  "plan_update",
-  "plan_get",
-
-  // --- Question / human interaction ---
-  "question",
-  "ask_user",
+  // --- Human interaction ---
+  // NOTE: no todo/plan/task or question/ask_user tools — ChatGPT plans and asks
+  // the user natively, so tool-ifying those only bloats the surface. Only the
+  // local security-gating request is exposed; ChatGPT must NOT self-approve, so
+  // approval_approve/approval_deny are deliberately excluded (human approves in
+  // the dashboard / CLI).
   "approval_request",
-  "approval_approve",
-  "approval_deny",
 
   // --- Agent delegation (aliases over coding_agent_*) ---
   "agent_list",
@@ -206,11 +194,6 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "lsp_workspace_symbols",
   "lsp_rename_symbol",
 
-  // --- Web (local-reachable fetch only; ChatGPT does its own web search) ---
-  "webfetch",
-  "web_open",
-  "web_extract_text",
-  "web_screenshot",
 
   // --- Basic browser ---
   "browser_open",

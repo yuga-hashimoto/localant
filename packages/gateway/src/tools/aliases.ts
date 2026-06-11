@@ -56,10 +56,8 @@ export function registerAliasTools(gw: Gateway): void {
   registerAlias(gw, "git_checkout_new_branch", "git_create_branch");
   registerAlias(gw, "git_restore", "git_restore_file");
 
-  // --- Web (browser-backed) ---
-  registerAlias(gw, "web_open", "browser_open");
-  registerAlias(gw, "web_extract_text", "browser_extract_text");
-  registerAlias(gw, "web_screenshot", "browser_screenshot");
+  // --- Browser (local automation; no web_* aliases — those imply ChatGPT's own
+  // web browsing, which it already does). ---
   registerAlias(gw, "browser_wait", "browser_wait_for");
 
   // --- Agent delegation ---

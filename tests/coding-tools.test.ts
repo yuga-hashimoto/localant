@@ -229,28 +229,26 @@ describe("project validation", () => {
   });
 });
 
-describe("todo / question / agent", () => {
-  it("todowrite persists and todo_list returns them", async () => {
-    const g = gw();
-    const w = await g.executeTool("todowrite", { todos: [{ content: "do thing", status: "pending" }] }, { caller: "test" });
-    expect(w.ok).toBe(true);
-    const list = await g.executeTool("todo_list", {}, { caller: "test" });
-    expect((list.data as { todos: { content: string }[] }).todos[0]!.content).toBe("do thing");
-  });
-
-  it("question creates a pending question", async () => {
-    const g = gw();
-    const res = await g.executeTool("question", { question: "proceed?" }, { caller: "test" });
-    expect(res.ok).toBe(true);
-    const id = (res.data as { questionId: string }).questionId;
-    expect(g.todos.getQuestion(id)!.status).toBe("pending");
-  });
-
+describe("agent / removed-tool surface", () => {
   it("agent_list alias resolves to coding_agent_list", async () => {
     const g = gw();
     const res = await g.executeTool("agent_list", {}, { caller: "test" });
     expect(res.ok).toBe(true);
     expect(Array.isArray(res.data)).toBe(true);
+  });
+
+  it("does not register ChatGPT-duplicate tools (todo/question/webfetch/websearch)", async () => {
+    const g = gw();
+    for (const name of ["todowrite", "todo_list", "question", "ask_user", "webfetch", "websearch", "web_open"]) {
+      expect(g.registry.get(name), `${name} should not be registered`).toBeUndefined();
+    }
+  });
+
+  it("still exposes approval_request (local security gating)", async () => {
+    const g = gw();
+    const res = await g.executeTool("approval_request", { action: "do risky thing", risk: 3 }, { caller: "test" });
+    expect(res.ok).toBe(true);
+    expect((res.data as { approvalId: string }).approvalId).toBeTruthy();
   });
 });
 
@@ -277,14 +275,6 @@ describe("lsp", () => {
     const res = await g.executeTool("lsp_status", {}, { caller: "test" });
     expect(res.ok).toBe(true);
     expect(res.data).toHaveProperty("typescript");
-  });
-});
-
-describe("web aliases", () => {
-  it("web_open is registered as an alias of browser_open", async () => {
-    const g = gw();
-    expect(g.registry.get("web_open")).toBeTruthy();
-    expect(g.registry.get("web_extract_text")).toBeTruthy();
   });
 });
 

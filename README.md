@@ -89,10 +89,15 @@ It exposes the standard **Codex / Claude Code / OpenCode**-style tool names:
 | Run | `bash` · `shell_run_background` · `shell_get_output` · `shell_stop` · `command_exists` |
 | Git | `git_status` · `git_diff` · `git_add` · `git_commit` · `git_restore` · `git_stash` · `git_reset` · `git_apply_patch` · `git_is_dirty` |
 | Validate | `project_run_tests` · `project_run_lint` · `project_run_typecheck` · `project_run_build` · `project_run_validation` · `project_get_package_scripts` |
-| Plan | `todowrite` · `todo_list` · `plan_create` · `task_create` |
-| Human | `question` · `ask_user` · `approval_request` |
-| Web / LSP | `webfetch` (local/LAN reachable) · `lsp_status` · `lsp_diagnostics` · `lsp_document_symbols` |
+| Code intel | `lsp_status` · `lsp_diagnostics` · `lsp_document_symbols` · `lsp_go_to_definition` · `lsp_find_references` · `lsp_hover` · `lsp_rename_symbol` |
+| Approve | `approval_request` (the human approves in the dashboard / CLI) |
 | Delegate | `agent_run` (claude-code · codex · opencode · openclaw · antigravity-cli · hermes-agent) |
+
+> **No web search / web fetch / todo / "ask the user" tools** — ChatGPT already
+> does web search, browsing, planning, and asking you directly, so tool-ifying
+> those would only bloat the surface. LocalAnt exposes only what it *uniquely*
+> provides: your local files, shell, git, toolchain, language server, browser,
+> device, and agents.
 
 `bash` runs through a real shell (pipelines and `&&` work) **but** every command
 is screened by CommandGuard (blocked tokens, `rm -rf`, …), the `cwd` is validated
@@ -352,7 +357,6 @@ localant secrets set <name> [value] | list | remove <name>
 localant tools list | profile <minimal|coding|full>
 localant agents list | detect | run <agent> <projectId> <task> [--execute] | logs <taskId> | stop <taskId>
 localant mcp list | test <name> | import-all
-localant todos list | clear
 ```
 
 ## Architecture

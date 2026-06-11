@@ -2,47 +2,18 @@ import { z } from "zod";
 import type { Gateway } from "../gateway.js";
 
 /**
- * Human-in-the-loop tools. `question`/`ask_user` persist a pending question that
- * the human answers in the dashboard or CLI — ChatGPT cannot mark its own
- * question answered. `approval_request` creates an explicit approval via the
- * ApprovalStore (never auto-granted on ChatGPT's say-so).
+ * Human-in-the-loop. We deliberately do NOT ship `question`/`ask_user` tools —
+ * ChatGPT asks the user directly in the chat, so a tool for it is redundant.
+ * Only `approval_request` is exposed: it creates an explicit, risk-gated approval
+ * via the ApprovalStore that the HUMAN must grant (never auto-granted on
+ * ChatGPT's say-so).
  */
 export function registerQuestionTools(gw: Gateway): void {
   const r = gw.registry;
 
   r.register({
-    name: "question",
-    description:
-      "Ask the human a question and pause. Saves a pending question (visible in the dashboard/CLI) and returns its id. Poll the answer via approval/question listings — do not assume an answer.",
-    risk: 1,
-    inputSchema: z.object({ question: z.string(), context: z.string().optional() }),
-    summarize: (i) => `question: ${i.question.slice(0, 80)}`,
-    handler: (i) => {
-      const rec = gw.todos.createQuestion(i.question, i.context);
-      return {
-        questionId: rec.id,
-        status: rec.status,
-        message: "Question saved. The human must answer it in the dashboard or via `localant`.",
-      };
-    },
-  });
-
-  // ask_user is an alias-style duplicate kept distinct so both names resolve.
-  r.register({
-    name: "ask_user",
-    description: "Alias of `question`: ask the human and pause for an answer.",
-    risk: 1,
-    inputSchema: z.object({ question: z.string(), context: z.string().optional() }),
-    summarize: (i) => `ask_user: ${i.question.slice(0, 80)}`,
-    handler: (i) => {
-      const rec = gw.todos.createQuestion(i.question, i.context);
-      return { questionId: rec.id, status: rec.status };
-    },
-  });
-
-  r.register({
     name: "approval_request",
-    description: "Create an explicit approval request (risk-gated action) the human must approve.",
+    description: "Create an explicit approval request (risk-gated action) the human must approve in the dashboard or CLI.",
     risk: 0,
     inputSchema: z.object({ action: z.string(), risk: z.number().int().min(0).max(4).default(3), reason: z.string().default("") }),
     handler: (i, ctx) => {

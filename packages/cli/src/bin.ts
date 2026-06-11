@@ -470,19 +470,6 @@ mcpCmd
     console.log(JSON.stringify(res.data ?? res.error, null, 2));
   });
 
-// ---------- todos ----------
-const todosCmd = program.command("todos").description("Inspect ChatGPT's working todo list");
-todosCmd.command("list").action(() => {
-  const gw = createGateway();
-  const todos = gw.todos.listTodos();
-  if (!todos.length) return console.log("No todos.");
-  for (const t of todos) console.log(`[${t.status}] ${t.content}`);
-});
-todosCmd.command("clear").action(() => {
-  const gw = createGateway();
-  console.log(ok(`Cleared ${gw.todos.clearTodos().cleared} todos.`));
-});
-
 function ensureWorkspace(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }

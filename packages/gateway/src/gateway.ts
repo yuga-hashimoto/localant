@@ -16,7 +16,6 @@ import { ConfigStore } from "./stores/config-store.js";
 import { SecretVault } from "./stores/secret-vault.js";
 import { AuditLog } from "./stores/audit-log.js";
 import { ApprovalStore } from "./stores/approval-store.js";
-import { TodoStore } from "./stores/todo-store.js";
 import { PathGuard } from "./security/path-guard.js";
 import { CommandGuard } from "./security/command-guard.js";
 import { LspService } from "./managers/lsp-service.js";
@@ -58,7 +57,6 @@ export class Gateway {
   readonly vault: SecretVault;
   readonly audit: AuditLog;
   readonly approvals: ApprovalStore;
-  readonly todos: TodoStore;
   readonly pathGuard: PathGuard;
   readonly commandGuard: CommandGuard;
   readonly fs: FsManager;
@@ -105,7 +103,6 @@ export class Gateway {
     this.audit = new AuditLog(this.paths);
     this.audit.setSecretsProvider(() => this.vault.allValues());
     this.approvals = new ApprovalStore(this.paths);
-    this.todos = new TodoStore(this.paths);
 
     this.pathGuard = new PathGuard(this.cfg.security.allowedDirectories);
     this.pathGuard.setMode(this.cfg.security.mode);

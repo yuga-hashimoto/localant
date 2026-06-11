@@ -311,17 +311,7 @@ function mountDashboardApi(
     s.json(res.data ?? { error: res.error });
   });
 
-  // --- Todos / plans / questions / processes ---
-  r.get("/todos", (_q, s) => s.json({ todos: gw.todos.listTodos() }));
-  r.get("/plans", (_q, s) => s.json({ plans: gw.todos.listPlans() }));
-  r.get("/questions", (_q, s) => s.json({ questions: gw.todos.listQuestions() }));
-  r.post("/questions/:id/answer", (q, s) => {
-    try {
-      s.json(gw.todos.answerQuestion(q.params.id, String(q.body?.answer ?? "")));
-    } catch (e) {
-      s.status(404).json({ error: (e as Error).message });
-    }
-  });
+  // --- Running shell processes (local visibility; ChatGPT has no equivalent) ---
   r.get("/processes", (_q, s) => s.json({ processes: gw.shell.listProcesses() }));
 
   r.get("/status", (_q, s) => s.json(gw.runtimeInfo()));
