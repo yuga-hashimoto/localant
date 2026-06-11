@@ -60,12 +60,8 @@ export class CodingAgentManager {
       throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
     }
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
-    const args = [...cfg.args, ...cfg.planArgs];
     const isYolo = this.config().security.mode === "yolo";
-    if (isYolo && !args.includes("--danger")) {
-      args.push("--danger");
-    }
-    args.push(prompt);
+    const args = [...cfg.args, ...cfg.planArgs, ...(isYolo ? cfg.dangerArgs : []), prompt];
     const res = await execFileSafe(cfg.command, args, {
       cwd,
       timeoutMs: cfg.timeoutMs,
@@ -111,13 +107,11 @@ export class CodingAgentManager {
 
     const id = nanoid(8);
     const prompt = `Implement the following task. Run tests/validation when done.\n\n${task}`;
-    const args = [...cfg.args, ...cfg.executeArgs];
     const isYolo = this.config().security.mode === "yolo";
-    if (isYolo && !args.includes("--danger")) {
-      args.push("--danger");
-    }
-    args.push(prompt);
-    const child = spawn(cfg.command, args, { cwd, shell: false });
+    const args = [...cfg.args, ...cfg.executeArgs, ...(isYolo ? cfg.dangerArgs : []), prompt];
+    // stdin is /dev/null: spawned agents have no TTY, and an open-but-empty
+    // stdin pipe makes interactive CLIs hang waiting for input that never EOFs.
+    const child = spawn(cfg.command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
     const rec: RunningTask = {
       id,
       agent,

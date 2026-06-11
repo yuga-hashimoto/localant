@@ -106,6 +106,10 @@ const CodingAgentConfig = z.object({
   args: z.array(z.string()).default([]),
   planArgs: z.array(z.string()).default([]),
   executeArgs: z.array(z.string()).default([]),
+  // Flags appended only when security.mode is "yolo" to auto-approve tool use.
+  // These differ per agent (e.g. claude/agy use --dangerously-skip-permissions),
+  // so they are configured here rather than hardcoded.
+  dangerArgs: z.array(z.string()).default([]),
   defaultPermissionMode: z.enum(["plan", "execute"]).default("plan"),
   maxTurns: z.number().int().positive().default(10),
   timeoutMs: z.number().int().positive().default(600_000),
@@ -180,6 +184,7 @@ export const ConfigSchema = z.object({
         args: [],
         planArgs: ["-p"],
         executeArgs: ["-p"],
+        dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,
@@ -208,8 +213,11 @@ export const ConfigSchema = z.object({
         enabled: true,
         command: "agy",
         args: [],
-        planArgs: [],
-        executeArgs: [],
+        // agy launches an interactive TUI by default, which hangs when spawned
+        // without a TTY. --print runs a single prompt non-interactively.
+        planArgs: ["--print"],
+        executeArgs: ["--print"],
+        dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,

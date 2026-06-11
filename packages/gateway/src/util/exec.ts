@@ -22,7 +22,11 @@ export interface ExecOptions {
 export function execFileSafe(file: string, args: string[], opts: ExecOptions = {}): Promise<ExecResult> {
   const { cwd, timeoutMs = 120_000, maxOutputBytes = 100_000, input, env } = opts;
   return new Promise((resolve) => {
-    const child = spawn(file, args, { cwd, env: env ?? process.env, shell: false });
+    // When no input is supplied, give the child /dev/null for stdin. A spawned
+    // process has no TTY, and an open-but-empty stdin pipe makes interactive
+    // CLIs (e.g. coding agents) hang waiting for input that never reaches EOF.
+    const stdin = input !== undefined ? "pipe" : "ignore";
+    const child = spawn(file, args, { cwd, env: env ?? process.env, shell: false, stdio: [stdin, "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
@@ -31,10 +35,10 @@ export function execFileSafe(file: string, args: string[], opts: ExecOptions = {
       child.kill("SIGKILL");
     }, timeoutMs);
 
-    child.stdout.on("data", (d: Buffer) => {
+    child.stdout?.on("data", (d: Buffer) => {
       if (stdout.length < maxOutputBytes) stdout += d.toString("utf8");
     });
-    child.stderr.on("data", (d: Buffer) => {
+    child.stderr?.on("data", (d: Buffer) => {
       if (stderr.length < maxOutputBytes) stderr += d.toString("utf8");
     });
     child.on("error", (err) => {
@@ -50,7 +54,7 @@ export function execFileSafe(file: string, args: string[], opts: ExecOptions = {
         timedOut,
       });
     });
-    if (input !== undefined) {
+    if (input !== undefined && child.stdin) {
       child.stdin.write(input);
       child.stdin.end();
     }
