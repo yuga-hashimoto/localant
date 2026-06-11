@@ -248,7 +248,7 @@ export class TunnelManager {
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
-        const m = text.match(/https:\/\/[a-z0-9-]+\.serveo\.net/i);
+        const m = text.match(/https:\/\/(?!console\b)[a-z0-9-]+\.serveo\.net/i);
         if (m && this.info.status !== "running") {
           this.info = { provider: "serveo", url: m[0], status: "running" };
           resolve(this.info);
