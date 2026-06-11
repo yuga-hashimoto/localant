@@ -61,7 +61,8 @@ describe("tool profiles", () => {
   });
 
   it("coding profile still hides destructive/authoring tools", () => {
-    for (const name of ["git_reset_hard", "secret_remove", "skill_create", "adb_tap", "browser_evaluate"]) {
+    // websearch intentionally excluded: ChatGPT does its own web search.
+    for (const name of ["git_reset_hard", "secret_remove", "skill_create", "adb_tap", "browser_evaluate", "websearch"]) {
       expect(isToolInProfile(name, "coding"), name).toBe(false);
     }
   });

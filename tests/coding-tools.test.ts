@@ -280,15 +280,6 @@ describe("lsp", () => {
   });
 });
 
-describe("websearch", () => {
-  it("returns provider guidance when no API key is configured", async () => {
-    const g = gw();
-    const res = await g.executeTool("websearch", { query: "localant" }, { caller: "test" });
-    expect(res.ok).toBe(true);
-    expect((res.data as { error?: string }).error).toMatch(/provider/i);
-  });
-});
-
 describe("web aliases", () => {
   it("web_open is registered as an alias of browser_open", async () => {
     const g = gw();

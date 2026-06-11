@@ -206,9 +206,8 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "lsp_workspace_symbols",
   "lsp_rename_symbol",
 
-  // --- Web ---
+  // --- Web (local-reachable fetch only; ChatGPT does its own web search) ---
   "webfetch",
-  "websearch",
   "web_open",
   "web_extract_text",
   "web_screenshot",

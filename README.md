@@ -91,7 +91,7 @@ It exposes the standard **Codex / Claude Code / OpenCode**-style tool names:
 | Validate | `project_run_tests` · `project_run_lint` · `project_run_typecheck` · `project_run_build` · `project_run_validation` · `project_get_package_scripts` |
 | Plan | `todowrite` · `todo_list` · `plan_create` · `task_create` |
 | Human | `question` · `ask_user` · `approval_request` |
-| Web / LSP | `webfetch` · `websearch` · `lsp_status` · `lsp_diagnostics` |
+| Web / LSP | `webfetch` (local/LAN reachable) · `lsp_status` · `lsp_diagnostics` · `lsp_document_symbols` |
 | Delegate | `agent_run` (claude-code · codex · opencode · openclaw · antigravity-cli · hermes-agent) |
 
 `bash` runs through a real shell (pipelines and `&&` work) **but** every command
