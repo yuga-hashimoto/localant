@@ -248,8 +248,25 @@ export class TunnelManager {
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
+
+        // 登録警告URLを検出
+        const regMatch = text.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
+        if (regMatch && this.info.status !== "error") {
+          const registerUrl = regMatch[0];
+          log.warn(`SSH key registration required: ${registerUrl}`);
+          openBrowser(registerUrl);
+
+          this.info = {
+            provider: "serveo",
+            status: "error",
+            error: `SSH key not registered with serveo.net. Opening registration page: ${registerUrl}`,
+          };
+          resolve(this.info);
+          return;
+        }
+
         const m = text.match(/https:\/\/(?!console\b)[a-z0-9-]+\.serveo\.net/i);
-        if (m && this.info.status !== "running") {
+        if (m && this.info.status !== "running" && this.info.status !== "error") {
           this.info = { provider: "serveo", url: m[0], status: "running" };
           resolve(this.info);
         }
@@ -261,7 +278,7 @@ export class TunnelManager {
         resolve(this.info);
       });
       setTimeout(() => {
-        if (this.info.status !== "running") {
+        if (this.info.status !== "running" && this.info.status !== "error") {
           if (cfg.subdomain) {
             this.info = { provider: "serveo", url: cfg.publicUrl || `https://${cfg.subdomain}.serveo.net`, status: "running" };
             resolve(this.info);
@@ -281,5 +298,14 @@ export class TunnelManager {
       this.child = undefined;
     }
     this.info = { provider: this.info.provider, status: "stopped" };
+  }
+}
+
+function openBrowser(url: string): void {
+  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+  try {
+    spawn(cmd, [url], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();
+  } catch {
+    /* ignore */
   }
 }
