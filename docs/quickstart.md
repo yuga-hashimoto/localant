@@ -45,6 +45,6 @@ localant status
 localant logs
 localant approvals list
 localant skills list
-localant projects add ~/Projects/my-app
+localant agents run claude-code ~/Documents/my-app "Plan SEO improvements"
 localant secrets set QIITA_TOKEN
 ```

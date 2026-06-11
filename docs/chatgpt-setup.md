@@ -76,13 +76,12 @@ localant status        # shows MCP URL
 
 ## Try it
 
-> - "List my registered projects."
-> - "Show the git diff of my-app and review it."
-> - "Read the README in ~/Projects/my-app."
+> - "Show the git diff of ~/Documents/my-app and review it."
+> - "Read the README in ~/Documents/my-app."
 > - "Create a new skill named qiita-private-post (don't enable it yet)."
-> - "Ask Claude Code to plan SEO improvements for my-app."
+> - "Ask Claude Code to plan SEO improvements for ~/Documents/my-app."
 
-ChatGPT will call tools like `project_list`, `git_diff`, `fs_read_file`,
+ChatGPT will call tools like `git_diff`, `fs_read_file`,
 `skill_generate_from_prompt`, and `coding_agent_plan`. Risky actions will ask you
 to approve in the dashboard or CLI.
 

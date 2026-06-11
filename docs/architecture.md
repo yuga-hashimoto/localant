@@ -12,7 +12,7 @@ packages/
   gateway/     the engine (no network):
                  stores/    config, secret-vault, audit-log, approval-store
                  security/  path-guard, command-guard
-                 managers/  fs, git, shell, project-registry, skill-runtime,
+                 managers/  fs, git, shell, skill-runtime,
                             coding-agent, tunnel
                  tools/     built-in tool families registered onto a registry
                  gateway.ts execution pipeline (validate→approve→run→redact→audit)

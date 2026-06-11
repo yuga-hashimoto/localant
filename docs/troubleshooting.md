@@ -63,9 +63,11 @@ Then ask ChatGPT to retry.
 
 ### "Permission denied" on filesystem tools
 
-- Only paths inside `security.allowedDirectories` are accessible.
-- Sensitive paths (`~/.ssh`, `/etc`, etc) are always blocked.
-- Run `localant doctor` to see your allowed directories.
+- In `strict` mode, only paths inside `security.allowedDirectories` are
+  accessible. In `open`/`yolo` mode the allowlist is not enforced — any path
+  outside the sensitive blocklist is allowed.
+- Sensitive paths (`~/.ssh`, `/etc`, etc) are always blocked, in every mode.
+- Run `localant doctor` to see your mode and allowed directories.
 
 ### "Command blocked" on shell tools
 

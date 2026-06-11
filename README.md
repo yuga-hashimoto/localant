@@ -237,8 +237,8 @@ A live status badge and a pending-approvals counter update automatically.
   live-tail their logs.
 - **Audit** — full-text search and click-through to the full input/output of any
   entry.
-- **Projects** — register/remove. **Secrets** — add/remove with reveal toggle
-  (names only). Plus a live **Approvals** queue.
+- **Secrets** — add/remove with reveal toggle (names only). Plus a live
+  **Approvals** queue.
 
 ## Skills
 

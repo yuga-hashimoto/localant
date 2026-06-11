@@ -31,7 +31,7 @@ Switch modes in the dashboard **Settings** tab or with
 - **`minimal` (default)** — only a small core surface: the three delegation
   pillars (**Shell** `shell_*`, **coding Agent** `coding_agent_*`, **Skill**
   `skill_run`/`skill_list`/…), a read-only filesystem path (`fs_read_file`,
-  `fs_list_files`, `fs_search_content`, …), read-only project context, the MCP
+  `fs_list_files`, `fs_search_content`, …), the MCP
   bridge (`mcp_server_*` — connect downstream MCP servers and proxy their tools),
   and the control plane (status, approvals, audit). Real work is pushed onto shell
   commands, coding agents, and skills rather than bespoke tools. Tools outside

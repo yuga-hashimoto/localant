@@ -63,10 +63,10 @@ ChatGPT のための**ローカルファースト MCP ゲートウェイ**です
 - 🧾 **完全な監査ログ**: すべてのツール呼び出しを記録（シークレットはマスキング）。
 - 🧩 **スキルシステム**: 作成・検証・有効化・実行・git からの導入・公開、そして
   **ChatGPT からのスキル生成**（常に無効状態で保存）。
-- 🤖 **コーディングエージェント**: Claude Code / Codex を駆動（計画 → 承認 → 実行
-  → 検証 → 差分）。
-- 🖥️ **ローカルダッシュボード**: ステータス・承認・監査・スキル・プロジェクト・
-  シークレット・エージェント。
+- 🤖 **コーディングエージェント**: Claude Code / Codex を任意の作業ディレクトリで
+  駆動（計画 → 承認 → 実行 → 検証 → 差分）。
+- 🖥️ **ローカルダッシュボード**: ステータス・承認・監査・スキル・シークレット・
+  エージェント。
 - 🌐 **3分セットアップ**: Cloudflare Tunnel / ngrok とクリップボードコピー対応。
 - 🔌 **アダプタ**: OpenClaw、Desktop Commander、任意の MCP サーバ。
 
@@ -169,7 +169,7 @@ localant token rotate | show   # 認証トークンを再発行（シークレ�
 localant tunnel status
 localant approvals list | approve <id> [--session] | deny <id>
 localant skills list | info <name> | enable <name> | disable <name> | install <git-url>
-localant projects list | add <path> [--name <n>] | remove <id>
+localant agents list | detect | run <agent> <cwd> <task> [--execute] | logs <taskId> | stop <taskId>
 localant secrets set <name> [value] | list | remove <name>
 ```
 
