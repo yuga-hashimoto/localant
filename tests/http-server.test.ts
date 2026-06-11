@@ -298,12 +298,18 @@ describe("dashboard api routes", () => {
   it("lists exposed tools including parameter types", async () => {
     const res = await apiGet("tools");
     expect(res.status).toBe(200);
-    const list = (await res.json()) as { name: string; description: string; risk: number; inputSchema: Record<string, { type: string }> }[];
+    const list = (await res.json()) as { name: string; description: string; risk: number; active: boolean; inputSchema: Record<string, { type: string }> }[];
     expect(list.length).toBeGreaterThan(0);
     const getVersion = list.find((t) => t.name === "get_version")!;
     expect(getVersion).toBeDefined();
     expect(getVersion.description).toMatch(/version/i);
     expect(getVersion.risk).toBe(0);
+    // Under the default minimal profile, the catalog still lists every tool but
+    // flags which ones are advertised to ChatGPT.
+    expect(getVersion.active).toBe(true);
+    const gitCommit = list.find((t) => t.name === "git_commit")!;
+    expect(gitCommit).toBeDefined();
+    expect(gitCommit.active).toBe(false);
   });
 });
 

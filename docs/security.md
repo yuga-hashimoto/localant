@@ -24,6 +24,27 @@ Switch modes in the dashboard **Settings** tab or with
   `shutdown`, `reboot`, plus `rm -rf` / `chmod 777` — always rejected and cannot
   be removed from the blocklist.
 
+## Tool profile (advertised surface)
+
+`tools.profile` controls how many tools are advertised to ChatGPT:
+
+- **`minimal` (default)** — only a small core surface: the three delegation
+  pillars (**Shell** `shell_*`, **coding Agent** `coding_agent_*`, **Skill**
+  `skill_run`/`skill_list`/…), a read-only filesystem path (`fs_read_file`,
+  `fs_list_files`, `fs_search_content`, …), read-only project context, the MCP
+  bridge (`mcp_server_*` — connect downstream MCP servers and proxy their tools),
+  and the control plane (status, approvals, audit). Real work is pushed onto shell
+  commands, coding agents, and skills rather than bespoke tools. Tools outside
+  this set are also blocked at execution time, so a hallucinated call can't reach
+  them.
+- **`full`** — every registered tool (browser, adb, git, CLI adapters,
+  filesystem writes, skill authoring, …). Note: article publishing moved to the
+  `article-publisher` skill; the MCP bridge (`mcp_server_*`) is in `minimal`.
+
+Switch profiles in the dashboard or by setting `tools.profile` in the config.
+The smaller `minimal` surface keeps ChatGPT's tool selection sharp and shrinks
+each request.
+
 ## Other controls
 
 - **Risk levels 0–4**; in `strict`, risk 2+ requires local approval, risk 4

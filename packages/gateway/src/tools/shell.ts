@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
-import type { Gateway } from "../gateway.js";
+import { approvalRequirementForMode, type Gateway } from "../gateway.js";
 
 export function registerShellTools(gw: Gateway): void {
   const r = gw.registry;
@@ -56,6 +56,21 @@ export function registerShellTools(gw: Gateway): void {
     risk: 0,
     inputSchema: z.object({ command: z.string(), reason: z.string().default("") }),
     handler: (i, ctx) => {
+      // shell_run_approved_command is risk 3. In open/yolo the mode policy never
+      // gates risk-3 execution, so manufacturing a pending approval here would
+      // just leave an orphaned entry the user has to clear by hand. Only create
+      // one when the current mode would actually require it (strict).
+      const cfg = gw.config();
+      const needsApproval =
+        approvalRequirementForMode(cfg.security.mode, 3, cfg.security.approveRisk1) !== "none";
+      if (!needsApproval) {
+        return {
+          approvalRequired: false,
+          message:
+            `No approval needed in "${cfg.security.mode}" mode — run the command directly with ` +
+            `shell_run_approved_command (the hard blocklist still applies).`,
+        };
+      }
       const req = gw.approvals.create({
         tool: "shell_run_approved_command",
         risk: 3,
@@ -66,6 +81,7 @@ export function registerShellTools(gw: Gateway): void {
         sessionId: ctx.sessionId,
       });
       return {
+        approvalRequired: true,
         approvalId: req.id,
         message: `Approval requested. Approve with: localant approvals approve ${req.id}, then call shell_run_approved_command.`,
       };

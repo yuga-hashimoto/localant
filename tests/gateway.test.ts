@@ -35,7 +35,11 @@ describe("Gateway tool pipeline", () => {
     const g = gw();
     const dir = path.join(base, "proj");
     fs.mkdirSync(dir);
-    g.saveConfig({ ...g.config(), security: { ...g.config().security, mode: "strict", allowedDirectories: [dir] } });
+    g.saveConfig({
+      ...g.config(),
+      tools: { profile: "full" },
+      security: { ...g.config().security, mode: "strict", allowedDirectories: [dir] },
+    });
 
     const first = await g.executeTool("fs_create_file", { path: path.join(dir, "a.txt"), content: "x", overwrite: false }, { caller: "test" });
     expect(first.ok).toBe(false);
@@ -51,6 +55,7 @@ describe("Gateway tool pipeline", () => {
     const g = gw();
     const dir = path.join(base, "proj-open");
     fs.mkdirSync(dir);
+    g.saveConfig({ ...g.config(), tools: { profile: "full" } });
     // open is the default mode; no allowlist needed, no approval for risk < 4.
     expect(g.config().security.mode).toBe("open");
     const res = await g.executeTool(
@@ -104,8 +109,91 @@ describe("Gateway tool pipeline", () => {
     expect(hello!.enabled).toBe(false);
   });
 
+  it("defaults to the minimal tool profile", async () => {
+    const g = gw();
+    expect(g.config().tools.profile).toBe("minimal");
+  });
+
+  it("blocks a non-minimal tool in the minimal profile", async () => {
+    const g = gw();
+    const dir = path.join(base, "proj-min");
+    fs.mkdirSync(dir);
+    // fs_create_file is a write tool — not in the minimal surface.
+    const res = await g.executeTool(
+      "fs_create_file",
+      { path: path.join(dir, "c.txt"), content: "x", overwrite: false },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/not available in the "minimal" tool profile/i);
+    expect(fs.existsSync(path.join(dir, "c.txt"))).toBe(false);
+  });
+
+  it("allows core minimal tools in the minimal profile", async () => {
+    const g = gw();
+    expect(g.config().tools.profile).toBe("minimal");
+    const res = await g.executeTool("get_app_status", {}, { caller: "test" });
+    expect(res.ok).toBe(true);
+  });
+
+  it("exposes every tool once the full profile is selected", async () => {
+    const g = gw();
+    g.saveConfig({ ...g.config(), tools: { profile: "full" } });
+    const dir = path.join(base, "proj-full");
+    fs.mkdirSync(dir);
+    const res = await g.executeTool(
+      "fs_create_file",
+      { path: path.join(dir, "d.txt"), content: "x", overwrite: false },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(true);
+    expect(fs.existsSync(path.join(dir, "d.txt"))).toBe(true);
+  });
+
+  it("does not create a pending approval in open mode (risk-3 ungated)", async () => {
+    const g = gw();
+    expect(g.config().security.mode).toBe("open");
+    const res = await g.executeTool(
+      "shell_request_command_approval",
+      { command: "agy --version", reason: "smoke" },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(true);
+    expect((res.data as { approvalRequired: boolean }).approvalRequired).toBe(false);
+    expect(g.approvals.listPending()).toHaveLength(0);
+  });
+
+  it("does not create a pending approval in yolo mode", async () => {
+    const g = gw();
+    g.saveConfig({ ...g.config(), security: { ...g.config().security, mode: "yolo" } });
+    const res = await g.executeTool(
+      "shell_request_command_approval",
+      { command: "rm -i foo", reason: "smoke" },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(true);
+    expect((res.data as { approvalRequired: boolean }).approvalRequired).toBe(false);
+    expect(g.approvals.listPending()).toHaveLength(0);
+  });
+
+  it("creates a pending approval in strict mode", async () => {
+    const g = gw();
+    g.saveConfig({ ...g.config(), security: { ...g.config().security, mode: "strict" } });
+    const res = await g.executeTool(
+      "shell_request_command_approval",
+      { command: "agy --version", reason: "smoke" },
+      { caller: "test" },
+    );
+    expect(res.ok).toBe(true);
+    const data = res.data as { approvalRequired: boolean; approvalId?: string };
+    expect(data.approvalRequired).toBe(true);
+    expect(data.approvalId).toBeTruthy();
+    expect(g.approvals.listPending()).toHaveLength(1);
+  });
+
   it("generates a skill that is saved disabled", async () => {
     const g = gw();
+    g.saveConfig({ ...g.config(), tools: { profile: "full" } });
     const res = await g.executeTool(
       "skill_generate_from_prompt",
       { name: "test-skill", description: "demo", requirements: ["do a thing"] },

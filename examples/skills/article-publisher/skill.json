@@ -1,0 +1,134 @@
+{
+  "name": "article-publisher",
+  "displayName": "Article Publisher",
+  "version": "0.1.0",
+  "description": "Draft and publish articles to Zenn (git repo) and Qiita (API), plus local note/generic drafts.",
+  "author": "LocalAnt",
+  "license": "MIT",
+  "entry": "src/index.ts",
+  "riskLevel": 3,
+  "permissions": {
+    "filesystem": { "mode": "write", "allowedDirectories": [] },
+    "shell": { "mode": "allowed", "allowedCommands": ["git"] },
+    "network": { "mode": "allowlist", "allowedHosts": ["qiita.com"] },
+    "secrets": ["QIITA_TOKEN"],
+    "browser": "none",
+    "adb": "none",
+    "git": "write",
+    "agent": "none"
+  },
+  "tools": [
+    {
+      "name": "article_create",
+      "description": "Create a generic Markdown article draft in the skill workspace.",
+      "riskLevel": 1,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["title", "body"]
+      }
+    },
+    {
+      "name": "zenn_create_article",
+      "description": "Create a Zenn article markdown file (published:false draft) under <repoPath>/articles.",
+      "riskLevel": 2,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repoPath": { "type": "string" },
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "emoji": { "type": "string" },
+          "type": { "type": "string", "enum": ["tech", "idea"] },
+          "topics": { "type": "array", "items": { "type": "string" } },
+          "body": { "type": "string" }
+        },
+        "required": ["repoPath", "title", "body"]
+      }
+    },
+    {
+      "name": "zenn_list_articles",
+      "description": "List Zenn article files under <repoPath>/articles.",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": { "repoPath": { "type": "string" } },
+        "required": ["repoPath"]
+      }
+    },
+    {
+      "name": "zenn_publish_article",
+      "description": "Flip a Zenn article to published:true. Commit & push the repo to actually publish.",
+      "riskLevel": 4,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repoPath": { "type": "string" },
+          "slug": { "type": "string" }
+        },
+        "required": ["repoPath", "slug"]
+      }
+    },
+    {
+      "name": "zenn_create_pr",
+      "description": "Commit Zenn changes on a new branch (ready to push and open a PR).",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repoPath": { "type": "string" },
+          "branch": { "type": "string" },
+          "message": { "type": "string" }
+        },
+        "required": ["repoPath", "branch", "message"]
+      }
+    },
+    {
+      "name": "qiita_create_private_article",
+      "description": "Create a PRIVATE Qiita article via the official API (reads QIITA_TOKEN secret).",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["title", "body"]
+      }
+    },
+    {
+      "name": "qiita_list_articles",
+      "description": "List your authenticated Qiita articles (reads QIITA_TOKEN secret).",
+      "riskLevel": 3,
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "qiita_publish_article",
+      "description": "Flip a Qiita article to public (reads QIITA_TOKEN secret).",
+      "riskLevel": 4,
+      "inputSchema": {
+        "type": "object",
+        "properties": { "id": { "type": "string" } },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "note_create_draft",
+      "description": "Create a local note draft in the skill workspace (note has no official public write API).",
+      "riskLevel": 1,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string" },
+          "body": { "type": "string" }
+        },
+        "required": ["title", "body"]
+      }
+    }
+  ]
+}

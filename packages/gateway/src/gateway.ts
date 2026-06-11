@@ -5,6 +5,7 @@ import {
   createLogger,
   RISK_LABELS,
   CORE_BLOCKED_COMMAND_TOKENS,
+  isToolInProfile,
   type ApprovalRequirement,
   type Config,
   type AppPaths,
@@ -172,6 +173,20 @@ export class Gateway {
   async executeTool(name: string, rawInput: unknown, ctx: ToolCallContext): Promise<ToolResult> {
     const tool = this.registry.get(name);
     if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
+
+    // Profile gate: in the `minimal` profile only the core surface is callable.
+    // Everything else should go through shell / a coding agent / a skill, or the
+    // user can switch tools.profile to `full`.
+    const profile = this.cfg.tools.profile;
+    if (!isToolInProfile(name, profile)) {
+      return {
+        ok: false,
+        error:
+          `Tool "${name}" is not available in the "${profile}" tool profile. ` +
+          `Use shell_run_allowed_command, a coding agent (coding_agent_start_task), ` +
+          `or a skill (skill_run) instead — or set tools.profile to "full" in the config.`,
+      };
+    }
 
     const start = Date.now();
     let input: unknown;

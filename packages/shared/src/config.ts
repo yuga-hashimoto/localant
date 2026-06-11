@@ -220,6 +220,15 @@ export const ConfigSchema = z.object({
         timeoutMs: 600_000,
       },
     }),
+  tools: z
+    .object({
+      // Exposure profile for the MCP surface. `minimal` advertises only the
+      // small core (Shell / coding Agent / Skill pillars + read-only fs/project
+      // + control plane); `full` advertises every registered tool. See
+      // tool-profiles.ts. Defaults to `minimal` to keep tool-selection sharp.
+      profile: z.enum(["minimal", "full"]).default("minimal"),
+    })
+    .default({ profile: "minimal" }),
   mcpServers: z.record(z.string(), McpServerConfig).default({}),
   skillRegistry: z
     .object({

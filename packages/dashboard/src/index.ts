@@ -113,7 +113,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Skills","Projects","Secrets","Agents","MCP","Settings"];
 let current = "Home";
 let pendingApprovals = 0;
 let logTimers = [];
@@ -567,6 +567,49 @@ const VIEWS = {
     }
   },
 
+  async MCP(m){
+    m.innerHTML='<div class="card"><h2>Bridged MCP servers</h2>'
+      +'<p class="muted" style="margin-top:0">Connect downstream <b>stdio</b> MCP servers to LocalAnt. Their tools are proxied through the gateway (approval + audit pipeline). '
+        +'ChatGPT uses them via <code>mcp_server_list_tools</code> to discover and <code>mcp_server_run_tool</code> to invoke — these are available even in the <b>minimal</b> tool profile.</p>'
+      +'<table><thead><tr><th>Name</th><th>Command</th><th>Enabled</th><th></th></tr></thead><tbody id="mcpList"></tbody></table>'
+      +'<h3>Add server</h3>'
+      +'<div class="row" style="gap:12px">'
+        +'<input type="text" id="mcpName" placeholder="name (e.g. filesystem)" style="width:160px" />'
+        +'<input type="text" id="mcpCmd" placeholder="command (e.g. npx)" style="width:150px" />'
+        +'<input type="text" id="mcpArgs" placeholder="args (space-separated)" style="flex:1;min-width:180px" />'
+        +'<button class="btn" id="mcpAdd">Add</button>'
+      +'</div>'
+      +'<p class="muted" style="margin-top:8px;font-size:12px">Example — official filesystem server: command <code>npx</code>, args <code>-y @modelcontextprotocol/server-filesystem /path/to/dir</code>. Use <b>Test</b> to verify the connection and list its tools.</p>'
+      +'</div>';
+
+    const mcpServers=await api('mcp-servers');
+    const mcpList=document.getElementById('mcpList');
+    if(!mcpServers.length) mcpList.appendChild(el('<tr><td colspan=4 class="muted">No MCP servers configured. Add one below.</td></tr>'));
+    for(const sv of mcpServers){
+      const tr=el('<tr><td><b>'+esc(sv.name)+'</b></td><td class="muted"><code>'+esc(sv.command)+' '+esc((sv.args||[]).join(" "))+'</code></td><td>'+(sv.enabled?'<span class="risk0">yes</span>':'<span class="muted">no</span>')+'</td><td></td></tr>');
+      const cell=tr.lastElementChild;
+      const tog=el('<button class="btn ghost sm">'+(sv.enabled?'Disable':'Enable')+'</button>');
+      tog.onclick=action(tog,async()=>{ await api('mcp-servers/'+encodeURIComponent(sv.name)+'/'+(sv.enabled?'disable':'enable'),{method:'POST'}); render(); });
+      cell.appendChild(tog);
+      const test=el('<button class="btn ghost sm" style="margin-left:6px">Test</button>');
+      test.onclick=action(test,async()=>{ const r=await api('mcp-servers/'+encodeURIComponent(sv.name)+'/test',{method:'POST'}); if(r.ok){ toast(sv.name+': '+r.tools.length+' tools ('+r.tools.slice(0,5).join(', ')+')'); } else { toast(sv.name+': '+r.reason,'err'); } },'Testing');
+      cell.appendChild(test);
+      const rm=el('<button class="btn danger sm" style="margin-left:6px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>');
+      rm.onclick=action(rm,async()=>{ if(confirm('Remove MCP server "'+sv.name+'"?')){ await api('mcp-servers/'+encodeURIComponent(sv.name),{method:'DELETE'}); render(); } });
+      cell.appendChild(rm);
+      mcpList.appendChild(tr);
+    }
+    document.getElementById('mcpAdd').onclick=action(document.getElementById('mcpAdd'),async()=>{
+      const name=document.getElementById('mcpName').value.trim();
+      const command=document.getElementById('mcpCmd').value.trim();
+      const args=document.getElementById('mcpArgs').value.trim();
+      if(!name||!command){ toast('Name and command are required.','err'); return; }
+      await api('mcp-servers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,command,args,enabled:true})});
+      toast('MCP server added');
+      render();
+    });
+  },
+
   async Settings(m){
     const c=await api('config');
     const sec=c.security||{};
@@ -588,6 +631,13 @@ const VIEWS = {
         +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>open</b>: deny-list for personal use — anything except the blocklist; only risk-4 needs approval. <b>strict</b>: allow-list + per-risk approval (shared machines). <b>yolo</b>: no approval gates at all.</p>'
       +'</div>'
       +'<div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="approveRisk1"'+(sec.approveRisk1?' checked':'')+' style="width:auto"/> Require approval for Risk 1 (draft) actions</label></div>'
+      +'<div class="field"><label>Tool profile</label>'
+        +'<select id="toolProfile" style="width:160px">'
+          +'<option value="minimal"'+(((c.tools&&c.tools.profile)||'minimal')==='minimal'?' selected':'')+'>minimal (default)</option>'
+          +'<option value="full"'+((c.tools&&c.tools.profile)==='full'?' selected':'')+'>full</option>'
+        +'</select>'
+        +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files/projects, and the control plane. Sharper tool selection. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
+      +'</div>'
       +'</div>'
 
       +'<div class="card"><h2>Auth token</h2>'
@@ -596,17 +646,6 @@ const VIEWS = {
       +'<p class="muted" style="margin-top:8px;font-size:12px">Rotating the token immediately invalidates the old MCP URL — you must update the URL in the ChatGPT connector (or just re-paste the new one shown on Home). Existing stored secrets are unaffected.</p>'
       +'<button class="btn danger" id="authRotate" style="margin-top:4px">Rotate token</button>'
       +'</div>'
-
-      +'<div class="card"><h2>Bridged MCP servers</h2>'
-      +'<p class="muted" style="margin-top:0">Downstream stdio MCP servers the gateway can proxy (through the approval pipeline). Tools become available to ChatGPT.</p>'
-      +'<table><thead><tr><th>Name</th><th>Command</th><th>Enabled</th><th></th></tr></thead><tbody id="mcpList"></tbody></table>'
-      +'<h3>Add server</h3>'
-      +'<div class="row" style="gap:12px">'
-        +'<input type="text" id="mcpName" placeholder="name" style="width:140px" />'
-        +'<input type="text" id="mcpCmd" placeholder="command (e.g. npx)" style="width:150px" />'
-        +'<input type="text" id="mcpArgs" placeholder="args (space-separated)" style="flex:1;min-width:160px" />'
-        +'<button class="btn" id="mcpAdd">Add</button>'
-      +'</div></div>'
 
       +'<div class="card"><h2>Tunnel — fixed URL</h2>'
       +'<p class="muted" style="margin-top:0">A fixed URL means you never recreate the ChatGPT connector. Pick a provider and fill the matching field, then Save &amp; restart.</p>'
@@ -647,6 +686,7 @@ const VIEWS = {
 
     document.getElementById('secMode').onchange=async(e)=>{ try{ await saveSec({mode:e.target.value}); toast('Mode → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('approveRisk1').onchange=async(e)=>{ try{ await saveSec({approveRisk1:e.target.checked}); toast('Saved'); }catch(err){ toast(err.message,'err'); } };
+    document.getElementById('toolProfile').onchange=async(e)=>{ try{ await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tools:{profile:e.target.value}})}); toast('Tool profile → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
 
     const authTok=document.getElementById('authTok');
     document.getElementById('authReveal').onclick=action(document.getElementById('authReveal'),async()=>{
@@ -661,33 +701,6 @@ const VIEWS = {
       toast('Token rotated — update the connector URL (see Home)');
     });
 
-    // Bridged MCP servers
-    const mcpServers=await api('mcp-servers');
-    const mcpList=document.getElementById('mcpList');
-    if(!mcpServers.length) mcpList.appendChild(el('<tr><td colspan=4 class="muted">No MCP servers configured.</td></tr>'));
-    for(const sv of mcpServers){
-      const tr=el('<tr><td><b>'+esc(sv.name)+'</b></td><td class="muted"><code>'+esc(sv.command)+' '+esc((sv.args||[]).join(" "))+'</code></td><td>'+(sv.enabled?'<span class="risk0">yes</span>':'<span class="muted">no</span>')+'</td><td></td></tr>');
-      const cell=tr.lastElementChild;
-      const tog=el('<button class="btn ghost sm">'+(sv.enabled?'Disable':'Enable')+'</button>');
-      tog.onclick=action(tog,async()=>{ await api('mcp-servers/'+encodeURIComponent(sv.name)+'/'+(sv.enabled?'disable':'enable'),{method:'POST'}); render(); });
-      cell.appendChild(tog);
-      const test=el('<button class="btn ghost sm" style="margin-left:6px">Test</button>');
-      test.onclick=action(test,async()=>{ const r=await api('mcp-servers/'+encodeURIComponent(sv.name)+'/test',{method:'POST'}); if(r.ok){ toast(sv.name+': '+r.tools.length+' tools ('+r.tools.slice(0,5).join(', ')+')'); } else { toast(sv.name+': '+r.reason,'err'); } },'Testing');
-      cell.appendChild(test);
-      const rm=el('<button class="btn danger sm" style="margin-left:6px;background:none;border:1px solid var(--danger);color:var(--danger)">Remove</button>');
-      rm.onclick=action(rm,async()=>{ if(confirm('Remove MCP server "'+sv.name+'"?')){ await api('mcp-servers/'+encodeURIComponent(sv.name),{method:'DELETE'}); render(); } });
-      cell.appendChild(rm);
-      mcpList.appendChild(tr);
-    }
-    document.getElementById('mcpAdd').onclick=action(document.getElementById('mcpAdd'),async()=>{
-      const name=document.getElementById('mcpName').value.trim();
-      const command=document.getElementById('mcpCmd').value.trim();
-      const args=document.getElementById('mcpArgs').value.trim();
-      if(!name||!command){ toast('Name and command are required.','err'); return; }
-      await api('mcp-servers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,command,args,enabled:true})});
-      toast('MCP server added');
-      render();
-    });
     document.getElementById('tunProvider').onchange=async(e)=>{ try{ await saveTun({provider:e.target.value}); toast('Provider → '+e.target.value); }catch(err){ toast(err.message,'err'); } };
 
     function tunPayload(){
@@ -744,11 +757,14 @@ const VIEWS = {
 
   async Tools(m){
     const tools = await api('tools');
+    const cfg = await api('config');
+    const profile = (cfg.tools && cfg.tools.profile) || 'minimal';
+    const activeCount = tools.filter(function(t){ return t.active; }).length;
     m.innerHTML = '<div class="card"><h2>Exposed Tools</h2>'
-      + '<p class="muted">List of all built-in and skill-provided tools registered in LocalAnt.</p>'
-      + '<table><thead><tr><th>Name</th><th>Risk</th><th>Description</th><th>Parameters</th></tr></thead><tbody id="tl"></tbody></table></div>';
+      + '<p class="muted">All built-in and skill-provided tools registered in LocalAnt. Profile <code>'+esc(profile)+'</code> advertises <b>'+activeCount+'</b> of '+tools.length+' to ChatGPT. <span class="muted">Inactive tools are blocked at call time — switch the profile in Settings.</span></p>'
+      + '<table><thead><tr><th>Name</th><th>Exposed</th><th>Risk</th><th>Description</th><th>Parameters</th></tr></thead><tbody id="tl"></tbody></table></div>';
     const tb = document.getElementById('tl');
-    if(!tools.length){ tb.appendChild(el('<tr><td colspan=4 class="muted">No tools registered.</td></tr>')); return; }
+    if(!tools.length){ tb.appendChild(el('<tr><td colspan=5 class="muted">No tools registered.</td></tr>')); return; }
     for(const t of tools){
       const params = Object.entries(t.inputSchema || {}).map(function(item) {
         const name = item[0];
@@ -757,8 +773,12 @@ const VIEWS = {
         return '<code>' + esc(name) + '</code>: <span class="muted">' + esc(info.type) + '</span>' + desc;
       }).join('<br>') || '<span class="muted">none</span>';
 
-      const tr = el('<tr>'
+      const exposed = t.active
+        ? '<span style="color:var(--ok,#3fb950)">●</span>'
+        : '<span class="muted" title="Hidden in the current tool profile">○</span>';
+      const tr = el('<tr'+(t.active?'':' style="opacity:.55"')+'>'
         + '<td><b>' + esc(t.name) + '</b></td>'
+        + '<td>' + exposed + '</td>'
         + '<td class="' + riskClass(t.risk) + '">risk ' + t.risk + '</td>'
         + '<td>' + esc(t.description) + '</td>'
         + '<td>' + params + '</td>'

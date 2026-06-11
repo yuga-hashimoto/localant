@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema } from "@localant/shared";
+import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile } from "@localant/shared";
 import { commandExists, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
@@ -268,6 +268,7 @@ function mountDashboardApi(
   });
 
   r.get("/tools", (_q, s) => {
+    const profile = gw.config().tools.profile;
     s.json(
       gw.registry.list().map((t) => {
         const shape = (t.inputSchema as any).shape ?? {};
@@ -284,6 +285,8 @@ function mountDashboardApi(
           description: t.description,
           risk: t.risk,
           inputSchema,
+          // Whether this tool is advertised to ChatGPT under the active profile.
+          active: isToolInProfile(t.name, profile),
         };
       })
     );

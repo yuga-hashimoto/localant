@@ -1,0 +1,9 @@
+{
+  "name": "@localant-skill/article-publisher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@localant/skill-sdk": "workspace:*"
+  }
+}

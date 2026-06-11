@@ -19,7 +19,7 @@ export class ConfigStore {
     }
     if (!fs.existsSync(p.configFile)) {
       const config = defaultConfig();
-      config.tunnel.provider = "localtunnel";
+      config.tunnel.provider = "serveo";
       const rand = crypto.randomBytes(16).toString("hex");
       config.tunnel.subdomain = `localant-${rand}`;
       this.save(config);

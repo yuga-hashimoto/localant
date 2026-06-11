@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import crypto from "node:crypto";
 import { createLogger, type Config } from "@localant/shared";
 import { commandExists } from "../util/exec.js";
 
@@ -163,32 +162,26 @@ export class TunnelManager {
           const requestedSubdomain = cfg.subdomain;
 
           if (requestedSubdomain && assignedSubdomain && assignedSubdomain !== requestedSubdomain) {
-            // First attempt: generate a new random subdomain and update config.json
-            if (attempt === 1 && this.updateConfig) {
-              log.warn(`Subdomain conflict detected (${requestedSubdomain} vs ${assignedSubdomain}). Regenerating subdomain.`);
-              const rand = crypto.randomBytes(16).toString("hex");
-              const newSubdomain = `localant-${rand}`;
-              
-              this.updateConfig({
-                tunnel: {
-                  ...cfg,
-                  subdomain: newSubdomain,
-                }
-              });
-              
-              this.stop();
-              await new Promise((r) => setTimeout(r, 1000));
-              continue;
-            } else {
-              // Subsequent attempts (e.g. restart): wait 10 seconds for session release
-              log.warn(`Subdomain conflict (possibly previous session remaining). Retrying in 10s...`);
-              this.stop();
-              if (Date.now() - startTime >= maxDurationMs) {
-                return { provider: "localtunnel", status: "error", error: "Subdomain conflict. Timed out waiting for subdomain to release." };
-              }
-              await new Promise((r) => setTimeout(r, intervalMs));
-              continue;
+            // We asked for our fixed subdomain but localtunnel handed back a
+            // different one — the requested name is still held, almost always by
+            // our own just-killed previous session (a quick restart). The public
+            // URL must stay stable so the ChatGPT connector keeps working across
+            // restarts, so we never regenerate: drop this throwaway tunnel and
+            // keep retrying the SAME subdomain until the server releases it.
+            log.warn(
+              `Subdomain "${requestedSubdomain}" not yet available (got "${assignedSubdomain}"). ` +
+                `Waiting for the previous session to release it, retrying in ${intervalMs / 1000}s...`,
+            );
+            this.stop();
+            if (Date.now() - startTime >= maxDurationMs) {
+              return {
+                provider: "localtunnel",
+                status: "error",
+                error: `Subdomain "${requestedSubdomain}" did not become available within ${maxDurationMs / 1000}s.`,
+              };
             }
+            await new Promise((r) => setTimeout(r, intervalMs));
+            continue;
           }
 
           return tunnelInfo;
