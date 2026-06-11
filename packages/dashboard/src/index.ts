@@ -227,13 +227,28 @@ async function renderOAuthApprove(m){
 }
 
 function tunnelControls(t){
+  let regLink = '';
+  let errMsg = t.error || '';
+  if (t.error && t.error.indexOf('https://console.serveo.net') !== -1) {
+    const m = t.error.match(/https:\/\/console\.serveo\.net\/ssh\/keys\?add=[^\s]+/i);
+    if (m) {
+      const url = m[0];
+      regLink = '<div class="warnbox" style="border-color:var(--accent);background:rgba(79,140,255,0.1);color:#cce0ff">'
+        + '🔑 <b>Action Required</b>: SSH key registration is required to use the serveo tunnel.<br>'
+        + '<a href="' + esc(url) + '" target="_blank" class="btn sm" style="display:inline-block;margin-top:8px;text-decoration:none;background:var(--accent);color:#fff">Register Key on Serveo</a>'
+        + '</div>';
+      errMsg = t.error.replace(url, '').replace(/Please register here:\s*$/, '');
+    }
+  }
+
   const card=el('<div class="card"><h2>Tunnel</h2>'
-    +'<p>Provider: <code>'+esc(t.provider)+'</code> · Status: <code>'+esc(t.status)+'</code></p>'
-    +(t.url?'<p>URL: <code>'+esc(t.url)+'</code></p>':'<p class="muted">No public URL.</p>')
-    +(t.error?'<p class="risk4">'+esc(t.error)+'</p>':'')
-    +'<div class="row"><button class="btn" id="tunStart">Start</button>'
-    +'<button class="btn ghost" id="tunRestart">Restart</button>'
-    +'<button class="btn danger" id="tunStop">Stop</button></div></div>');
+    + (regLink || '')
+    + '<p>Provider: <code>'+esc(t.provider)+'</code> · Status: <code>'+esc(t.status)+'</code></p>'
+    + (t.url?'<p>URL: <code>'+esc(t.url)+'</code></p>':'<p class="muted">No public URL.</p>')
+    + (errMsg?'<p class="risk4">'+esc(errMsg)+'</p>':'')
+    + '<div class="row"><button class="btn" id="tunStart">Start</button>'
+    + '<button class="btn ghost" id="tunRestart">Restart</button>'
+    + '<button class="btn danger" id="tunStop">Stop</button></div></div>');
   card.querySelector('#tunStart').onclick=action(card.querySelector('#tunStart'),async()=>{ await api('tunnel/start',{method:'POST'}); toast('Tunnel starting'); render(); },'Starting');
   card.querySelector('#tunRestart').onclick=action(card.querySelector('#tunRestart'),async()=>{ await api('tunnel/restart',{method:'POST'}); toast('Tunnel restarted'); render(); },'Restarting');
   card.querySelector('#tunStop').onclick=action(card.querySelector('#tunStop'),async()=>{ await api('tunnel/stop',{method:'POST'}); toast('Tunnel stopped'); render(); });

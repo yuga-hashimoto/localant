@@ -254,12 +254,23 @@ export class TunnelManager {
         if (regMatch && this.info.status !== "error") {
           const registerUrl = regMatch[0];
           log.warn(`SSH key registration required: ${registerUrl}`);
-          openBrowser(registerUrl);
 
           this.info = {
             provider: "serveo",
             status: "error",
-            error: `SSH key not registered with serveo.net. Opening registration page: ${registerUrl}`,
+            error: `SSH key not registered with serveo.net. Please register here: ${registerUrl}`,
+          };
+          resolve(this.info);
+          return;
+        }
+
+        // ポートフォワーディング失敗を検出
+        if (text.includes("remote port forwarding failed") && this.info.status !== "error") {
+          log.warn("Serveo port forwarding failed. Subdomain might be in use.");
+          this.info = {
+            provider: "serveo",
+            status: "error",
+            error: "Serveo port forwarding failed. Subdomain might be in use. Please try restarting the tunnel in a few seconds.",
           };
           resolve(this.info);
           return;
@@ -298,14 +309,5 @@ export class TunnelManager {
       this.child = undefined;
     }
     this.info = { provider: this.info.provider, status: "stopped" };
-  }
-}
-
-function openBrowser(url: string): void {
-  const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
-  try {
-    spawn(cmd, [url], { stdio: "ignore", detached: true, shell: process.platform === "win32" }).unref();
-  } catch {
-    /* ignore */
   }
 }
