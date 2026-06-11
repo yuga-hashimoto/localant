@@ -569,7 +569,7 @@ function mountDashboardApi(
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8000);
-      const resp = await fetch(target, { signal: ctrl.signal });
+      const resp = await fetch(target, { signal: ctrl.signal, redirect: "manual" });
       clearTimeout(timer);
       s.json({ reachable: resp.ok, status: resp.status, ms: Date.now() - started, url: target });
     } catch (e) {
