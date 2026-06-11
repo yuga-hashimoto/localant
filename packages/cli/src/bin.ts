@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
 import { APP_VERSION, ConfigSchema } from "@localant/shared";
-import { c, ok, warn, fail, openBrowser } from "./util.js";
+import { c, ok, warn, fail, openBrowser, ensureSshKey } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
 
@@ -30,6 +30,7 @@ program
   .action(async (o) => {
     console.log(c.bold("Setting up LocalAnt…\n"));
     await runDoctor();
+    await ensureSshKey();
     const gw = createGateway();
     console.log("");
     console.log(ok(`Config: ${gw.paths.root}`));
