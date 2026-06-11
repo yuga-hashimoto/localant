@@ -1,7 +1,5 @@
-import { spawn, execSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
+import { spawn } from "node:child_process";
+import readline from "node:readline";
 
 const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
 const wrap = (code: number) => (s: string) => (useColor ? `\x1b[${code}m${s}\x1b[0m` : s);
@@ -17,6 +15,24 @@ export const c = {
 export const ok = (s: string) => `${c.green("✅")} ${s}`;
 export const warn = (s: string) => `${c.yellow("⚠️ ")} ${s}`;
 export const fail = (s: string) => `${c.red("✖")} ${s}`;
+
+/**
+ * Ask a yes/no question on the terminal. When stdin is not a TTY (piped,
+ * CI, background run) the prompt is skipped and `def` is returned, so
+ * non-interactive invocations never hang.
+ */
+export function promptYesNo(question: string, def = false): Promise<boolean> {
+  if (!process.stdin.isTTY) return Promise.resolve(def);
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`${question} ${def ? "[Y/n]" : "[y/N]"} `, (answer) => {
+      rl.close();
+      const a = answer.trim().toLowerCase();
+      if (a === "") return resolve(def);
+      resolve(a === "y" || a === "yes");
+    });
+  });
+}
 
 /** Copy text to the clipboard using the platform tool. Best-effort. */
 export function copyToClipboard(text: string): Promise<boolean> {
@@ -51,51 +67,3 @@ export function urlBox(url: string): string {
   const line = "─".repeat(Math.min(url.length, 60) + 2);
   return `┌${line}┐\n│ ${url} │\n└${line}┘`;
 }
-
-/** Ensure the user has an SSH key pair for serveo tunnel. If not, generate one. */
-export function ensureSshKey(): Promise<void> {
-  return new Promise((resolve) => {
-    const home = os.homedir();
-    const sshDir = path.join(home, ".ssh");
-    const keyFiles = ["id_rsa", "id_ed25519", "id_ecdsa", "id_dsa"];
-
-    if (fs.existsSync(sshDir)) {
-      try {
-        const files = fs.readdirSync(sshDir);
-        const hasKey = files.some((file) => keyFiles.includes(file));
-        if (hasKey) {
-          return resolve();
-        }
-      } catch {
-        // ignore read error and try to generate
-      }
-    } else {
-      try {
-        fs.mkdirSync(sshDir, { recursive: true, mode: 0o700 });
-      } catch (err) {
-        console.log(warn(`Failed to create directory ${sshDir}: ${(err as Error).message}`));
-      }
-    }
-
-    console.log(c.gray("SSH key not found. Generating a new one for serveo tunnel…"));
-    const keyPath = path.join(sshDir, "id_ed25519");
-    const child = spawn("ssh-keygen", ["-t", "ed25519", "-N", "", "-f", keyPath], { stdio: "inherit" });
-
-    child.on("error", (err) => {
-      console.log(warn(`Could not start ssh-keygen: ${err.message}`));
-      console.log(warn("If you plan to use the serveo tunnel, please run 'ssh-keygen' manually."));
-      resolve();
-    });
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        console.log(ok("SSH key generated successfully at ~/.ssh/id_ed25519"));
-      } else {
-        console.log(warn(`ssh-keygen exited with code ${code}`));
-        console.log(warn("If you plan to use the serveo tunnel, please run 'ssh-keygen' manually."));
-      }
-      resolve();
-    });
-  });
-}
-

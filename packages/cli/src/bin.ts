@@ -3,9 +3,11 @@ import fs from "node:fs";
 import { Command } from "commander";
 import { createGateway } from "@localant/gateway";
 import { APP_VERSION, ConfigSchema } from "@localant/shared";
-import { c, ok, warn, fail, openBrowser, ensureSshKey } from "./util.js";
+import { c, ok, warn, fail, openBrowser, promptYesNo } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
+import { ensureServeoRegistration } from "./serveo-setup.js";
+import { autostartSupported, isAutostartEnabled, enableAutostart, disableAutostart } from "./autostart.js";
 
 const program = new Command();
 program.name("LocalAnt").description("Use ChatGPT as the brain and your local computer as the hands.").version(APP_VERSION);
@@ -30,13 +32,39 @@ program
   .action(async (o) => {
     console.log(c.bold("Setting up LocalAnt…\n"));
     await runDoctor();
-    await ensureSshKey();
+
     const gw = createGateway();
     console.log("");
     console.log(ok(`Config: ${gw.paths.root}`));
     console.log(ok("Auth token generated"));
     console.log(ok(`Skills: ${gw.skills.list().length} available`));
     ensureWorkspace(gw.paths.workspaceDir);
+
+    // Serveo gives a stable, free URL only once the user's SSH key is registered.
+    // Handle that one-time registration here so first-run setup "just works" —
+    // and skip silently for users (like returning ones) who are already set up.
+    const cfg = gw.config();
+    if (o.tunnel !== false && cfg.tunnel.provider === "serveo" && !cfg.tunnel.token && cfg.tunnel.subdomain) {
+      console.log("");
+      await ensureServeoRegistration(cfg.tunnel.subdomain, cfg.gateway.port, { noOpen: o.open === false });
+    }
+
+    // Offer to start LocalAnt automatically on every login (macOS launchd).
+    if (autostartSupported() && !isAutostartEnabled()) {
+      console.log("");
+      const enable = await promptYesNo(
+        "Start LocalAnt automatically when you log in? (no need to run setup again)",
+        true,
+      );
+      if (enable) {
+        const p = enableAutostart(gw.paths.logsDir);
+        console.log(ok(`Auto-start enabled — takes effect on your next login. (${p})`));
+        console.log(c.gray("   Disable anytime with: localant autostart disable"));
+      } else {
+        console.log(c.gray("Skipped auto-start. Enable later with: localant autostart enable"));
+      }
+    }
+
     await runGateway(gw, startOpts(o));
   });
 
@@ -177,6 +205,33 @@ tunnel.command("status").action(() => {
 });
 tunnel.command("start").action(() => console.log(warn("The tunnel is started automatically by `start`/`setup`. Restart the gateway to (re)start it.")));
 tunnel.command("stop").action(() => console.log(warn("Stop the tunnel by stopping the gateway (`localant stop`).")));
+
+// ---------- autostart ----------
+const autostart = program.command("autostart").description("Start LocalAnt automatically on login (macOS)");
+autostart
+  .command("enable")
+  .description("Install the login LaunchAgent")
+  .action(() => {
+    if (!autostartSupported()) return console.log(warn("Auto-start on login is only supported on macOS."));
+    const gw = createGateway();
+    const p = enableAutostart(gw.paths.logsDir);
+    console.log(ok(`Auto-start enabled — takes effect on your next login. (${p})`));
+  });
+autostart
+  .command("disable")
+  .description("Remove the login LaunchAgent and stop the managed instance")
+  .action(() => {
+    if (!autostartSupported()) return console.log(warn("Auto-start on login is only supported on macOS."));
+    disableAutostart();
+    console.log(ok("Auto-start disabled."));
+  });
+autostart
+  .command("status")
+  .description("Show whether auto-start on login is enabled")
+  .action(() => {
+    if (!autostartSupported()) return console.log(warn("Auto-start on login is only supported on macOS."));
+    console.log(isAutostartEnabled() ? ok("Auto-start is enabled.") : warn("Auto-start is not enabled."));
+  });
 
 // ---------- approvals ----------
 const approvals = program.command("approvals").description("Manage approval requests");
