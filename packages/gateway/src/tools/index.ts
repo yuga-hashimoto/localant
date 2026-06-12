@@ -13,6 +13,7 @@ import { registerLspTools } from "./lsp.js";
 import { registerControlTools } from "./control.js";
 import { registerSkillTools } from "./skill.js";
 import { registerCodingAgentTools } from "./coding-agent.js";
+import { registerAutopilotTools } from "./autopilot.js";
 import { registerAdbTools } from "./adb.js";
 import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
@@ -36,6 +37,7 @@ export function registerAllTools(gw: Gateway): void {
   registerControlTools(gw);
   registerSkillTools(gw);
   registerCodingAgentTools(gw);
+  registerAutopilotTools(gw);
   registerAdbTools(gw);
   registerComputerTools(gw);
   registerBrowserTools(gw);

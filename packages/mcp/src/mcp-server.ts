@@ -73,10 +73,9 @@ export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => D
       {
         description: `[risk ${tool.risk}] ${tool.description}`,
         inputSchema: shape,
-        // Advertise read-only / destructive hints so MCP clients (e.g. ChatGPT)
-        // don't gate safe tools behind a confirmation "safety check". In yolo
-        // mode every tool is advertised gate-free, matching the gateway policy.
-        annotations: toolAnnotationsForRisk(tool.risk, mode),
+        // Advertise per-tool MCP hints based on the tool's actual behavior.
+        // Gateway approval policy is enforced separately from these hints.
+        annotations: tool.annotations ?? toolAnnotationsForRisk(tool.risk, mode),
         _meta: widgetMetaForTool(tool.name),
       },
       async (args: unknown) => {

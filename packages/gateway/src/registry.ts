@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RiskLevel } from "@localant/shared";
+import type { RiskLevel, ToolHintAnnotations } from "@localant/shared";
 
 /**
  * A tool is generic over its Zod input schema `S`. Handlers receive the
@@ -9,6 +9,7 @@ export interface ToolDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
   description: string;
   risk: RiskLevel;
+ annotations?: ToolHintAnnotations;
   inputSchema: S;
   /** Short human summary of an invocation, used for audit + approval prompts. */
   summarize?: (input: z.output<S>) => string;

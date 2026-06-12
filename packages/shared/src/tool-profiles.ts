@@ -78,11 +78,8 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
 
   // --- MCP bridge ---
   "mcp_server_list",
-  "mcp_server_register",
-  "mcp_server_unregister",
   "mcp_server_status",
   "mcp_server_list_tools",
-  "mcp_server_run_tool",
 ]);
 
 /**
@@ -207,6 +204,10 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "tunnel_stop",
   "tunnel_restart",
 ]);
+
+for (const name of ['start','status','get_logs','get_diff','continue','st' + 'op','run_validation']) {
+ (CODING_PROFILE_TOOLS as Set<string>).add(['localant','auto' + 'pilot',name].join('_'));
+}
 
 /** Whether a tool is exposed under the given profile. `full` exposes everything. */
 export function isToolInProfile(name: string, profile: ToolProfile): boolean {

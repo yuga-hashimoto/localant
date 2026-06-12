@@ -15,11 +15,8 @@ describe("tool profiles", () => {
   it("exposes the MCP bridge tools in the minimal surface", () => {
     for (const name of [
       "mcp_server_list",
-      "mcp_server_register",
-      "mcp_server_unregister",
       "mcp_server_status",
       "mcp_server_list_tools",
-      "mcp_server_run_tool",
     ]) {
       expect(MINIMAL_PROFILE_TOOLS.has(name), `missing ${name}`).toBe(true);
     }
@@ -33,6 +30,9 @@ describe("tool profiles", () => {
       "zenn_publish_article",
       "fs_create_file",
       "skill_create",
+ "mcp_server_register",
+ "mcp_server_unregister",
+ "mcp_server_run_tool",
     ]) {
       expect(MINIMAL_PROFILE_TOOLS.has(name)).toBe(false);
     }
@@ -53,6 +53,20 @@ describe("tool profiles", () => {
       expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
     }
   });
+
+ it('coding profile exposes high-level delegation tools', () => {
+ for (const name of [
+ 'localant_autopilot_start',
+ 'localant_autopilot_status',
+ 'localant_autopilot_get_logs',
+ 'localant_autopilot_get_diff',
+ 'localant_autopilot_continue',
+ 'localant_autopilot_stop',
+ 'localant_autopilot_run_validation',
+ ]) {
+ expect(isToolInProfile(name, 'coding')).toBe(true);
+ }
+ });
 
   it("coding profile is a superset of minimal", () => {
     for (const name of MINIMAL_PROFILE_TOOLS) {

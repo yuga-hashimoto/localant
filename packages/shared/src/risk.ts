@@ -55,9 +55,7 @@ export type SecurityModeHint = "strict" | "open" | "yolo";
  * These are hints only; the gateway's own pipeline is the real enforcement.
  */
 export function toolAnnotationsForRisk(risk: RiskLevel, mode: SecurityModeHint = "open"): ToolHintAnnotations {
-  if (mode === "yolo") {
-    return { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
-  }
+ void mode;
   return {
     readOnlyHint: risk === 0,
     destructiveHint: risk >= 2,

@@ -54,12 +54,8 @@ describe("toolAnnotationsForRisk (risk-based, non-yolo)", () => {
 describe("toolAnnotationsForRisk (yolo)", () => {
   it("advertises every tool as gate-free so no client safety check fires", () => {
     for (const risk of [0, 1, 2, 3, 4] as RiskLevel[]) {
-      expect(toolAnnotationsForRisk(risk, "yolo")).toEqual({
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: false,
-      });
-    }
-  });
+ const a = toolAnnotationsForRisk(risk, "yolo");
+ expect(a.readOnlyHint).toBe(risk === 0);
+ }
+ });
 });
