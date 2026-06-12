@@ -1,13 +1,16 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { APP_VERSION, isToolInProfile, toolAnnotationsForRisk } from "@localant/shared";
+import { APP_VERSION, DEFAULT_SESSION_ID, isToolInProfile, toolAnnotationsForRisk } from "@localant/shared";
 import type { Gateway } from "@localant/gateway";
-
-const SESSION_ID = "chatgpt";
+import { IMAGE_META_KEY, registerWidgets, widgetMetaForTool } from "./widgets/index.js";
 
 export interface ImagePayload {
   mimeType: string;
   base64: string;
+}
+
+export interface ImageResourcePayload extends ImagePayload {
+  sizeBytes: number;
 }
 
 /**
@@ -15,7 +18,7 @@ export interface ImagePayload {
  * ({ mimeType, base64 }). It is returned to ChatGPT as an MCP image content
  * block and stripped from the JSON text so the payload isn't sent twice.
  */
-export function extractImage(data: unknown): { image?: ImagePayload; rest: unknown } {
+export function extractImage(data: unknown): { image?: ImageResourcePayload; rest: unknown } {
   if (typeof data !== "object" || data === null || !("__image" in data)) return { rest: data };
   const { __image, ...rest } = data as { __image: unknown } & Record<string, unknown>;
   if (
@@ -23,18 +26,42 @@ export function extractImage(data: unknown): { image?: ImagePayload; rest: unkno
     typeof (__image as ImagePayload).mimeType === "string" &&
     typeof (__image as ImagePayload).base64 === "string"
   ) {
-    return { image: __image as ImagePayload, rest };
+    const image = __image as ImagePayload;
+    return {
+      image: {
+        ...image,
+        sizeBytes: Buffer.byteLength(image.base64, "base64"),
+      },
+      rest,
+    };
   }
   return { rest: data };
+}
+
+function imageStructuredData(data: unknown, image?: ImageResourcePayload): unknown {
+  if (!image || typeof data !== "object" || data === null) return data;
+  return {
+    ...(data as Record<string, unknown>),
+    image: {
+      mimeType: image.mimeType,
+      sizeBytes: image.sizeBytes,
+    },
+  };
 }
 
 /**
  * Build an McpServer that exposes every registered gateway tool. Each MCP tool
  * call is routed through gateway.executeTool, applying the full safety
  * pipeline (validation → approval → redaction → audit).
+ *
+ * `getSessionId` resolves the originating ChatGPT chat for every call. In
+ * stateful mode it returns the transport's `Mcp-Session-Id`; for stateless
+ * callers it falls back to {@link DEFAULT_SESSION_ID}. It is read lazily per
+ * call because the session id is only assigned once `initialize` completes.
  */
-export function buildMcpServer(gw: Gateway): McpServer {
+export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => DEFAULT_SESSION_ID): McpServer {
   const server = new McpServer({ name: "LocalAnt", version: APP_VERSION });
+  registerWidgets(server);
 
   const profile = gw.config().tools.profile;
   const mode = gw.config().security.mode;
@@ -50,16 +77,20 @@ export function buildMcpServer(gw: Gateway): McpServer {
         // don't gate safe tools behind a confirmation "safety check". In yolo
         // mode every tool is advertised gate-free, matching the gateway policy.
         annotations: toolAnnotationsForRisk(tool.risk, mode),
+        _meta: widgetMetaForTool(tool.name),
       },
       async (args: unknown) => {
-        const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: SESSION_ID });
+        const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: getSessionId() });
         const { image, rest } = extractImage(result.data);
+        const response = { ...result, data: imageStructuredData(rest, image) };
         const text = JSON.stringify({ ...result, data: rest }, null, 2);
         return {
+          structuredContent: response,
           content: [
             { type: "text" as const, text },
             ...(image ? [{ type: "image" as const, data: image.base64, mimeType: image.mimeType }] : []),
           ],
+          _meta: image ? { [IMAGE_META_KEY]: image } : undefined,
           isError: !result.ok && !result.approvalRequired,
         };
       },

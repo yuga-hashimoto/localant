@@ -1,6 +1,13 @@
 import type { RiskLevel } from "./risk.js";
 import type { SkillPermissions } from "./config.js";
 
+/**
+ * Fallback session id used when a caller does not carry an MCP session
+ * (e.g. a stateless client, the CLI, or the dashboard). Real ChatGPT chats
+ * are distinguished by their per-connection Mcp-Session-Id.
+ */
+export const DEFAULT_SESSION_ID = "chatgpt-default";
+
 export interface AuditEntry {
   id: string;
   timestamp: string;
@@ -12,6 +19,8 @@ export interface AuditEntry {
   approval: "not-required" | "approved" | "denied" | "auto";
   durationMs: number;
   error?: string;
+  /** Which ChatGPT chat / MCP session originated this call. */
+  sessionId?: string;
 }
 
 export type ApprovalStatus = "pending" | "approved" | "denied" | "expired";
@@ -87,4 +96,6 @@ export interface CodingTask {
   finishedAt?: string;
   exitCode?: number;
   approvedPlanId?: string;
+  /** Which ChatGPT chat / MCP session started this task. */
+  sessionId?: string;
 }

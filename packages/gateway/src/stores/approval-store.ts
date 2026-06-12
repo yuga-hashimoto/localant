@@ -107,9 +107,20 @@ export class ApprovalStore {
     return this.sessionGrants.get(sessionId)?.has(tool) ?? false;
   }
 
-  /** Find an approved-but-unconsumed once-approval for a tool. */
-  findApprovedForTool(tool: string): ApprovalRequest | undefined {
-    return this.read().find((r) => r.tool === tool && r.status === "approved" && r.scope !== "session");
+  /**
+   * Find an approved-but-unconsumed once-approval for a tool. When the approval
+   * carries a `sessionId`, it can only be consumed by the same session — so a
+   * different ChatGPT chat cannot steal another chat's pending approval. Legacy
+   * approvals without a `sessionId` remain consumable by anyone (back-compat).
+   */
+  findApprovedForTool(tool: string, sessionId?: string): ApprovalRequest | undefined {
+    return this.read().find(
+      (r) =>
+        r.tool === tool &&
+        r.status === "approved" &&
+        r.scope !== "session" &&
+        (!r.sessionId || r.sessionId === sessionId),
+    );
   }
 
   /** Mark a once-approval as consumed so it cannot be reused. */

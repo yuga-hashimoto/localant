@@ -25,13 +25,14 @@ export function registerAgentRunTool(gw: Gateway): void {
       branchName: z.string().optional(),
     }),
     summarize: (i) => `${i.agent} ${i.mode} on ${i.cwd}`,
-    handler: (i) => {
+    handler: (i, ctx) => {
       if (i.mode === "plan") {
         return gw.agents.plan(i.agent, i.cwd, i.task);
       }
       return gw.agents.startTask(i.agent, i.cwd, i.task, {
         createBranch: i.createBranch,
         branchName: i.branchName,
+        sessionId: ctx.sessionId,
       });
     },
   });

@@ -42,8 +42,12 @@ export function registerCodingAgentTools(gw: Gateway): void {
       createBranch: z.boolean().default(true),
     }),
     summarize: (i) => `${i.agent} EXECUTE on ${i.cwd}`,
-    handler: (i) =>
-      gw.agents.startTask(i.agent, i.cwd, i.task, { createBranch: i.createBranch, branchName: i.branchName }),
+    handler: (i, ctx) =>
+      gw.agents.startTask(i.agent, i.cwd, i.task, {
+        createBranch: i.createBranch,
+        branchName: i.branchName,
+        sessionId: ctx.sessionId,
+      }),
   });
 
   r.register({
@@ -68,7 +72,7 @@ export function registerCodingAgentTools(gw: Gateway): void {
     risk: 2,
     inputSchema: z.object({ taskId: z.string() }),
     summarize: (i) => `stop task ${i.taskId}`,
-    handler: (i) => gw.agents.stopTask(i.taskId),
+    handler: async (i) => gw.agents.stopTask(i.taskId),
   });
 
   r.register({

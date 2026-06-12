@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from
 import fs from "node:fs";
 import path from "node:path";
 import http from "node:http";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createGateway, type Gateway } from "@localant/gateway";
 import { startHttpServers, type Servers } from "@localant/mcp";
 
@@ -69,6 +71,84 @@ describe("gateway /mcp auth", () => {
   it("returns 405 for GET /mcp", async () => {
     const res = await fetch(`${gatewayBase}/mcp`);
     expect(res.status).toBe(405);
+  });
+
+});
+
+describe("mcp chat sessions", () => {
+  async function connectClient(name: string) {
+    const transport = new StreamableHTTPClientTransport(new URL(`${gatewayBase}/mcp`), {
+      requestInit: { headers: { Authorization: `Bearer ${token}` } },
+    });
+    const client = new Client({ name, version: "1.0.0" });
+    await client.connect(transport);
+    return { client, transport };
+  }
+
+  it("returns image results with Apps SDK metadata over MCP HTTP", async () => {
+    gw.saveConfig({ ...gw.config(), tools: { profile: "full" } });
+    const imgPath = path.join(base, "mcp_image.png");
+    const fakePng = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02]);
+    fs.writeFileSync(imgPath, fakePng);
+
+    const { client } = await connectClient("image-client");
+    try {
+      const tools = await client.listTools();
+      const readImage = tools.tools.find((tool) => tool.name === "fs_read_image") as { _meta?: Record<string, unknown> } | undefined;
+      expect(readImage?._meta?.ui).toEqual({ resourceUri: "ui://localant/image-viewer-v1.html" });
+      expect(readImage?._meta?.["openai/outputTemplate"]).toBe("ui://localant/image-viewer-v1.html");
+
+      const result = await client.callTool({ name: "fs_read_image", arguments: { path: imgPath } });
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        data: {
+          path: imgPath,
+          image: { mimeType: "image/png", sizeBytes: fakePng.length },
+        },
+      });
+      expect(result.content).toContainEqual({ type: "image", data: fakePng.toString("base64"), mimeType: "image/png" });
+      expect(result._meta?.["localant/image"]).toEqual({
+        mimeType: "image/png",
+        base64: fakePng.toString("base64"),
+        sizeBytes: fakePng.length,
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("assigns a distinct session id per chat and tags audit entries with it", async () => {
+    const a = await connectClient("chat-a");
+    const b = await connectClient("chat-b");
+    try {
+      expect(a.transport.sessionId).toBeTruthy();
+      expect(b.transport.sessionId).toBeTruthy();
+      // Two ChatGPT chats get two different LocalAnt sessions.
+      expect(a.transport.sessionId).not.toBe(b.transport.sessionId);
+
+      await a.client.callTool({ name: "get_version", arguments: {} });
+      await b.client.callTool({ name: "get_version", arguments: {} });
+
+      const entries = gw.audit.list(50).filter((e) => e.tool === "get_version");
+      const sessions = new Set(entries.map((e) => e.sessionId));
+      expect(sessions.has(a.transport.sessionId!)).toBe(true);
+      expect(sessions.has(b.transport.sessionId!)).toBe(true);
+    } finally {
+      await a.client.close();
+      await b.client.close();
+    }
+  });
+
+  it("terminates a session on DELETE (transport.close)", async () => {
+    const a = await connectClient("chat-c");
+    const sid = a.transport.sessionId!;
+    expect(sid).toBeTruthy();
+    // The SDK client issues an HTTP DELETE carrying the session id.
+    await a.transport.terminateSession();
+    // After teardown a tool call on the same transport must not silently reuse
+    // the old session — the client transport has dropped its session id.
+    expect(a.transport.sessionId).toBeUndefined();
+    await a.client.close();
   });
 });
 
@@ -294,4 +374,3 @@ describe("dashboard api routes", () => {
     expect(gitCommit.active).toBe(false);
   });
 });
-

@@ -3,6 +3,7 @@ export type { ToolResult } from "./gateway.js";
 export { ToolRegistry } from "./registry.js";
 export type { ToolDefinition, ToolCallContext } from "./registry.js";
 export { registerAllTools } from "./tools/index.js";
+export { closeBrowserSession } from "./tools/browser.js";
 export { buildKeyComboArgs, buildTypeArgs, SPECIAL_KEYS, MODIFIERS } from "./tools/computer.js";
 export type { Modifier } from "./tools/computer.js";
 export { McpBridge } from "./managers/mcp-bridge.js";
