@@ -28,10 +28,19 @@ export const WIDGETS: readonly WidgetDef[] = [
   skillPanel,
 ];
 
-/** tool name -> the widget that renders its result. Built once, validated. */
+/**
+ * tool name -> the widget that renders its result. Built once, validated.
+ *
+ * The image viewer is intentionally excluded: a file/screenshot tool only
+ * carries an image on *some* calls (e.g. `fs_read_file` on a text file returns
+ * no image), so binding its template statically would render an empty
+ * "No image payload" panel for every text read. Image tools instead receive
+ * their template per-result via {@link imageWidgetMeta} when an image is present.
+ */
 const TOOL_TO_WIDGET: Map<string, WidgetDef> = (() => {
   const map = new Map<string, WidgetDef>();
   for (const w of WIDGETS) {
+    if (w === imageViewer) continue;
     for (const tool of w.tools) {
       const existing = map.get(tool);
       if (existing) {
@@ -51,6 +60,19 @@ const TOOL_TO_WIDGET: Map<string, WidgetDef> = (() => {
 export function widgetMetaForTool(name: string): Record<string, unknown> | undefined {
   const widget = TOOL_TO_WIDGET.get(name);
   if (!widget) return undefined;
+  return widgetMeta(widget);
+}
+
+/**
+ * Result-level `_meta` that asks ChatGPT to render the image viewer for a single
+ * tool call. Attached only when the result actually carries an image payload, so
+ * text reads never surface an empty image panel.
+ */
+export function imageWidgetMeta(): Record<string, unknown> {
+  return widgetMeta(imageViewer);
+}
+
+function widgetMeta(widget: WidgetDef): Record<string, unknown> {
   return {
     ui: { resourceUri: widget.uri },
     "openai/outputTemplate": widget.uri,

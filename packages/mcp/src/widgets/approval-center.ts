@@ -56,7 +56,10 @@ export const approvalCenter: WidgetDef = {
   id: "approval-center",
   uri: "ui://localant/approval-center-v1.html",
   description: "Review pending LocalAnt approval requests and approve or deny them inline.",
-  tools: ["approval_list_pending", "approval_get", "approval_approve", "approval_deny"],
+  // View tools only. approve / deny are actions returning {ok:true}; the panel
+  // drives them via its own inline buttons, so binding it to their results would
+  // render an empty approvals panel.
+  tools: ["approval_list_pending", "approval_get"],
   invoking: "Loading approvals...",
   invoked: "Approvals ready.",
   html: () => widgetDocument({ body: "Loading approvals...", render, config: { refreshTool: "approval_list_pending" } }),

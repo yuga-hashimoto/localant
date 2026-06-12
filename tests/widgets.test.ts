@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { WIDGETS, widgetMetaForTool } from "@localant/mcp";
+import { WIDGETS, widgetMetaForTool, imageWidgetMeta } from "@localant/mcp";
 
 /** Extract the body of every <script> block from a widget document. */
 function scriptBlocks(html: string): string[] {
@@ -49,16 +49,33 @@ describe("widget documents", () => {
 });
 
 describe("widgetMetaForTool", () => {
-  it("points image tools at the image viewer template", () => {
-    const meta = widgetMetaForTool("fs_read_image");
-    expect(meta).toBeDefined();
-    expect(meta!["openai/outputTemplate"]).toBe("ui://localant/image-viewer-v1.html");
-    expect((meta!.ui as { resourceUri: string }).resourceUri).toBe("ui://localant/image-viewer-v1.html");
+  it("does NOT statically bind image tools to a template (image is per-result)", () => {
+    // fs_read_file reads text most of the time; a static image template would
+    // render an empty "No image payload" panel on every text read.
+    for (const tool of ["fs_read_file", "fs_read_image", "computer_screenshot"]) {
+      expect(widgetMetaForTool(tool)).toBeUndefined();
+    }
   });
 
-  it("points approval tools at the approval center template", () => {
-    for (const tool of ["approval_list_pending", "approval_approve", "approval_deny"]) {
+  it("imageWidgetMeta points at the image viewer template for results with an image", () => {
+    const meta = imageWidgetMeta();
+    expect(meta["openai/outputTemplate"]).toBe("ui://localant/image-viewer-v1.html");
+    expect((meta.ui as { resourceUri: string }).resourceUri).toBe("ui://localant/image-viewer-v1.html");
+  });
+
+  it("points the approval list/get tools at the approval center template", () => {
+    for (const tool of ["approval_list_pending", "approval_get"]) {
       expect(widgetMetaForTool(tool)!["openai/outputTemplate"]).toBe("ui://localant/approval-center-v1.html");
+    }
+  });
+
+  it("does NOT bind action tools to a panel (they return {ok:true}, not a view)", () => {
+    for (const tool of [
+      "approval_approve", "approval_deny",
+      "git_commit", "git_add",
+      "skill_validate", "skill_enable", "skill_disable",
+    ]) {
+      expect(widgetMetaForTool(tool)).toBeUndefined();
     }
   });
 

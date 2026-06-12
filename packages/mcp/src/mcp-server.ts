@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { APP_VERSION, DEFAULT_SESSION_ID, isToolInProfile, toolAnnotationsForRisk } from "@localant/shared";
 import type { Gateway } from "@localant/gateway";
-import { IMAGE_META_KEY, registerWidgets, widgetMetaForTool } from "./widgets/index.js";
+import { IMAGE_META_KEY, imageWidgetMeta, registerWidgets, widgetMetaForTool } from "./widgets/index.js";
 
 export interface ImagePayload {
   mimeType: string;
@@ -89,7 +89,7 @@ export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => D
             { type: "text" as const, text },
             ...(image ? [{ type: "image" as const, data: image.base64, mimeType: image.mimeType }] : []),
           ],
-          _meta: image ? { [IMAGE_META_KEY]: image } : undefined,
+          _meta: image ? { [IMAGE_META_KEY]: image, ...imageWidgetMeta() } : undefined,
           isError: !result.ok && !result.approvalRequired,
         };
       },
