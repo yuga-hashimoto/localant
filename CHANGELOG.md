@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-06-12
+
+### Added
+- High-level LocalAnt Autopilot tool surface for delegating local coding tasks through configured coding agents while keeping task status, logs, diffs, continuation, stop and validation as first-class tools.
+- Per-tool MCP annotation overrides so high-level read-only Autopilot status/log/diff tools can advertise safe hints independently from mutating Autopilot actions.
+
+### Changed
+- yolo mode no longer advertises all tools as fake read-only; MCP annotations now reflect the tool actual risk while gateway approval behavior remains separate.
+- Minimal tool profile now keeps MCP bridge execution and authoring out of the default surface and exposes only read/status MCP bridge tools.
+
+### Fixed
+- Coding-agent validation now goes through PathGuard and CommandGuard before execution.
+- Coding-agent plan mode no longer receives gate-bypassing danger args, even in yolo mode.
+
 ## [1.4.0] - 2026-06-12
 
 ### Added
