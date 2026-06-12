@@ -263,7 +263,8 @@ const VIEWS = {
     const t=s.tunnel||{};
     const endpoint = mcp.endpoint || '(tunnel not running — start it below or from the CLI)';
     m.appendChild(el('<div class="card"><h2>Gateway</h2>'
-      +'<div class="row"><span class="tag">v'+esc(s.version)+'</span><span class="tag">'+esc(s.platform)+'</span><span class="tag">node '+esc(s.node)+'</span><span class="tag">pid '+s.pid+'</span></div>'
+      +'<p><b>LocalAnt Version:</b> <code>v'+esc(s.version)+'</code></p>'
+      +'<div class="row"><span class="tag">'+esc(s.platform)+'</span><span class="tag">node '+esc(s.node)+'</span><span class="tag">pid '+s.pid+'</span></div>'
       +'<p class="muted">Started '+esc(s.startedAt)+'</p>'
       +'<p>Gateway: <code>'+esc(s.gateway)+'</code></p>'
       +'<p>Dashboard: <code>'+esc(s.dashboard||'')+'</code></p></div>'));
@@ -575,7 +576,7 @@ const VIEWS = {
   },
 
   async Settings(m){
-    const c=await api('config');
+    const [c, s]=await Promise.all([api('config'), api('status').catch(()=>({}))]);
     const sec=c.security||{};
     const mode=sec.mode||'open';
     const allowedDirs=sec.allowedDirectories||[];
@@ -585,7 +586,14 @@ const VIEWS = {
 
     const tun=c.tunnel||{};
 
-    m.innerHTML='<div class="card"><h2>Security settings</h2>'
+    let infoHtml = '';
+    if (s && s.version) {
+      infoHtml = '<div class="card"><h2>System Info</h2>'
+        +'<p><b>LocalAnt Version:</b> <code>v'+esc(s.version)+'</code></p>'
+        +'</div>';
+    }
+
+    m.innerHTML=infoHtml+'<div class="card"><h2>Security settings</h2>'
       +'<div class="field"><label>Security mode</label>'
         +'<select id="secMode" style="width:160px">'
           +'<option value="open"'+(mode==='open'?' selected':'')+'>open (default)</option>'
