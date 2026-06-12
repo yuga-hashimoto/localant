@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Image-aware MCP results.** `fs_read_image` and the image fallback in
+  `fs_read_file` now actually render in ChatGPT: tool results may carry an
+  inline image via an `__image` field (`{ mimeType, base64 }`), which the MCP
+  server returns as a proper MCP image content block instead of inlining the
+  base64 into the JSON text payload.
+
 ## [1.2.0] - 2026-06-12
 
 ### Added
