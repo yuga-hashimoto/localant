@@ -1,4 +1,4 @@
-import { commandExists } from "@localant/gateway";
+import { commandExists, resolveTailscale } from "@localant/gateway";
 import { c, ok, warn, fail } from "./util.js";
 
 interface Check {
@@ -16,8 +16,11 @@ export async function runDoctor(): Promise<boolean> {
   checks.push({ name: `Platform ${process.platform}`, required: true, pass: true });
 
   const required = ["git", "node"];
+  // tailscale is resolved separately: on macOS the GUI build ships the CLI in
+  // the app bundle and isn't on PATH, so a bare commandExists would lie.
   const optional = ["pnpm", "npm", "npx", "claude", "codex", "cloudflared", "ngrok", "adb", "docker", "bun"];
   for (const cmd of required) checks.push({ name: cmd, required: true, pass: await commandExists(cmd) });
+  checks.push({ name: "tailscale", required: false, pass: (await resolveTailscale()) !== null });
   for (const cmd of optional) checks.push({ name: cmd, required: false, pass: await commandExists(cmd) });
 
   console.log(c.bold("\nEnvironment check\n"));

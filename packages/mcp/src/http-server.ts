@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile } from "@localant/shared";
-import { commandExists, type Gateway } from "@localant/gateway";
+import { commandExists, resolveTailscale, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
 
@@ -321,6 +321,8 @@ function mountDashboardApi(
     const checks = await Promise.all(
       tools.map(async (name) => ({ name, available: await commandExists(name) })),
     );
+    // tailscale: resolve via app bundle too (macOS GUI build isn't on PATH).
+    checks.push({ name: "tailscale", available: (await resolveTailscale()) !== null });
     const nodeMajor = Number(process.versions.node.split(".")[0]);
     s.json({
       node: process.version,

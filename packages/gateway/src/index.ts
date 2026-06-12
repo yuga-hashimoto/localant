@@ -4,6 +4,7 @@ export { ToolRegistry } from "./registry.js";
 export type { ToolDefinition, ToolCallContext } from "./registry.js";
 export { registerAllTools } from "./tools/index.js";
 export { McpBridge } from "./managers/mcp-bridge.js";
+export { resolveTailscale } from "./managers/tunnel-manager.js";
 export { PathGuard, PathAccessError } from "./security/path-guard.js";
 export { CommandGuard, CommandRejectedError, parseCommand } from "./security/command-guard.js";
 export { commandExists, execFileSafe } from "./util/exec.js";

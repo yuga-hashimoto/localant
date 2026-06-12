@@ -5,7 +5,7 @@
 3. Go to **Connectors → Create**.
 4. Paste the **Connector URL** shown by `setup`:
    ```
-   https://xxxxx.trycloudflare.com/mcp?key=<token>
+   https://your-machine.your-tailnet.ts.net/mcp?key=<token>
    ```
 5. Set **Authentication** to **None**.
 6. Name it **LocalAnt** and save.
@@ -13,20 +13,41 @@
 
 ## Keep a fixed URL (don't recreate the connector every time)
 
-By default LocalAnt uses a **cloudflared Quick Tunnel**
-(`https://xxxxx.trycloudflare.com`). That URL is **random and changes every time
-you restart** — so you'd have to delete and recreate the ChatGPT connector each
-session. The fix is to use a **fixed URL**. Because the auth token is persistent,
+By default LocalAnt uses **Tailscale Funnel**. Funnel gives you a stable HTTPS
+URL under your tailnet domain, for example
+`https://your-machine.your-tailnet.ts.net`. Because the auth token is persistent,
 once the URL is stable you never recreate the connector or re-authenticate.
 
-Set one of these (in the dashboard **Settings → Tunnel** tab, or with
-`localant config set tunnel.<key> <value>`), then **Save & restart tunnel**:
+Tailscale Funnel may ask for one-time approval the first time you expose a
+machine. If LocalAnt times out waiting for the Funnel URL, run:
 
-### Option A — ngrok static domain (recommended, free)
+```bash
+tailscale funnel <localant-gateway-port>
+```
+
+Then configure the stable Funnel FQDN in the dashboard **Settings → Tunnel** tab,
+or with:
+
+```bash
+localant config set tunnel.provider tailscale
+localant config set tunnel.domain your-machine.your-tailnet.ts.net
+```
+
+### Option A — Tailscale Funnel (default, recommended)
+
+```bash
+localant config set tunnel.provider tailscale
+localant config set tunnel.domain your-machine.your-tailnet.ts.net
+```
+
+Your endpoint is then always
+`https://your-machine.your-tailnet.ts.net/mcp?key=<token>`.
+
+### Option B — ngrok static domain
 
 1. Create a free account at <https://ngrok.com> and copy your **authtoken**.
-2. In the ngrok dashboard, claim your free **static domain** (one per account,
-   e.g. `myname.ngrok-free.app`).
+2. In the ngrok dashboard, claim your **static domain**
+   (e.g. `myname.ngrok-free.app`).
 3. Configure:
    ```bash
    localant config set tunnel.provider ngrok
@@ -35,7 +56,7 @@ Set one of these (in the dashboard **Settings → Tunnel** tab, or with
    ```
    Your endpoint is then always `https://myname.ngrok-free.app/mcp?key=<token>`.
 
-### Option B — custom subdomain, no signup (localtunnel / serveo)
+### Option C — custom subdomain, no signup (localtunnel / serveo)
 
 ```bash
 localant config set tunnel.provider localtunnel
@@ -44,7 +65,7 @@ localant config set tunnel.subdomain my-localant-mcp
 Gives `https://my-localant-mcp.localtunnel.me` (best-effort — the subdomain isn't
 reserved, so it can occasionally be taken).
 
-### Option C — Cloudflare Named Tunnel (your own domain)
+### Option D — Cloudflare Named Tunnel (your own domain)
 
 Create a Named Tunnel in the Cloudflare Zero Trust dashboard, then:
 ```bash

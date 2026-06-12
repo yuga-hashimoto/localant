@@ -298,7 +298,7 @@ const VIEWS = {
     try {
       const d=await api('doctor');
       const chips=d.tools.map(function(t){ return '<span class="tag" style="margin:2px;'+(t.available?'':'opacity:.5')+'">'+(t.available?'✓':'✗')+' '+esc(t.name)+'</span>'; }).join(' ');
-      document.getElementById('envOut').innerHTML='<p>node '+esc(d.node)+' · '+esc(d.platform)+(d.skillExecOk?'':' <span class="risk2">(Node 22+ recommended for skills)</span>')+'</p><div class="row">'+chips+'</div><p class="muted" style="font-size:12px;margin-top:8px">✓ = on PATH. Install <code>cloudflared</code>/<code>ngrok</code> for tunnels, <code>claude</code>/<code>codex</code>/<code>openclaw</code>/<code>agy</code>/<code>hermes</code>/<code>opencode</code> for agents.</p>';
+      document.getElementById('envOut').innerHTML='<p>node '+esc(d.node)+' · '+esc(d.platform)+(d.skillExecOk?'':' <span class="risk2">(Node 22+ recommended for skills)</span>')+'</p><div class="row">'+chips+'</div><p class="muted" style="font-size:12px;margin-top:8px">✓ = on PATH. Install <code>tailscale</code> for the default Funnel tunnel, or <code>cloudflared</code>/<code>ngrok</code> as fallbacks, <code>claude</code>/<code>codex</code>/<code>openclaw</code>/<code>agy</code>/<code>hermes</code>/<code>opencode</code> for agents.</p>';
     } catch(e){ document.getElementById('envOut').textContent='Could not load environment.'; }
   },
 
@@ -616,11 +616,11 @@ const VIEWS = {
       +'<p class="muted" style="margin-top:0">A fixed URL means you never recreate the ChatGPT connector. Pick a provider and fill the matching field, then Save &amp; restart.</p>'
       +'<div class="field"><label>Provider</label>'
         +'<select id="tunProvider" style="width:160px">'
-          +['cloudflared','ngrok','localtunnel','serveo','none'].map(function(p){return '<option value="'+p+'"'+((tun.provider||'cloudflared')===p?' selected':'')+'>'+p+'</option>';}).join('')
+          +['tailscale','cloudflared','ngrok','localtunnel','serveo','none'].map(function(p){return '<option value="'+p+'"'+((tun.provider||'tailscale')===p?' selected':'')+'>'+p+'</option>';}).join('')
         +'</select></div>'
       +'<div class="field"><label>Custom subdomain (localtunnel: no signup · serveo: one-time SSH key registration for a fixed URL)</label><input type="text" id="tunSubdomain" value="'+esc(tun.subdomain||'')+'" placeholder="e.g. my-localant-mcp" /></div>'
       +'<div class="field"><label>Token / authtoken (cloudflared tunnel token / ngrok authtoken)</label><div class="row" style="gap:8px"><input type="password" id="tunToken" value="'+esc(tun.token||'')+'" placeholder="Cloudflare Tunnel token or ngrok authtoken" style="flex:1" /><button class="btn ghost sm" id="tunTokenShow">Show</button></div></div>'
-      +'<div class="field"><label>Custom domain (ngrok static domain)</label><input type="text" id="tunDomain" value="'+esc(tun.domain||'')+'" placeholder="e.g. my-app.ngrok-free.app" /></div>'
+      +'<div class="field"><label>Custom domain (Tailscale Funnel FQDN / ngrok static domain)</label><input type="text" id="tunDomain" value="'+esc(tun.domain||'')+'" placeholder="e.g. my-mac.example-tailnet.ts.net or my-app.ngrok-free.app" /></div>'
       +'<div class="field"><label>Public URL (override — used as-is)</label><input type="text" id="tunUrl" value="'+esc(tun.publicUrl||'')+'" placeholder="e.g. https://my-domain.com" /></div>'
       +'<div class="row"><button class="btn" id="saveTunBtn">Save tunnel settings</button><button class="btn ghost" id="saveRestartBtn">Save &amp; restart tunnel</button></div>'
       +'</div>'

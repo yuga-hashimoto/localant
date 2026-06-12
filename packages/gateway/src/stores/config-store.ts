@@ -25,11 +25,7 @@ export class ConfigStore {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(p.configFile)) {
-      const config = defaultConfig();
-      config.tunnel.provider = "serveo";
-      const rand = crypto.randomBytes(16).toString("hex");
-      config.tunnel.subdomain = `localant-${rand}`;
-      this.save(config);
+      this.save(defaultConfig());
     }
     if (!fs.existsSync(p.tokenFile)) {
       const token = crypto.randomBytes(32).toString("base64url");
