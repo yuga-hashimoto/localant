@@ -14,6 +14,7 @@ import { registerControlTools } from "./control.js";
 import { registerSkillTools } from "./skill.js";
 import { registerCodingAgentTools } from "./coding-agent.js";
 import { registerAdbTools } from "./adb.js";
+import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
 import { registerAdapterTools } from "./adapters.js";
 import { registerAliasTools } from "./aliases.js";
@@ -36,6 +37,7 @@ export function registerAllTools(gw: Gateway): void {
   registerSkillTools(gw);
   registerCodingAgentTools(gw);
   registerAdbTools(gw);
+  registerComputerTools(gw);
   registerBrowserTools(gw);
   registerAdapterTools(gw);
   // Aliases must run last: they wrap already-registered tools.
