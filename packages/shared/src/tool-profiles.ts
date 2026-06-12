@@ -173,6 +173,15 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "agent_get_diff",
   "agent_run_validation",
 
+  // --- High-level Autopilot delegation ---
+  "localant_autopilot_start",
+  "localant_autopilot_status",
+  "localant_autopilot_get_logs",
+  "localant_autopilot_get_diff",
+  "localant_autopilot_continue",
+  "localant_autopilot_stop",
+  "localant_autopilot_run_validation",
+
   // --- LSP / code intelligence ---
   "lsp_status",
   "lsp_list_servers",
@@ -183,7 +192,6 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "lsp_hover",
   "lsp_workspace_symbols",
   "lsp_rename_symbol",
-
 
   // --- Basic browser ---
   "browser_open",
@@ -203,15 +211,6 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "tunnel_start",
   "tunnel_stop",
   "tunnel_restart",
-
-  // --- Autopilot (high-level delegation surface) ---
-  "localant_autopilot_start",
-  "localant_autopilot_status",
-  "localant_autopilot_get_logs",
-  "localant_autopilot_get_diff",
-  "localant_autopilot_continue",
-  "localant_autopilot_stop",
-  "localant_autopilot_run_validation",
 ]);
 
 /** Whether a tool is exposed under the given profile. `full` exposes everything. */

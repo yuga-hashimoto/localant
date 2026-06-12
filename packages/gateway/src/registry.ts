@@ -9,7 +9,7 @@ export interface ToolDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> {
   name: string;
   description: string;
   risk: RiskLevel;
- annotations?: ToolHintAnnotations;
+  annotations?: ToolHintAnnotations;
   inputSchema: S;
   /** Short human summary of an invocation, used for audit + approval prompts. */
   summarize?: (input: z.output<S>) => string;

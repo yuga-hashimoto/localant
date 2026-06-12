@@ -2,10 +2,10 @@ import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { nanoid } from "nanoid";
 import type { CodingAgentConfig, Config } from "@localant/shared";
-import { commandExists, execFileSafe } from "../util/exec.js";
-import type { GitManager } from "./git-manager.js";
 import type { CommandGuard } from "../security/command-guard.js";
 import type { PathGuard } from "../security/path-guard.js";
+import { commandExists, execFileSafe } from "../util/exec.js";
+import type { GitManager } from "./git-manager.js";
 
 interface RunningTask {
   id: string;
@@ -80,8 +80,6 @@ export class CodingAgentManager {
       throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
     }
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
-    // Plan mode is read-only by construction, so it never receives dangerArgs
-    // (the gate-bypassing flags) even in yolo mode.
     const args = [...cfg.args, ...cfg.planArgs, prompt];
     const res = await execFileSafe(cfg.command, args, {
       cwd,
@@ -266,8 +264,31 @@ export class CodingAgentManager {
     if (!command) throw new Error("No validate/test command provided.");
     const safeCwd = this.pathGuard.assertAccess(cwd, "read");
     const normalized = this.commandGuard.assertAllowed(command);
-    const [file, ...args] = normalized.split(" ");
-    const res = await execFileSafe(file!, args, { cwd: safeCwd, timeoutMs: 300_000, maxOutputBytes: 200_000 });
+    const [file, ...args] = splitArgs(normalized);
+    if (!file) throw new Error("Empty command.");
+    const res = await execFileSafe(file, args, { cwd: safeCwd, timeoutMs: 300_000, maxOutputBytes: 200_000 });
     return { command: normalized, code: res.code, output: (res.stdout + res.stderr).slice(0, 50_000) };
   }
+}
+
+/** Split a normalized command string into argv, honoring simple quoting. */
+function splitArgs(command: string): string[] {
+  const args: string[] = [];
+  let current = "";
+  let quote: '"' | "'" | null = null;
+  for (const ch of command) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      else current += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+    } else if (ch === " ") {
+      if (current) args.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  if (current) args.push(current);
+  return args;
 }

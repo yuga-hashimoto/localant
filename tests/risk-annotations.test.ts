@@ -52,10 +52,13 @@ describe("toolAnnotationsForRisk (risk-based, non-yolo)", () => {
 });
 
 describe("toolAnnotationsForRisk (yolo)", () => {
-  it("does not relax annotations in yolo mode — they still reflect real behavior", () => {
-    for (const risk of [0, 1, 2, 3, 4] as RiskLevel[]) {
-      expect(toolAnnotationsForRisk(risk, "yolo")).toEqual(toolAnnotationsForRisk(risk, "open"));
-      expect(toolAnnotationsForRisk(risk, "yolo").readOnlyHint).toBe(risk === 0);
+  it("keeps actual risk hints instead of advertising higher-risk tools as read-only", () => {
+    expect(toolAnnotationsForRisk(0, "yolo").readOnlyHint).toBe(true);
+    for (const risk of [3, 4] as RiskLevel[]) {
+      const a = toolAnnotationsForRisk(risk, "yolo");
+      expect(a.readOnlyHint).toBe(false);
+      expect(a.destructiveHint).toBe(true);
+      expect(a.openWorldHint).toBe(true);
     }
   });
 });
