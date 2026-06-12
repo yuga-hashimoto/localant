@@ -49,7 +49,7 @@ LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashbo
   ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
   ├─ Browser (Playwright, isolated profile) · Android (ADB) · Computer Use (macOS desktop)
   ├─ Articles (Zenn / Qiita / note, via skill) · Custom Skills
-  └─ Adapters: OpenClaw · Desktop Commander · any MCP server
+  └─ Adapters: any downstream MCP server (Desktop Commander, etc.)
 ```
 
 ---
@@ -92,7 +92,7 @@ and audit.
   desktop (`screencapture` + `cliclick`). Screenshots come back as inline MCP
   images whose pixels map 1:1 to click coordinates; all input actions are
   risk 3 and audited. See [docs/computer-use.md](docs/computer-use.md).
-- 🔌 **Adapters** for OpenClaw, Desktop Commander, and arbitrary MCP servers.
+- 🔌 **Adapters** for arbitrary downstream MCP servers (e.g. Desktop Commander).
 
 ## ChatGPT as a local coding agent
 
@@ -366,26 +366,19 @@ MCP images, resampled so image pixels map 1:1 to click coordinates.
 `adb_list_devices/screenshot/tap/swipe/input_text/logcat/install_apk/...`.
 Input/installs are risk 3 and audited. See [docs/adb.md](docs/adb.md).
 
-## OpenClaw adapter
-
-`openclaw_status/list_skills/run_skill/list_sessions/...` — bridges to a local
-`openclaw` CLI if installed, otherwise returns clear install guidance. Every call
-flows through the gateway's permission + approval + audit pipeline.
-
-## Desktop Commander adapter
-
-`desktop_commander_status/list_tools/run_tool` — gated bridge; tools are never
-exposed unmediated.
-
 ## Existing MCP bridge
 
 Register downstream MCP servers (`mcp_server_register/list/status/...`) to bundle
-them behind the gateway's safety pipeline.
+them behind the gateway's safety pipeline. Desktop Commander and any other MCP
+server are driven through this generic bridge — there is no dedicated adapter.
+`mcp_server_list_tools` returns an actionable hint when a server is unregistered
+or disabled.
 
 ## CLI
 
 ```bash
 localant setup | start | stop | restart | status | doctor | uninstall
+localant deps list | install [browser|desktop]   # optional capability deps (Playwright, cliclick)
 localant update [--check] [--pm npm|pnpm|yarn|bun]   # update to the latest published version and restart
 localant token rotate | show   # re-issue the auth token (secrets preserved)
 localant tunnel status | start | stop

@@ -85,6 +85,23 @@ describe("background shell", () => {
     const stop = await g.executeTool("shell_stop", { processId: id }, { caller: "test" });
     expect(stop.ok).toBe(true);
   });
+
+  it("interprets && chaining through the shell", async () => {
+    const g = gw();
+    const start = await g.executeTool(
+      "shell_run_background",
+      { command: "echo one && echo two", cwd: proj },
+      { caller: "test" },
+    );
+    expect(start.ok).toBe(true);
+    const id = (start.data as { processId: string }).processId;
+    await new Promise((r) => setTimeout(r, 300));
+    const out = await g.executeTool("shell_get_output", { processId: id }, { caller: "test" });
+    expect(out.ok).toBe(true);
+    const stdout = (out.data as { stdout: string }).stdout;
+    expect(stdout).toContain("one");
+    expect(stdout).toContain("two");
+  });
 });
 
 describe("editing tools", () => {
@@ -383,6 +400,32 @@ describe("coding agent sessions & repo lock", () => {
 
     await g.agents.stopTask(a.taskId);
     await g.agents.stopTask(b.taskId);
+  });
+});
+
+describe("fs backup roundtrip", () => {
+  it("restores a backup by the id returned from fs_list_backups", async () => {
+    const g = gw();
+    const f = path.join(proj, "doc.txt");
+    fs.writeFileSync(f, "original");
+
+    const made = await g.executeTool("fs_backup_file", { path: f }, { caller: "test" });
+    expect(made.ok).toBe(true);
+    const backupId = (made.data as { id: string }).id;
+    expect(backupId).toBeTruthy();
+
+    // Mutate the file after the backup was taken.
+    fs.writeFileSync(f, "changed");
+
+    const listed = await g.executeTool("fs_list_backups", {}, { caller: "test" });
+    expect(listed.ok).toBe(true);
+    const ids = (listed.data as { id: string }[]).map((b) => b.id);
+    expect(ids).toContain(backupId);
+
+    // Restoring the id surfaced by fs_list_backups must succeed and revert content.
+    const restored = await g.executeTool("fs_restore_backup", { id: backupId }, { caller: "test" });
+    expect(restored.ok).toBe(true);
+    expect(fs.readFileSync(f, "utf8")).toBe("original");
   });
 });
 

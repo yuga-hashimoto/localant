@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Optional capability dependencies are now first-class: `localant doctor` reports
+  whether browser automation (Playwright + Chromium) and desktop mouse/keyboard
+  control (`cliclick`) are installed, `localant setup` offers to install the
+  missing ones, and a new `localant deps list|install [browser|desktop]` command
+  manages them on demand.
+
+### Changed
+- Trimmed the `coding` tool profile to one name per function: 12 pure duplicate
+  aliases (`read_file`, `read_file_range`, `write_file`, `edit_file`,
+  `list_files`, `search_content`, `search_files`, `get_file_info`, `diff_file`,
+  `shell_run`, `bash_output`, `kill_shell`) are no longer exposed. Each remains
+  reachable through its canonical name (e.g. `read`, `grep`, `bash`,
+  `fs_list_files`), so no capability is lost while tool-selection surface and
+  request bloat shrink.
+- `shell_run_background` now runs through a real shell (`bash -c` / `cmd /c`) so
+  pipelines, redirection and `&&` chaining behave the same as the foreground
+  `bash` tool instead of being passed as literal argv.
+- `mcp_server_list_tools` returns an actionable hint when the target server is
+  unregistered or disabled (how to register/enable it) instead of a bare
+  connection error.
+- Removed the redundant `desktop_commander_*` adapter tools; Desktop Commander is
+  a regular downstream MCP server and is driven through the generic
+  `mcp_server_*` bridge.
+- Removed the eight `openclaw_*` CLI-wrapper tools. OpenClaw remains usable as a
+  configured coding agent (via `agent_*` / `coding_agent_*`) or as a downstream
+  MCP server, so no capability is lost while the tool surface stays focused.
+
+### Fixed
+- `fs_restore_backup` could never find a backup created via `fs_backup_file`: the
+  backup lookup excluded exactly the metadata file it needed (an inverted
+  `startsWith(id + "__")` guard), so every restore failed with "Backup not found".
+
 ## [1.4.1] - 2026-06-12
 
 ### Added

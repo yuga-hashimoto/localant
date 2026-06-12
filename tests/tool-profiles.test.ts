@@ -106,4 +106,26 @@ describe("tool profiles", () => {
       expect(isToolInProfile(name, "coding"), name).toBe(false);
     }
   });
+
+  it("coding profile drops pure duplicate aliases (one name per function)", () => {
+    // Each removed alias must still be reachable via the kept canonical name.
+    const droppedToKept: Record<string, string> = {
+      read_file: "read",
+      read_file_range: "fs_read_file_range",
+      write_file: "write",
+      edit_file: "edit",
+      list_files: "fs_list_files",
+      search_content: "grep",
+      search_files: "fs_search_files",
+      get_file_info: "fs_get_file_info",
+      diff_file: "git_diff_file",
+      shell_run: "bash",
+      bash_output: "shell_get_output",
+      kill_shell: "shell_stop",
+    };
+    for (const [dropped, kept] of Object.entries(droppedToKept)) {
+      expect(isToolInProfile(dropped, "coding"), `${dropped} should be dropped`).toBe(false);
+      expect(isToolInProfile(kept, "coding"), `${kept} should remain`).toBe(true);
+    }
+  });
 });

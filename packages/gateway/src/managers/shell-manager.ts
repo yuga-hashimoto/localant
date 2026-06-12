@@ -99,12 +99,17 @@ export class ShellManager {
     return { code: res.code, stdout: res.stdout, stderr: res.stderr };
   }
 
-  /** Spawn a long-running approved process and track it. */
+  /**
+   * Spawn a long-running approved process and track it. Runs through a real
+   * shell (`bash -c`, `cmd /c` on Windows) so pipelines, redirection and `&&`
+   * chaining behave the same as the foreground `bash` tool — but only after
+   * CommandGuard rejects blocked tokens across every pipeline segment.
+   */
   startProcess(command: string, cwd?: string): string {
     const normalized = this.guard.assertNotBlocked(command);
-    const [file, ...args] = splitArgs(normalized);
-    if (!file) throw new Error("Empty command.");
-    const child = spawn(file, args, { cwd: this.resolveCwd(cwd), shell: false });
+    const shell = process.platform === "win32" ? "cmd" : "bash";
+    const shellArgs = process.platform === "win32" ? ["/c", normalized] : ["-c", normalized];
+    const child = spawn(shell, shellArgs, { cwd: this.resolveCwd(cwd), shell: false });
     const id = nanoid(8);
     const proc: ManagedProcess = {
       id,
