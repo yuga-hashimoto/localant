@@ -1,10 +1,11 @@
-import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
+import { configDir } from "@localant/shared";
 
 /**
  * Heavy optional dependencies (Playwright …) are installed into a dedicated
- * directory under the user's home — never the current working directory.
+ * directory under the LocalAnt config home — never the current working
+ * directory.
  *
  * Running `npm install` in the cwd breaks whenever that directory (or a parent)
  * is a pnpm/yarn workspace, because npm cannot parse `workspace:*` protocol
@@ -13,7 +14,7 @@ import { createRequire } from "node:module";
  * user invoked `localant deps install` from.
  */
 export function optionalDepsDir(): string {
-  return path.join(os.homedir(), ".localant", "optional-deps");
+  return path.join(configDir(), "optional-deps");
 }
 
 /**
