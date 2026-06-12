@@ -15,6 +15,10 @@
   <b>English</b> · <a href="README.ja.md">日本語</a>
 </p>
 
+<p align="center">
+  <video src="assets/demo.mp4" width="100%" autoplay loop muted playsinline></video>
+</p>
+
 > **Use ChatGPT as the brain. Use your local computer as the hands.**
 
 `LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
@@ -72,6 +76,16 @@ and audit.
 - 🤖 **Coding agents**: drive Claude Code / Codex (plan → approve → execute →
   validate → diff) on any working directory.
 - 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
+  <table>
+    <tr>
+      <td width="50%"><b>Before (Task Start)</b></td>
+      <td width="50%"><b>After (PR Created & Validated)</b></td>
+    </tr>
+    <tr>
+      <td><img src="assets/before.png" alt="Before" width="100%" /></td>
+      <td><img src="assets/after.png" alt="After" width="100%" /></td>
+    </tr>
+  </table>
 - 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
 - 🖱️ **Computer Use**: screenshot + mouse + keyboard control of the macOS
   desktop (`screencapture` + `cliclick`). Screenshots come back as inline MCP
