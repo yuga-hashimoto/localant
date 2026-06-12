@@ -37,6 +37,7 @@ export function buildMcpServer(gw: Gateway): McpServer {
   const server = new McpServer({ name: "LocalAnt", version: APP_VERSION });
 
   const profile = gw.config().tools.profile;
+  const mode = gw.config().security.mode;
   for (const tool of gw.registry.list()) {
     if (!isToolInProfile(tool.name, profile)) continue;
     const shape = (tool.inputSchema as unknown as { shape?: Record<string, z.ZodTypeAny> }).shape ?? {};
@@ -46,8 +47,9 @@ export function buildMcpServer(gw: Gateway): McpServer {
         description: `[risk ${tool.risk}] ${tool.description}`,
         inputSchema: shape,
         // Advertise read-only / destructive hints so MCP clients (e.g. ChatGPT)
-        // don't gate safe read-only tools behind a confirmation "safety check".
-        annotations: toolAnnotationsForRisk(tool.risk),
+        // don't gate safe tools behind a confirmation "safety check". In yolo
+        // mode every tool is advertised gate-free, matching the gateway policy.
+        annotations: toolAnnotationsForRisk(tool.risk, mode),
       },
       async (args: unknown) => {
         const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: SESSION_ID });

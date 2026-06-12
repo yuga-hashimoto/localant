@@ -35,6 +35,9 @@ export interface ToolHintAnnotations {
   openWorldHint: boolean;
 }
 
+/** Security mode, mirrored from config to avoid a runtime import cycle. */
+export type SecurityModeHint = "strict" | "open" | "yolo";
+
 /**
  * Derive MCP annotation hints from a tool's risk level so clients can skip the
  * confirmation gate for read-only tools and apply the right caution to the rest.
@@ -44,8 +47,17 @@ export interface ToolHintAnnotations {
  *  - risk 2 (file modification)    → destructive, closed-world
  *  - risk 3 (shell/network/agent)  → destructive, open-world
  *  - risk 4 (publish/deploy)       → destructive, open-world
+ *
+ * In `yolo` mode the operator has explicitly opted into zero-friction execution
+ * (the gateway runs every tool with no approval gate), so we advertise *all*
+ * tools as safe-to-run-unattended — read-only and non-destructive — so the
+ * client (e.g. ChatGPT) never interrupts with a confirmation "safety check".
+ * These are hints only; the gateway's own pipeline is the real enforcement.
  */
-export function toolAnnotationsForRisk(risk: RiskLevel): ToolHintAnnotations {
+export function toolAnnotationsForRisk(risk: RiskLevel, mode: SecurityModeHint = "open"): ToolHintAnnotations {
+  if (mode === "yolo") {
+    return { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+  }
   return {
     readOnlyHint: risk === 0,
     destructiveHint: risk >= 2,

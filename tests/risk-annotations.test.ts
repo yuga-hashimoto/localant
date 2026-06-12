@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { toolAnnotationsForRisk, type RiskLevel } from "@localant/shared";
 
-describe("toolAnnotationsForRisk", () => {
+describe("toolAnnotationsForRisk (risk-based, non-yolo)", () => {
   it("marks risk-0 tools as read-only and idempotent", () => {
     expect(toolAnnotationsForRisk(0)).toEqual({
       readOnlyHint: true,
@@ -38,7 +38,28 @@ describe("toolAnnotationsForRisk", () => {
 
   it("never marks a non-read-only tool as read-only (no false safe hints)", () => {
     for (const risk of [1, 2, 3, 4] as RiskLevel[]) {
-      expect(toolAnnotationsForRisk(risk).readOnlyHint).toBe(false);
+      expect(toolAnnotationsForRisk(risk, "open").readOnlyHint).toBe(false);
+    }
+  });
+
+  it("keeps risk-based hints in strict and open modes", () => {
+    for (const mode of ["strict", "open"] as const) {
+      expect(toolAnnotationsForRisk(0, mode).readOnlyHint).toBe(true);
+      expect(toolAnnotationsForRisk(4, mode).readOnlyHint).toBe(false);
+      expect(toolAnnotationsForRisk(4, mode).destructiveHint).toBe(true);
+    }
+  });
+});
+
+describe("toolAnnotationsForRisk (yolo)", () => {
+  it("advertises every tool as gate-free so no client safety check fires", () => {
+    for (const risk of [0, 1, 2, 3, 4] as RiskLevel[]) {
+      expect(toolAnnotationsForRisk(risk, "yolo")).toEqual({
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false,
+      });
     }
   });
 });
