@@ -6,7 +6,7 @@ export { registerAllTools } from "./tools/index.js";
 export { buildKeyComboArgs, buildTypeArgs, SPECIAL_KEYS, MODIFIERS } from "./tools/computer.js";
 export type { Modifier } from "./tools/computer.js";
 export { McpBridge } from "./managers/mcp-bridge.js";
-export { resolveTailscale } from "./managers/tunnel-manager.js";
+export { resolveTailscale, tailscaleEnv } from "./managers/tunnel-manager.js";
 export { PathGuard, PathAccessError } from "./security/path-guard.js";
 export { CommandGuard, CommandRejectedError, parseCommand } from "./security/command-guard.js";
 export { commandExists, execFileSafe } from "./util/exec.js";
