@@ -23,6 +23,17 @@
 
 `LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
 
+<table>
+  <tr>
+    <td width="50%"><b>Before (Task Start)</b></td>
+    <td width="50%"><b>After (PR Created & Validated)</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/before.png" alt="Before" width="100%" /></td>
+    <td><img src="assets/after.png" alt="After" width="100%" /></td>
+  </tr>
+</table>
+
 It exposes safe, permissioned local skills to ChatGPT through MCP:
 run approved commands, inspect projects, manage files, call coding agents like
 Claude Code or Codex, control browser/ADB, publish articles, and create your own
@@ -76,16 +87,6 @@ and audit.
 - 🤖 **Coding agents**: drive Claude Code / Codex (plan → approve → execute →
   validate → diff) on any working directory.
 - 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
-  <table>
-    <tr>
-      <td width="50%"><b>Before (Task Start)</b></td>
-      <td width="50%"><b>After (PR Created & Validated)</b></td>
-    </tr>
-    <tr>
-      <td><img src="assets/before.png" alt="Before" width="100%" /></td>
-      <td><img src="assets/after.png" alt="After" width="100%" /></td>
-    </tr>
-  </table>
 - 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
 - 🖱️ **Computer Use**: screenshot + mouse + keyboard control of the macOS
   desktop (`screencapture` + `cliclick`). Screenshots come back as inline MCP

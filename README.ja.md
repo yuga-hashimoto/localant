@@ -24,6 +24,17 @@
 `LocalAnt` は、ChatGPT を頭脳として、ローカル PC を実行環境として使うための
 ツールです。
 
+<table>
+  <tr>
+    <td width="50%"><b>Before (作業前: タスク開始時)</b></td>
+    <td width="50%"><b>After (作業後: PR作成・バリデーション通過)</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/before.png" alt="Before" width="100%" /></td>
+    <td><img src="assets/after.png" alt="After" width="100%" /></td>
+  </tr>
+</table>
+
 安全で権限管理された「スキル」を MCP 経由で ChatGPT に公開します。
 許可済みコマンドの実行、プロジェクトの調査、ファイル操作、Claude Code や Codex
 などのコーディングエージェントの呼び出し、ブラウザ / ADB の操作、記事の公開、
@@ -71,16 +82,6 @@ ChatGPT のための**ローカルファースト MCP ゲートウェイ**です
 - 🤖 **コーディングエージェント**: Claude Code / Codex を任意の作業ディレクトリで
   駆動（計画 → 承認 → 実行 → 検証 → 差分）。
 - 🖥️ **ローカルダッシュボード**: ホーム・ツール（スキル / MCP サブタブ）・セキュリティ・承認・監査・シークレット・エージェント・設定。
-  <table>
-    <tr>
-      <td width="50%"><b>Before (作業前: タスク開始時)</b></td>
-      <td width="50%"><b>After (作業後: PR作成・バリデーション通過)</b></td>
-    </tr>
-    <tr>
-      <td><img src="assets/before.png" alt="Before" width="100%" /></td>
-      <td><img src="assets/after.png" alt="After" width="100%" /></td>
-    </tr>
-  </table>
 - 🌐 **3分セットアップ**: デフォルトは Tailscale Funnel、Cloudflare Tunnel / ngrok フォールバック、クリップボードコピー対応。
 - 🖱️ **Computer Use**: macOS デスクトップのスクリーンショット・クリック・
   キーボード操作（`screencapture` + `cliclick`）。スクリーンショットは MCP 画像
