@@ -32,7 +32,7 @@ LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashbo
   ↓ Local PC
   ├─ Shell · Filesystem · Git (deny-list by default · allow-list in strict mode)
   ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
-  ├─ Browser (Playwright, isolated profile) · Android (ADB)
+  ├─ Browser (Playwright, isolated profile) · Android (ADB) · Computer Use (macOS desktop)
   ├─ Articles (Zenn / Qiita / note, via skill) · Custom Skills
   └─ Adapters: OpenClaw · Desktop Commander · any MCP server
 ```
@@ -73,6 +73,10 @@ and audit.
   validate → diff) on any working directory.
 - 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
 - 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
+- 🖱️ **Computer Use**: screenshot + mouse + keyboard control of the macOS
+  desktop (`screencapture` + `cliclick`). Screenshots come back as inline MCP
+  images whose pixels map 1:1 to click coordinates; all input actions are
+  risk 3 and audited. See [docs/computer-use.md](docs/computer-use.md).
 - 🔌 **Adapters** for OpenClaw, Desktop Commander, and arbitrary MCP servers.
 
 ## ChatGPT as a local coding agent
@@ -332,6 +336,15 @@ Publish actions are **risk 4 (double approval)**. See [docs/articles.md](docs/ar
 Playwright-based (optional peer dependency), using an **isolated profile** by
 default. `browser_open/screenshot/extract_text/click/type/...` — all risk 3.
 See [docs/browser.md](docs/browser.md).
+
+## Computer Use (desktop control)
+
+Screenshot + mouse + keyboard control of the local desktop (macOS, via
+`screencapture` and `cliclick`). Screenshots are returned to ChatGPT inline as
+MCP images, resampled so image pixels map 1:1 to click coordinates.
+`computer_screenshot/left_click/double_click/right_click/drag/type/paste_text/key/scroll/...`
+— all input actions are risk 3 and audited. See
+[docs/computer-use.md](docs/computer-use.md).
 
 ## Android ADB
 

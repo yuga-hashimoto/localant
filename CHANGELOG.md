@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Computer Use (macOS desktop control).** New `computer_*` tool family:
+  screenshot of the main display (returned inline to ChatGPT as an MCP image,
+  resampled to logical resolution so image pixels map 1:1 to click
+  coordinates), mouse move/click/double-click/right-click/drag, typing,
+  clipboard paste, key combos with modifiers, and key-based scrolling.
+  Screenshots use the built-in `screencapture`/`sips`; input uses `cliclick`
+  (`brew install cliclick`). All input actions are risk 3 (audited; approval
+  required in `strict` mode). Exposed only in the `full` tool profile. See
+  `docs/computer-use.md`.
 - **Image-aware MCP results.** `fs_read_image` and the image fallback in
   `fs_read_file` now actually render in ChatGPT: tool results may carry an
   inline image via an `__image` field (`{ mimeType, base64 }`), which the MCP
