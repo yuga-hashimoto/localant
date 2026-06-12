@@ -9,7 +9,7 @@ import { dirname, join } from "node:path";
  * published package (`node_modules/localant/...`): we walk up from this module
  * until we find the `package.json` whose `name` is `localant`.
  */
-function resolveAppVersion(): string {
+export function resolveAppVersion(): string {
   try {
     let dir = dirname(fileURLToPath(import.meta.url));
     for (let i = 0; i < 10; i++) {

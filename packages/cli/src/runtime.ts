@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { createGateway, type Gateway } from "@localant/gateway";
 import { startHttpServers } from "@localant/mcp";
 import { c, ok, warn, copyToClipboard, openBrowser, urlBox } from "./util.js";
+import { resolveAppVersion, APP_VERSION } from "@localant/shared";
 
 export interface StartOptions {
   noTunnel?: boolean;
@@ -86,6 +87,7 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
   }
 
   const shutdown = () => {
+    clearInterval(versionCheckInterval);
     gw.tunnel.stop();
     servers.gateway.close();
     servers.dashboard?.close();
@@ -98,6 +100,20 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
+
+  // Check for version updates on disk every 15 seconds to trigger auto-restart.
+  const versionCheckInterval = setInterval(() => {
+    try {
+      const diskVersion = resolveAppVersion();
+      if (diskVersion !== "0.0.0" && diskVersion !== APP_VERSION) {
+        console.log(c.yellow(`\n[LocalAnt] New version v${diskVersion} detected on disk (running: v${APP_VERSION}). Restarting gateway...`));
+        clearInterval(versionCheckInterval);
+        shutdown();
+      }
+    } catch {
+      // ignore disk read errors
+    }
+  }, 15000);
 
   // Keep the process alive.
   await new Promise(() => {});
