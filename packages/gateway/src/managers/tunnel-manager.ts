@@ -1,8 +1,32 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
 import { createLogger, type Config } from "@localant/shared";
-import { commandExists } from "../util/exec.js";
+import { commandExists, execFileSafe } from "../util/exec.js";
 
 const log = createLogger("tunnel");
+
+/**
+ * Resolve an invokable Tailscale CLI path, or null when Tailscale isn't
+ * installed. The macOS App Store / GUI build ships the CLI inside the app
+ * bundle and does NOT add `tailscale` to PATH, so a bare commandExists check
+ * reports "not installed" even though Funnel is fully usable. We therefore also
+ * probe the known app-bundle location.
+ */
+async function resolveTailscale(): Promise<string | null> {
+  if (await commandExists("tailscale")) return "tailscale";
+  const bundled = [
+    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
+    "/Applications/Tailscale.app/Contents/MacOS/tailscale",
+  ];
+  for (const candidate of bundled) {
+    try {
+      if (fs.existsSync(candidate)) return candidate;
+    } catch {
+      // ignore and try the next candidate
+    }
+  }
+  return null;
+}
 
 export interface TunnelInfo {
   provider: string;
@@ -40,41 +64,83 @@ export class TunnelManager {
       this.info = { provider: "user-provided", url: cfg.publicUrl, status: "running" };
       return this.info;
     }
-    if (cfg.provider === "tailscale" && (await commandExists("tailscale"))) {
-      return this.startTailscale(port);
+
+    // Try the configured provider first, then fall back through the others. A
+    // provider that is unavailable (binary missing) or that starts but never
+    // publishes a URL (e.g. Tailscale Funnel not yet approved on the tailnet)
+    // must NOT leave the gateway tunnel-less when another installed provider
+    // could work. localtunnel is excluded from automatic fallback because its
+    // start path retries for minutes — it only runs when explicitly chosen.
+    const fallbackOrder = ["tailscale", "cloudflared", "ngrok", "serveo"];
+    const preferred = cfg.provider;
+    const candidates =
+      preferred && preferred !== "none"
+        ? [preferred, ...fallbackOrder.filter((p) => p !== preferred)]
+        : fallbackOrder;
+
+    for (const provider of candidates) {
+      if (this.stopped) break;
+      if (!(await this.providerAvailable(provider))) continue;
+      const info = await this.startProvider(provider, port);
+      if (info.status === "running") return info;
+      log.warn(`tunnel provider "${provider}" did not start (${info.error ?? "unknown error"}); trying next provider`);
     }
-    if (cfg.provider === "cloudflared" && (await commandExists("cloudflared"))) {
-      return this.startCloudflared(port);
-    }
-    if (cfg.provider === "ngrok" && (await commandExists("ngrok"))) {
-      return this.startNgrok(port);
-    }
-    if (cfg.provider === "localtunnel") {
-      return this.startLocaltunnel(port);
-    }
-    if (cfg.provider === "serveo" && (await commandExists("ssh"))) {
-      return this.startServeo(port);
-    }
-    // Fallbacks
-    if (await commandExists("tailscale")) return this.startTailscale(port);
-    if (await commandExists("cloudflared")) return this.startCloudflared(port);
-    if (await commandExists("ngrok")) return this.startNgrok(port);
-    if (await commandExists("ssh")) return this.startServeo(port);
 
     this.info = {
       provider: "none",
       status: "error",
       error:
-        "No tunnel provider found. Install Tailscale, cloudflared, or ngrok, or set tunnel.publicUrl in config to a public HTTPS URL.",
+        "No tunnel provider could start. Install Tailscale, cloudflared, or ngrok, or set tunnel.publicUrl in config to a public HTTPS URL.",
     };
     return this.info;
   }
 
-  private startTailscale(port: number): Promise<TunnelInfo> {
+  /** Whether a provider's binary/runtime is present so it's worth attempting. */
+  private async providerAvailable(provider: string): Promise<boolean> {
+    switch (provider) {
+      case "tailscale":
+        return (await resolveTailscale()) !== null;
+      case "cloudflared":
+        return commandExists("cloudflared");
+      case "ngrok":
+        return commandExists("ngrok");
+      case "localtunnel":
+        return true; // launched on demand via npx
+      case "serveo":
+        return commandExists("ssh");
+      default:
+        return false;
+    }
+  }
+
+  private startProvider(provider: string, port: number): Promise<TunnelInfo> {
+    switch (provider) {
+      case "tailscale":
+        return this.startTailscale(port);
+      case "cloudflared":
+        return this.startCloudflared(port);
+      case "ngrok":
+        return this.startNgrok(port);
+      case "localtunnel":
+        return this.startLocaltunnel(port);
+      case "serveo":
+        return this.startServeo(port);
+      default:
+        return Promise.resolve({ provider: "none", status: "error", error: `Unknown tunnel provider "${provider}".` });
+    }
+  }
+
+  private async startTailscale(port: number): Promise<TunnelInfo> {
+    const bin = (await resolveTailscale()) ?? "tailscale";
+    // Funnel serves publicly on port 443 and only one serve/funnel config can
+    // own it. A leftover config (e.g. a prior `--bg` funnel pointing elsewhere)
+    // makes the foreground `funnel <port>` fail with "listener already exists
+    // for port 443". Best-effort clear it first so we cleanly claim the port.
+    await execFileSafe(bin, ["funnel", "reset"], { timeoutMs: 10_000 });
     return new Promise((resolve) => {
       this.info = { provider: "tailscale", status: "starting" };
       const cfg = this.config().tunnel;
-      const child = spawn("tailscale", ["funnel", String(port)], { shell: false });
+      const child = spawn(bin, ["funnel", String(port)], { shell: false });
       this.child = child;
 
       const onData = (buf: Buffer) => {
