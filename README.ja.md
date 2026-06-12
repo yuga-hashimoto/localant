@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/readme-icon.svg" width="240" alt="LocalAnt — ChatGPT ネイティブのローカル MCP ゲートウェイ" />
+  <img src="assets/hero.png" width="320" alt="LocalAnt — ChatGPT ネイティブのローカル MCP ゲートウェイ" />
 </p>
 
 # LocalAnt
