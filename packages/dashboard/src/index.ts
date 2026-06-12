@@ -263,7 +263,7 @@ const VIEWS = {
     const t=s.tunnel||{};
     const endpoint = mcp.endpoint || '(tunnel not running — start it below or from the CLI)';
     m.appendChild(el('<div class="card"><h2>Gateway</h2>'
-      +'<div class="row"><span class="tag">'+esc(s.platform)+'</span><span class="tag">node '+esc(s.node)+'</span><span class="tag">pid '+s.pid+'</span></div>'
+      +'<div class="row"><span class="tag">v'+esc(s.version)+'</span><span class="tag">'+esc(s.platform)+'</span><span class="tag">node '+esc(s.node)+'</span><span class="tag">pid '+s.pid+'</span></div>'
       +'<p class="muted">Started '+esc(s.startedAt)+'</p>'
       +'<p>Gateway: <code>'+esc(s.gateway)+'</code></p>'
       +'<p>Dashboard: <code>'+esc(s.dashboard||'')+'</code></p></div>'));

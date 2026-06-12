@@ -1,5 +1,6 @@
 import os from "node:os";
 import {
+  APP_VERSION,
   approvalFor,
   redactDeep,
   createLogger,
@@ -301,6 +302,7 @@ export class Gateway {
   runtimeInfo() {
     const dashPort = this.boundDashboardPort ?? this.cfg.dashboard.port;
     return {
+      version: APP_VERSION,
       startedAt: this.startedAt,
       pid: process.pid,
       host: os.hostname(),
