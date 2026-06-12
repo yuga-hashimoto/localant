@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-12
+
+### Fixed
+- **ChatGPT no longer interrupts safe tool calls with a confirmation "safety
+  check".** Tools are now advertised to MCP clients with proper annotations
+  (`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`)
+  derived from each tool's risk level, so read-only tools like `git_status`
+  run without a prompt while genuinely destructive tools stay flagged. The
+  gateway's own approval pipeline is unchanged — these are client-side hints
+  only.
+
+### Changed
+- **`yolo` mode now runs fully gate-free on the client too.** In `yolo`, every
+  tool is advertised as read-only / non-destructive, so ChatGPT never stops any
+  tool (read or write) behind a safety check — matching `yolo`'s "no approval
+  gates at all" policy. `strict` and `open` keep risk-based hints.
+
 ## [1.2.1] - 2026-06-12
 
 ### Added
