@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-06-12
+
 ### Added
 - Optional capability dependencies are now first-class: `localant doctor` reports
   whether browser automation (Playwright + Chromium) and desktop mouse/keyboard
