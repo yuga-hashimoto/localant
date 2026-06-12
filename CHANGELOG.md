@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-06-12
+
 ### Added
 - **Computer Use (macOS desktop control).** New `computer_*` tool family:
   screenshot of the main display (returned inline to ChatGPT as an MCP image,
