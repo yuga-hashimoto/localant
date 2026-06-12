@@ -12,7 +12,7 @@ const log = createLogger("tunnel");
  * reports "not installed" even though Funnel is fully usable. We therefore also
  * probe the known app-bundle location.
  */
-async function resolveTailscale(): Promise<string | null> {
+export async function resolveTailscale(): Promise<string | null> {
   if (await commandExists("tailscale")) return "tailscale";
   const bundled = [
     "/Applications/Tailscale.app/Contents/MacOS/Tailscale",

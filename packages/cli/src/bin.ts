@@ -8,6 +8,7 @@ import { c, ok, warn, fail, openBrowser, promptYesNo } from "./util.js";
 import { runGateway, type StartOptions } from "./runtime.js";
 import { runDoctor } from "./doctor.js";
 import { ensureServeoRegistration } from "./serveo-setup.js";
+import { ensureTailscaleSetup } from "./tailscale-setup.js";
 import { autostartSupported, isAutostartEnabled, enableAutostart, disableAutostart, bounceAutostart } from "./autostart.js";
 
 /** True when `candidate` is a strictly higher semver than `current`. */
@@ -60,6 +61,13 @@ program
     if (o.tunnel !== false && cfg.tunnel.provider === "serveo" && !cfg.tunnel.token && cfg.tunnel.subdomain) {
       console.log("");
       await ensureServeoRegistration(cfg.tunnel.subdomain, cfg.gateway.port, { noOpen: o.open === false });
+    }
+
+    // Tailscale Funnel is the default. Walk first-time users through the one-time
+    // install → login → enable-Funnel steps so the tunnel comes up on its own.
+    // Skipped when a fixed FQDN / publicUrl is already configured.
+    if (o.tunnel !== false && cfg.tunnel.provider === "tailscale" && !cfg.tunnel.publicUrl && !cfg.tunnel.domain) {
+      await ensureTailscaleSetup(cfg.gateway.port, { noOpen: o.open === false });
     }
 
     // Offer to start LocalAnt automatically on every login (macOS launchd).
