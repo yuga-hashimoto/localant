@@ -57,7 +57,10 @@ export const skillPanel: WidgetDef = {
   id: "skill-panel",
   uri: "ui://localant/skill-panel-v1.html",
   description: "Review installed LocalAnt skills, their permissions and validity, and enable or disable them.",
-  tools: ["skill_list", "skill_info", "skill_validate", "skill_enable", "skill_disable"],
+  // View tools only. validate / enable / disable are actions returning {ok:true};
+  // binding the panel to them rendered the "No skills installed." empty state.
+  // The panel drives those via its own inline buttons.
+  tools: ["skill_list", "skill_info"],
   invoking: "Loading skills...",
   invoked: "Skills ready.",
   html: () => widgetDocument({ body: "Loading skills...", render, config: { refreshTool: "skill_list" } }),

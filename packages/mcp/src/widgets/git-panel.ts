@@ -81,7 +81,10 @@ export const gitPanel: WidgetDef = {
   id: "git-panel",
   uri: "ui://localant/git-panel-v1.html",
   description: "Review changed files, view per-file diffs, stage and commit in a LocalAnt repo.",
-  tools: ["git_status", "git_list_changed_files", "git_diff", "git_commit", "git_add"],
+  // View tools only. git_commit / git_add are actions that return {ok:true};
+  // the panel self-loads via its own callTool, and binding it to a mutation
+  // would render a "Changes ready." panel after a commit. Open it from a view.
+  tools: ["git_status", "git_list_changed_files", "git_diff"],
   invoking: "Loading changes...",
   invoked: "Changes ready.",
   html: () => widgetDocument({ body: "Loading changes...", render }),

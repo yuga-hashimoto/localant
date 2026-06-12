@@ -95,10 +95,15 @@ describe("mcp chat sessions", () => {
     try {
       const tools = await client.listTools();
       const readImage = tools.tools.find((tool) => tool.name === "fs_read_image") as { _meta?: Record<string, unknown> } | undefined;
-      expect(readImage?._meta?.ui).toEqual({ resourceUri: "ui://localant/image-viewer-v1.html" });
-      expect(readImage?._meta?.["openai/outputTemplate"]).toBe("ui://localant/image-viewer-v1.html");
+      // The image template is NOT bound statically — it is attached per-result
+      // only when an image is actually returned (see below), so text reads of
+      // fs_read_file never surface an empty image panel.
+      expect(readImage?._meta?.["openai/outputTemplate"]).toBeUndefined();
 
       const result = await client.callTool({ name: "fs_read_image", arguments: { path: imgPath } });
+      // This call returned an image, so the result carries the image template.
+      expect((result._meta as Record<string, unknown> | undefined)?.["openai/outputTemplate"]).toBe("ui://localant/image-viewer-v1.html");
+      expect((result._meta as { ui?: unknown } | undefined)?.ui).toEqual({ resourceUri: "ui://localant/image-viewer-v1.html" });
       expect(result.structuredContent).toMatchObject({
         ok: true,
         data: {
