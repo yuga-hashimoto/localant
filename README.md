@@ -16,7 +16,11 @@
 </p>
 
 <p align="center">
-  <video src="assets/demo.mp4" width="100%" autoplay loop muted playsinline></video>
+  <a href="assets/demo.mp4"><img src="assets/lp.png" width="100%" alt="LocalAnt — From ChatGPT to Your Local PC." /></a>
+</p>
+
+<p align="center">
+  🎬 <a href="assets/demo.mp4"><b>Play Demo Video (mp4)</b></a>
 </p>
 
 > **Use ChatGPT as the brain. Use your local computer as the hands.**

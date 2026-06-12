@@ -16,7 +16,11 @@
 </p>
 
 <p align="center">
-  <video src="assets/demo.mp4" width="100%" autoplay loop muted playsinline></video>
+  <a href="assets/demo.mp4"><img src="assets/lp.ja.png" width="100%" alt="LocalAnt — ChatGPTから、あなたのPCへ。" /></a>
+</p>
+
+<p align="center">
+  🎬 <a href="assets/demo.mp4"><b>デモ動画を再生する (mp4)</b></a>
 </p>
 
 > **ChatGPT を頭脳に、あなたのローカル PC を手足にする。**
