@@ -215,4 +215,27 @@ describe("Gateway tool pipeline", () => {
       expect((gen.data as { enabled: boolean }).enabled).toBe(false);
     }
   });
+
+  it("reads an image file automatically through fs_read_file or fs_read_image", async () => {
+    const g = gw();
+    g.saveConfig({ ...g.config(), tools: { profile: "full" } });
+    const imgPath = path.join(base, "test_image.png");
+    const fakePng = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x01, 0x02]);
+    fs.writeFileSync(imgPath, fakePng);
+
+    const resFile = await g.executeTool("fs_read_file", { path: imgPath }, { caller: "test" });
+    expect(resFile.ok).toBe(true);
+    const dataFile = resFile.data as { path: string; __image?: { mimeType: string; base64: string } };
+    expect(dataFile.__image).toBeDefined();
+    expect(dataFile.__image!.mimeType).toBe("image/png");
+    expect(dataFile.__image!.base64).toBe(fakePng.toString("base64"));
+
+    const resImage = await g.executeTool("fs_read_image", { path: imgPath }, { caller: "test" });
+    expect(resImage.ok).toBe(true);
+    const dataImage = resImage.data as { path: string; __image?: { mimeType: string; base64: string } };
+    expect(dataImage.__image).toBeDefined();
+    expect(dataImage.__image!.mimeType).toBe("image/png");
+    expect(dataImage.__image!.base64).toBe(fakePng.toString("base64"));
+  });
 });
+
