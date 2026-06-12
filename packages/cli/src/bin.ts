@@ -67,7 +67,17 @@ program
     // install → login → enable-Funnel steps so the tunnel comes up on its own.
     // Skipped when a fixed FQDN / publicUrl is already configured.
     if (o.tunnel !== false && cfg.tunnel.provider === "tailscale" && !cfg.tunnel.publicUrl && !cfg.tunnel.domain) {
-      await ensureTailscaleSetup(cfg.gateway.port, { noOpen: o.open === false });
+      const tailscaleDomain = await ensureTailscaleSetup(cfg.gateway.port, { noOpen: o.open === false });
+      if (tailscaleDomain) {
+        gw.saveConfig({
+          ...gw.config(),
+          tunnel: {
+            ...gw.config().tunnel,
+            domain: tailscaleDomain,
+          },
+        });
+        console.log(ok(`Tailscale domain registered: ${c.cyan(tailscaleDomain)}`));
+      }
     }
 
     // Offer to start LocalAnt automatically on every login (macOS launchd).

@@ -83,7 +83,7 @@ function probeFunnel(bin: string, port: number, timeoutMs = 12000): Promise<Funn
  * Returning users who are already set up hit only the fast Funnel probe and see
  * a single "ready" line with no prompts.
  */
-export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolean } = {}): Promise<boolean> {
+export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolean } = {}): Promise<string | null> {
   const bin = await resolveTailscale();
 
   // 1. Installed?
@@ -98,7 +98,7 @@ export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolea
     }
     console.log(c.gray("    • or download: https://tailscale.com/download"));
     console.log(c.gray("  Then re-run `localant setup`. (LocalAnt uses cloudflared until then.)"));
-    return false;
+    return null;
   }
 
   // 2. Logged in / daemon up?
@@ -116,12 +116,12 @@ export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolea
           /* ignore */
         }
       }
-      return false;
+      return null;
     }
     const go = await promptYesNo("Log in to Tailscale now? (opens a browser)", true);
     if (!go) {
       console.log(c.gray("  Skipped. Run `tailscale up`, then re-run `localant setup`."));
-      return false;
+      return null;
     }
     try {
       console.log(c.gray("  Running `tailscale up` — complete the login in your browser…"));
@@ -132,7 +132,7 @@ export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolea
     state = backendState(bin);
     if (state !== "running") {
       console.log(warn("Still not logged in. Re-run `localant setup` after logging in."));
-      return false;
+      return null;
     }
   }
   console.log(ok("Tailscale logged in."));
@@ -143,7 +143,8 @@ export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolea
   if (probe.url) {
     process.stdout.write(c.green("ready\n"));
     console.log(ok(`Funnel URL: ${c.cyan(`${probe.url}/mcp`)}`));
-    return true;
+    const domain = probe.url.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+    return domain;
   }
   process.stdout.write(c.yellow("not enabled\n"));
   console.log("");
@@ -153,5 +154,5 @@ export async function ensureTailscaleSetup(port: number, opts: { noOpen?: boolea
   console.log(c.gray(`  Open: ${enableUrl}`));
   if (!opts.noOpen) openBrowser(enableUrl);
   console.log(c.gray("  After enabling, run `localant restart`. (cloudflared is used until then.)"));
-  return false;
+  return null;
 }
