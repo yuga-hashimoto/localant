@@ -72,7 +72,7 @@ and audit.
 - 🤖 **Coding agents**: drive Claude Code / Codex (plan → approve → execute →
   validate → diff) on any working directory.
 - 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
-- 🌐 **3-minute setup** with Cloudflare Tunnel / ngrok and clipboard copy.
+- 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
 - 🔌 **Adapters** for OpenClaw, Desktop Commander, and arbitrary MCP servers.
 
 ## ChatGPT as a local coding agent
@@ -146,7 +146,7 @@ copies the MCP URL to your clipboard, and prints the ChatGPT connection steps.
 
   Local Gateway:  http://127.0.0.1:8787
   Dashboard:      http://127.0.0.1:8788
-  MCP Endpoint:   https://xxxxx.trycloudflare.com/mcp?key=********
+  MCP Endpoint:   https://your-machine.your-tailnet.ts.net/mcp?key=********
 
 Connect ChatGPT:
   1. Open ChatGPT → Settings → Apps & Connectors
@@ -173,11 +173,11 @@ The token is embedded in the URL so the connector authenticates even where
 custom headers aren't available. You can also send `Authorization: Bearer <token>`.
 See [docs/chatgpt-setup.md](docs/chatgpt-setup.md).
 
-> **Tip — set a fixed URL so you never recreate the connector.** The default
-> Quick Tunnel URL changes on every restart. Configure a fixed tunnel (ngrok
-> static domain, a custom subdomain, or your own domain) in the dashboard
-> **Settings** tab or with `localant config set tunnel.domain <domain>`. The
-> auth token is persistent, so a stable URL means you connect ChatGPT **once**.
+> **Tip — Tailscale Funnel is the default tunnel.** Configure your stable
+> Funnel FQDN (`machine.tailnet.ts.net`) in the dashboard **Settings** tab or
+> with `localant config set tunnel.domain <domain>`. The auth token is
+> persistent, so a stable URL means you connect ChatGPT **once**. Cloudflared,
+> ngrok, localtunnel and serveo remain available as fallback providers.
 > Full instructions: [docs/chatgpt-setup.md → Keep a fixed URL](docs/chatgpt-setup.md#keep-a-fixed-url-dont-recreate-the-connector-every-time).
 
 ## Security model

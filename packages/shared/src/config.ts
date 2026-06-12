@@ -154,14 +154,14 @@ export const ConfigSchema = z.object({
     .default({ enabled: true, port: 8788 }),
   tunnel: z
     .object({
-      provider: z.enum(["cloudflared", "ngrok", "localtunnel", "serveo", "none"]).default("cloudflared"),
+      provider: z.enum(["tailscale", "cloudflared", "ngrok", "localtunnel", "serveo", "none"]).default("tailscale"),
       publicUrl: z.string().optional(),
       token: z.string().optional(),
       domain: z.string().optional(),
       subdomain: z.string().optional(),
       subdomainConfirmed: z.boolean().default(false),
     })
-    .default({ provider: "cloudflared" }),
+    .default({ provider: "tailscale" }),
   security: z
     .object({
       mode: z.enum(["strict", "open", "yolo"]).default("open"),

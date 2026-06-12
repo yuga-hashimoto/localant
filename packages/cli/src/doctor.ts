@@ -16,7 +16,7 @@ export async function runDoctor(): Promise<boolean> {
   checks.push({ name: `Platform ${process.platform}`, required: true, pass: true });
 
   const required = ["git", "node"];
-  const optional = ["pnpm", "npm", "npx", "claude", "codex", "cloudflared", "ngrok", "adb", "docker", "bun"];
+  const optional = ["pnpm", "npm", "npx", "claude", "codex", "tailscale", "cloudflared", "ngrok", "adb", "docker", "bun"];
   for (const cmd of required) checks.push({ name: cmd, required: true, pass: await commandExists(cmd) });
   for (const cmd of optional) checks.push({ name: cmd, required: false, pass: await commandExists(cmd) });
 

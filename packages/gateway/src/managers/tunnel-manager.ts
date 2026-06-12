@@ -13,7 +13,7 @@ export interface TunnelInfo {
 
 /**
  * Starts a public tunnel to the local gateway so ChatGPT can reach /mcp.
- * Order of preference: cloudflared → ngrok → user-provided publicUrl.
+ * Order of preference: user-provided publicUrl → Tailscale Funnel → cloudflared → ngrok → serveo.
  */
 export class TunnelManager {
   private child?: ChildProcess;
@@ -40,6 +40,9 @@ export class TunnelManager {
       this.info = { provider: "user-provided", url: cfg.publicUrl, status: "running" };
       return this.info;
     }
+    if (cfg.provider === "tailscale" && (await commandExists("tailscale"))) {
+      return this.startTailscale(port);
+    }
     if (cfg.provider === "cloudflared" && (await commandExists("cloudflared"))) {
       return this.startCloudflared(port);
     }
@@ -53,6 +56,7 @@ export class TunnelManager {
       return this.startServeo(port);
     }
     // Fallbacks
+    if (await commandExists("tailscale")) return this.startTailscale(port);
     if (await commandExists("cloudflared")) return this.startCloudflared(port);
     if (await commandExists("ngrok")) return this.startNgrok(port);
     if (await commandExists("ssh")) return this.startServeo(port);
@@ -61,9 +65,62 @@ export class TunnelManager {
       provider: "none",
       status: "error",
       error:
-        "No tunnel provider found. Install cloudflared or ngrok, or set tunnel.publicUrl in config to a public HTTPS URL.",
+        "No tunnel provider found. Install Tailscale, cloudflared, or ngrok, or set tunnel.publicUrl in config to a public HTTPS URL.",
     };
     return this.info;
+  }
+
+  private startTailscale(port: number): Promise<TunnelInfo> {
+    return new Promise((resolve) => {
+      this.info = { provider: "tailscale", status: "starting" };
+      const cfg = this.config().tunnel;
+      const child = spawn("tailscale", ["funnel", String(port)], { shell: false });
+      this.child = child;
+
+      const onData = (buf: Buffer) => {
+        const text = buf.toString("utf8");
+        const m = text.match(/https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net/i);
+        if (m && this.info.status !== "running") {
+          this.info = { provider: "tailscale", url: m[0], status: "running" };
+          this.clearTunnelTimeout();
+          resolve(this.info);
+        }
+      };
+
+      child.stdout.on("data", onData);
+      child.stderr.on("data", onData);
+      child.on("error", (e) => {
+        this.info = { provider: "tailscale", status: "error", error: e.message };
+        this.clearTunnelTimeout();
+        resolve(this.info);
+      });
+      child.on("close", (code) => {
+        if (this.stopped || this.info.status === "running") return;
+        this.info = {
+          provider: "tailscale",
+          status: "error",
+          error:
+            `Tailscale Funnel exited before publishing a URL${code === null ? "" : ` (exit ${code})`}. ` +
+            "Run `tailscale funnel <port>` once to approve Funnel for this tailnet, or set tunnel.domain / tunnel.publicUrl.",
+        };
+        this.clearTunnelTimeout();
+        resolve(this.info);
+      });
+      this.timeoutId = setTimeout(() => {
+        if (this.info.status !== "running") {
+          if (cfg.domain) {
+            this.info = { provider: "tailscale", url: cfg.publicUrl || `https://${cfg.domain}`, status: "running" };
+          } else {
+            this.info = {
+              provider: "tailscale",
+              status: "error",
+              error: "Timed out waiting for Tailscale Funnel URL. Check `tailscale funnel status` or set tunnel.domain.",
+            };
+          }
+          resolve(this.info);
+        }
+      }, 20_000);
+    });
   }
 
   private startCloudflared(port: number): Promise<TunnelInfo> {

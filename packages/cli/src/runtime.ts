@@ -132,6 +132,7 @@ function printReady(gw: Gateway, mcpEndpoint?: string): void {
     console.log(warn("This is a temporary Quick Tunnel URL — it changes on every restart,"));
     console.log(c.yellow("   so you'll have to recreate the ChatGPT connector each time."));
     console.log(c.gray("   For a permanent URL (recreate the connector once, never again):"));
+    console.log(c.gray("     • Tailscale Funnel (default):   set tunnel.provider=tailscale, tunnel.domain=<machine.tailnet.ts.net>"));
     console.log(c.gray("     • ngrok static domain (free):  set tunnel.provider=ngrok, tunnel.token, tunnel.domain"));
     console.log(c.gray("     • custom subdomain (no signup): set tunnel.provider=localtunnel, tunnel.subdomain"));
     console.log(c.gray(`     • configure it in the dashboard Settings tab, or: ${c.cyan("localant config set tunnel.domain <domain>")}`));

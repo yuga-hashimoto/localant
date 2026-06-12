@@ -3,7 +3,7 @@
 ## Requirements
 - Node.js 20+ (22+ recommended; skill execution uses native TS type-stripping).
 - `git` on PATH.
-- Optional: `pnpm`, `claude`, `codex`, `cloudflared`/`ngrok`, `adb`, `docker`.
+- Optional: `pnpm`, `claude`, `codex`, `tailscale` (default tunnel), `cloudflared`/`ngrok` fallbacks, `adb`, `docker`.
 
 Run `localant doctor` to check.
 
