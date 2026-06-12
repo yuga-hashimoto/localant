@@ -327,6 +327,45 @@ describe("coding agent sessions & repo lock", () => {
     await g.agents.stopTask(third.taskId);
   });
 
+  it("does not append dangerArgs while planning, even in yolo mode", async () => {
+    const g = createGateway(base);
+    const script = path.join(base, "plan-agent.cjs");
+    const out = path.join(base, "plan-args.json");
+    fs.writeFileSync(script, `require('fs').writeFileSync(${JSON.stringify(out)}, JSON.stringify(process.argv.slice(2)))`);
+    g.saveConfig({
+      ...g.config(),
+      tools: { profile: "full" },
+      security: { ...g.config().security, mode: "yolo", allowedDirectories: [base] },
+      codingAgents: {
+        ...g.config().codingAgents,
+        fake: {
+          enabled: true,
+          command: "node",
+          args: [script],
+          planArgs: ["--plan"],
+          executeArgs: ["--execute"],
+          dangerArgs: ["--danger"],
+          defaultPermissionMode: "plan",
+          maxTurns: 1,
+          timeoutMs: 60_000,
+        },
+      },
+    });
+
+    await g.agents.plan("fake", proj, "make a plan");
+    const args = JSON.parse(fs.readFileSync(out, "utf8")) as string[];
+    expect(args).toContain("--plan");
+    expect(args).not.toContain("--danger");
+  });
+
+  it("guards validation commands with PathGuard and CommandGuard", async () => {
+    const g = gw("full", "strict");
+    await expect(g.agents.runValidation(proj, "not-allowlisted --version")).rejects.toThrow(/not in the allowed command list/i);
+    await expect(g.agents.runValidation(path.join(os.homedir(), ".ssh"), "pnpm test")).rejects.toThrow(
+      /blocklist|allowed/i,
+    );
+  });
+
   it("filters listTasks by session but shows all when unfiltered", async () => {
     const g = gwWithFakeAgent();
     const projB = path.join(base, "projB");
