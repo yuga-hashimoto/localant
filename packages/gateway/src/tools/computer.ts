@@ -89,9 +89,9 @@ async function cliclick(args: string[]): Promise<string> {
   ensureMacos();
   if (!(await commandExists("cliclick"))) {
     throw new Error(
-      "cliclick not found on PATH. Install it with `brew install cliclick` and grant " +
-        "Accessibility permission (System Settings → Privacy & Security → Accessibility) " +
-        "to the app running LocalAnt.",
+      "cliclick not found on PATH. Enable desktop control with `localant deps install desktop` " +
+        "(or manually: `brew install cliclick`), then grant Accessibility permission " +
+        "(System Settings → Privacy & Security → Accessibility) to the app running LocalAnt.",
     );
   }
   const res = await execFileSafe("cliclick", args, { timeoutMs: 30_000 });

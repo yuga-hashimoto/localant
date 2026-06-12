@@ -1,6 +1,8 @@
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { DEFAULT_SESSION_ID } from "@localant/shared";
+import { resolveOptionalDep } from "../util/optional-deps-path.js";
 import type { Gateway } from "../gateway.js";
 import type { ToolCallContext } from "../registry.js";
 
@@ -57,14 +59,23 @@ export async function closeBrowserSession(sessionId: string): Promise<void> {
 }
 
 async function loadPlaywright(): Promise<{ chromium: { launch: (o?: unknown) => Promise<PwBrowser> } }> {
+  type Pw = { chromium: { launch: (o?: unknown) => Promise<PwBrowser> } };
+  // Prefer normal resolution (dev tree / bundled installs); fall back to the
+  // isolated optional-deps dir that `localant deps install browser` populates.
   try {
     // @ts-ignore optional dependency resolved at runtime (may be absent at build time)
-    return (await import("playwright")) as { chromium: { launch: (o?: unknown) => Promise<PwBrowser> } };
+    return (await import("playwright")) as Pw;
   } catch {
-    throw new Error(
-      "Playwright is not installed. Install it to use browser tools: `npm i -D playwright && npx playwright install chromium`.",
-    );
+    /* not resolvable from here — try the optional-deps dir below */
   }
+  const entry = resolveOptionalDep("playwright");
+  if (entry) {
+    return (await import(pathToFileURL(entry).href)) as Pw;
+  }
+  throw new Error(
+    "Playwright is not installed. Enable browser tools with `localant deps install browser` " +
+      "(or manually: `npm i playwright && npx playwright install chromium`).",
+  );
 }
 
 export function registerBrowserTools(gw: Gateway): void {
