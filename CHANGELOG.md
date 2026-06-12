@@ -6,6 +6,31 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-06-12
+
+### Added
+- **Tailscale Funnel is the default tunnel.** Provides a stable, public HTTPS
+  URL (`machine.tailnet.ts.net`) with no idle/response time cap — unlike serveo,
+  which severs responses after ~10s and broke long-running tools (coding agents)
+  over the tunnel. cloudflared, ngrok, localtunnel and serveo remain available
+  as fallbacks; `localant config set tunnel.provider <name>` switches providers.
+- **Guided Tailscale onboarding in `localant setup`.** First-time users are
+  walked through install → login → enabling Funnel, with the relevant page
+  opened automatically. Returning users hit only a fast readiness probe.
+
+### Fixed
+- **Coding agents no longer hang when spawned without a TTY.** Agents that
+  default to an interactive TUI (e.g. `agy` / antigravity-cli) now run
+  non-interactively (`--print`), and agents are spawned with stdin set to
+  `/dev/null` so they see EOF immediately instead of blocking on input.
+- **Per-agent `dangerArgs` replace a hardcoded, invalid `--danger` flag** for
+  `yolo` mode (claude-code and antigravity-cli default to
+  `--dangerously-skip-permissions`).
+- **Robust Tailscale Funnel startup.** Resolves the macOS app-bundle CLI (the
+  GUI build isn't on `PATH`); clears stale port-443 config before claiming the
+  funnel; and falls back to another provider when the configured one can't
+  publish a URL, instead of leaving the gateway with no tunnel.
+
 ## [1.1.1] - 2026-06-12
 
 ### Removed
