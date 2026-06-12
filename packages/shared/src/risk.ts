@@ -48,14 +48,13 @@ export type SecurityModeHint = "strict" | "open" | "yolo";
  *  - risk 3 (shell/network/agent)  → destructive, open-world
  *  - risk 4 (publish/deploy)       → destructive, open-world
  *
- * In `yolo` mode the operator has explicitly opted into zero-friction execution
- * (the gateway runs every tool with no approval gate), so we advertise *all*
- * tools as safe-to-run-unattended — read-only and non-destructive — so the
- * client (e.g. ChatGPT) never interrupts with a confirmation "safety check".
- * These are hints only; the gateway's own pipeline is the real enforcement.
+ * Annotations always reflect a tool's actual behavior; they are not relaxed in
+ * `yolo` mode. Advertising mutating tools as read-only would mislead clients
+ * (e.g. ChatGPT) into skipping confirmation on genuinely destructive actions.
+ * Approval friction is governed by the gateway's pipeline, not by these hints.
+ * `mode` is retained for signature stability but no longer alters the output.
  */
-export function toolAnnotationsForRisk(risk: RiskLevel, mode: SecurityModeHint = "open"): ToolHintAnnotations {
- void mode;
+export function toolAnnotationsForRisk(risk: RiskLevel, _mode: SecurityModeHint = "open"): ToolHintAnnotations {
   return {
     readOnlyHint: risk === 0,
     destructiveHint: risk >= 2,

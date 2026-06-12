@@ -113,7 +113,7 @@ export class Gateway {
     this.lsp = new LspService(this.pathGuard);
     this.shell = new ShellManager(this.commandGuard, this.pathGuard, () => this.cfg);
     this.skills = new SkillRuntime(this.paths, (names) => this.resolveSecrets(names));
-    this.agents = new CodingAgentManager(() => this.cfg, this.git, this['commandGuard'], this['pathGuard']);
+    this.agents = new CodingAgentManager(() => this.cfg, this.git, this.commandGuard, this.pathGuard);
     this.tunnel = new TunnelManager(
       () => this.cfg,
       (patch) => {

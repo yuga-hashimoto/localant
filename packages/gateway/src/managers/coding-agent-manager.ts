@@ -4,6 +4,8 @@ import { nanoid } from "nanoid";
 import type { CodingAgentConfig, Config } from "@localant/shared";
 import { commandExists, execFileSafe } from "../util/exec.js";
 import type { GitManager } from "./git-manager.js";
+import type { CommandGuard } from "../security/command-guard.js";
+import type { PathGuard } from "../security/path-guard.js";
 
 interface RunningTask {
   id: string;
@@ -47,8 +49,8 @@ export class CodingAgentManager {
   constructor(
     private readonly config: () => Config,
     private readonly git: GitManager,
- private readonly commandGuard: any,
- private readonly pathGuard: any,
+    private readonly commandGuard: CommandGuard,
+    private readonly pathGuard: PathGuard,
   ) {}
 
   private agentConfig(agent: string): CodingAgentConfig {
@@ -78,8 +80,9 @@ export class CodingAgentManager {
       throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
     }
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
-    const isYolo = this.config().security.mode === "yolo";
- const args = [...cfg.args, ...cfg.planArgs, prompt];
+    // Plan mode is read-only by construction, so it never receives dangerArgs
+    // (the gate-bypassing flags) even in yolo mode.
+    const args = [...cfg.args, ...cfg.planArgs, prompt];
     const res = await execFileSafe(cfg.command, args, {
       cwd,
       timeoutMs: cfg.timeoutMs,
@@ -261,11 +264,10 @@ export class CodingAgentManager {
 
   async runValidation(cwd: string, command: string): Promise<{ command: string; code: number | null; output: string }> {
     if (!command) throw new Error("No validate/test command provided.");
- const safeCwd = this.pathGuard.assertAccess(cwd, "read");
- const normalized = this.commandGuard.assertAllowed(command);
- const [file, ...args] = normalized.split(" ");
- const res = await execFileSafe(file!, args, { cwd: safeCwd, timeoutMs: 300_000, maxOutputBytes: 200_000 });
- return { command: normalized, code: res.code, output: (res.stdout + res.stderr).slice(0, 50_000) };
- }
-
+    const safeCwd = this.pathGuard.assertAccess(cwd, "read");
+    const normalized = this.commandGuard.assertAllowed(command);
+    const [file, ...args] = normalized.split(" ");
+    const res = await execFileSafe(file!, args, { cwd: safeCwd, timeoutMs: 300_000, maxOutputBytes: 200_000 });
+    return { command: normalized, code: res.code, output: (res.stdout + res.stderr).slice(0, 50_000) };
+  }
 }

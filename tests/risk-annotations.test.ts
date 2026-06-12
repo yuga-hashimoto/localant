@@ -52,10 +52,10 @@ describe("toolAnnotationsForRisk (risk-based, non-yolo)", () => {
 });
 
 describe("toolAnnotationsForRisk (yolo)", () => {
-  it("advertises every tool as gate-free so no client safety check fires", () => {
+  it("does not relax annotations in yolo mode — they still reflect real behavior", () => {
     for (const risk of [0, 1, 2, 3, 4] as RiskLevel[]) {
- const a = toolAnnotationsForRisk(risk, "yolo");
- expect(a.readOnlyHint).toBe(risk === 0);
- }
- });
+      expect(toolAnnotationsForRisk(risk, "yolo")).toEqual(toolAnnotationsForRisk(risk, "open"));
+      expect(toolAnnotationsForRisk(risk, "yolo").readOnlyHint).toBe(risk === 0);
+    }
+  });
 });

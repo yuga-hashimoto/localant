@@ -203,11 +203,16 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "tunnel_start",
   "tunnel_stop",
   "tunnel_restart",
-]);
 
-for (const name of ['start','status','get_logs','get_diff','continue','st' + 'op','run_validation']) {
- (CODING_PROFILE_TOOLS as Set<string>).add(['localant','auto' + 'pilot',name].join('_'));
-}
+  // --- Autopilot (high-level delegation surface) ---
+  "localant_autopilot_start",
+  "localant_autopilot_status",
+  "localant_autopilot_get_logs",
+  "localant_autopilot_get_diff",
+  "localant_autopilot_continue",
+  "localant_autopilot_stop",
+  "localant_autopilot_run_validation",
+]);
 
 /** Whether a tool is exposed under the given profile. `full` exposes everything. */
 export function isToolInProfile(name: string, profile: ToolProfile): boolean {
