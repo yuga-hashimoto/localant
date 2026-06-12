@@ -82,6 +82,19 @@ describe("CommandGuard.assertNotBlocked", () => {
   it("still blocks rm -rf", () => {
     expect(() => guard().assertNotBlocked("rm -rf node_modules")).toThrow();
   });
+
+  // The default blocklist does NOT contain "rm" (only sudo/su/dd/mkfs/...), so the
+  // recursive-rm regex is the only thing standing between an approved command and
+  // a destructive `rm`. It must catch both flag orders, matching assertAllowed.
+  describe("with rm absent from the blocklist (the real default)", () => {
+    const rmGuard = () => new CommandGuard(allowed, ["sudo", "su", "dd"]);
+    it("blocks rm -rf via the recursive-rm regex", () => {
+      expect(() => rmGuard().assertNotBlocked("rm -rf node_modules")).toThrow(/rm/);
+    });
+    it("blocks rm -fr (reversed flag order)", () => {
+      expect(() => rmGuard().assertNotBlocked("rm -fr node_modules")).toThrow(/rm/);
+    });
+  });
 });
 
 describe("parseCommand", () => {
