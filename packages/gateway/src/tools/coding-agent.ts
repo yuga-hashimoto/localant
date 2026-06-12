@@ -72,7 +72,7 @@ export function registerCodingAgentTools(gw: Gateway): void {
     risk: 2,
     inputSchema: z.object({ taskId: z.string() }),
     summarize: (i) => `stop task ${i.taskId}`,
-    handler: (i) => gw.agents.stopTask(i.taskId),
+    handler: async (i) => gw.agents.stopTask(i.taskId),
   });
 
   r.register({

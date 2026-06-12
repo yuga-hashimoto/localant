@@ -598,9 +598,9 @@ function mountDashboardApi(
       s.status(404).json({ error: (e as Error).message });
     }
   });
-  r.post("/agents/tasks/:id/stop", (q, s) => {
+  r.post("/agents/tasks/:id/stop", async (q, s) => {
     try {
-      s.json(gw.agents.stopTask(q.params.id));
+      s.json(await gw.agents.stopTask(q.params.id));
     } catch (e) {
       s.status(404).json({ error: (e as Error).message });
     }

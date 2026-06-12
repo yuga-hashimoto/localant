@@ -218,10 +218,27 @@ export class CodingAgentManager {
     return t.logs;
   }
 
-  stopTask(id: string) {
+  async stopTask(id: string) {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
-    t.child?.kill("SIGTERM");
+    const child = t.child;
+    if (child) {
+      child.kill("SIGTERM");
+      // Windows: SIGTERM is not always delivered; fall back to SIGKILL.
+      const killed = await new Promise<boolean>((resolve) => {
+        const force = setTimeout(() => {
+          child.kill("SIGKILL");
+          resolve(false);
+        }, 500);
+        child.on("close", () => {
+          clearTimeout(force);
+          resolve(true);
+        });
+      });
+      if (!killed) {
+        await new Promise<void>((resolve) => child.on("close", () => resolve()));
+      }
+    }
     t.status = "stopped";
     const key = repoKey(t.cwd);
     if (this.repoLocks.get(key) === id) this.repoLocks.delete(key);

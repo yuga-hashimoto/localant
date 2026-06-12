@@ -321,10 +321,10 @@ describe("coding agent sessions & repo lock", () => {
     ).rejects.toThrow(/already running in this repo/i);
 
     // Stopping the first releases the lock so a new task can start.
-    g.agents.stopTask(first.taskId);
+    await g.agents.stopTask(first.taskId);
     const third = await g.agents.startTask("fake", proj, "task three", { createBranch: false, sessionId: "chat-b" });
     expect(third.taskId).toBeTruthy();
-    g.agents.stopTask(third.taskId);
+    await g.agents.stopTask(third.taskId);
   });
 
   it("filters listTasks by session but shows all when unfiltered", async () => {
@@ -342,8 +342,8 @@ describe("coding agent sessions & repo lock", () => {
     const all = g.agents.listTasks();
     expect(all.map((t) => t.id).sort()).toEqual([a.taskId, b.taskId].sort());
 
-    g.agents.stopTask(a.taskId);
-    g.agents.stopTask(b.taskId);
+    await g.agents.stopTask(a.taskId);
+    await g.agents.stopTask(b.taskId);
   });
 });
 

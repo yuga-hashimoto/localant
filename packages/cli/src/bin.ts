@@ -499,9 +499,9 @@ agentsCmd.command("logs <taskId>").action((taskId) => {
   const gw = createGateway();
   console.log(gw.agents.getLogs(taskId));
 });
-agentsCmd.command("stop <taskId>").action((taskId) => {
+agentsCmd.command("stop <taskId>").action(async (taskId) => {
   const gw = createGateway();
-  console.log(JSON.stringify(gw.agents.stopTask(taskId)));
+  console.log(JSON.stringify(await gw.agents.stopTask(taskId)));
 });
 
 // ---------- mcp ----------
