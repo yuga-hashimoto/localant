@@ -28,6 +28,23 @@ export async function resolveTailscale(): Promise<string | null> {
   return null;
 }
 
+/**
+ * Environment for invoking the bundled Tailscale CLI.
+ *
+ * The standalone macOS app (bundle id `io.tailscale.ipn.macsys`) ships a CLI
+ * that decides how to reach the daemon based on whether `SHLVL` is set: when it
+ * is, the CLI talks to the already-running daemon; when it is NOT, the CLI
+ * assumes it was launched from Finder/GUI and tries to *start the Tailscale
+ * GUI*, which fails headlessly with "The Tailscale GUI failed to start …
+ * (Tailscale.CLIError error 3.)". launchd starts jobs without `SHLVL`, so an
+ * auto-started gateway could never bring up Funnel. Seeding a non-empty `SHLVL`
+ * makes the CLI take the daemon path regardless of how the gateway was launched.
+ */
+export function tailscaleEnv(): NodeJS.ProcessEnv {
+  if (process.env.SHLVL && process.env.SHLVL.length > 0) return process.env;
+  return { ...process.env, SHLVL: "1" };
+}
+
 export interface TunnelInfo {
   provider: string;
   url?: string;
@@ -132,15 +149,16 @@ export class TunnelManager {
 
   private async startTailscale(port: number): Promise<TunnelInfo> {
     const bin = (await resolveTailscale()) ?? "tailscale";
+    const env = tailscaleEnv();
     // Funnel serves publicly on port 443 and only one serve/funnel config can
     // own it. A leftover config (e.g. a prior `--bg` funnel pointing elsewhere)
     // makes the foreground `funnel <port>` fail with "listener already exists
     // for port 443". Best-effort clear it first so we cleanly claim the port.
-    await execFileSafe(bin, ["funnel", "reset"], { timeoutMs: 10_000 });
+    await execFileSafe(bin, ["funnel", "reset"], { timeoutMs: 10_000, env });
     return new Promise((resolve) => {
       this.info = { provider: "tailscale", status: "starting" };
       const cfg = this.config().tunnel;
-      const child = spawn(bin, ["funnel", String(port)], { shell: false });
+      const child = spawn(bin, ["funnel", String(port)], { shell: false, env });
       this.child = child;
 
       const onData = (buf: Buffer) => {
