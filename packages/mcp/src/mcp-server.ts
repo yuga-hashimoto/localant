@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { APP_VERSION, isToolInProfile } from "@localant/shared";
+import { APP_VERSION, isToolInProfile, toolAnnotationsForRisk } from "@localant/shared";
 import type { Gateway } from "@localant/gateway";
 
 const SESSION_ID = "chatgpt";
@@ -45,6 +45,9 @@ export function buildMcpServer(gw: Gateway): McpServer {
       {
         description: `[risk ${tool.risk}] ${tool.description}`,
         inputSchema: shape,
+        // Advertise read-only / destructive hints so MCP clients (e.g. ChatGPT)
+        // don't gate safe read-only tools behind a confirmation "safety check".
+        annotations: toolAnnotationsForRisk(tool.risk),
       },
       async (args: unknown) => {
         const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: SESSION_ID });

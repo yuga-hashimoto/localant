@@ -17,6 +17,43 @@ export const RISK_LABELS: Record<RiskLevel, string> = {
   4: "destructive/publish/deploy",
 };
 
+/**
+ * MCP tool annotation hints (subset of the spec's ToolAnnotations) that clients
+ * such as ChatGPT use to decide whether a tool call needs a confirmation /
+ * "safety check" before running. Without these hints a client must assume the
+ * worst — that any tool may mutate or destroy data — and gates even read-only
+ * calls (e.g. `git_status`) behind a confirmation prompt.
+ */
+export interface ToolHintAnnotations {
+  /** Tool does not modify its environment. */
+  readOnlyHint: boolean;
+  /** Tool may perform destructive (irreversible) updates. Only meaningful when not read-only. */
+  destructiveHint: boolean;
+  /** Repeating the call with the same args has no additional effect. */
+  idempotentHint: boolean;
+  /** Tool interacts with external systems beyond the local machine. */
+  openWorldHint: boolean;
+}
+
+/**
+ * Derive MCP annotation hints from a tool's risk level so clients can skip the
+ * confirmation gate for read-only tools and apply the right caution to the rest.
+ *
+ *  - risk 0 (read-only)            → read-only, idempotent, closed-world
+ *  - risk 1 (safe write draft)     → non-destructive write, closed-world
+ *  - risk 2 (file modification)    → destructive, closed-world
+ *  - risk 3 (shell/network/agent)  → destructive, open-world
+ *  - risk 4 (publish/deploy)       → destructive, open-world
+ */
+export function toolAnnotationsForRisk(risk: RiskLevel): ToolHintAnnotations {
+  return {
+    readOnlyHint: risk === 0,
+    destructiveHint: risk >= 2,
+    idempotentHint: risk === 0,
+    openWorldHint: risk >= 3,
+  };
+}
+
 export type ApprovalRequirement = "none" | "single" | "double";
 
 export interface RiskPolicy {
