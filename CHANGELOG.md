@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- `localant deps install browser` no longer fails with `EUNSUPPORTEDPROTOCOL`
+  when run from a pnpm/yarn workspace. Heavy optional dependencies (Playwright)
+  now install into an isolated `~/.localant/optional-deps` directory with its own
+  `package.json`, so `npm install` never climbs into a parent workspace and trips
+  over `workspace:*` protocol deps. Tool resolution (`localant doctor` and the
+  browser tools) looks in that directory too.
+- Browser and desktop-control tools now point at the first-class
+  `localant deps install <browser|desktop>` command in their "not installed"
+  errors instead of raw `npm`/`brew` invocations.
+
 ## [1.4.2] - 2026-06-12
 
 ### Added

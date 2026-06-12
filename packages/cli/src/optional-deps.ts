@@ -1,6 +1,7 @@
-import { createRequire } from "node:module";
+import fs from "node:fs";
+import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { commandExists } from "@localant/gateway";
+import { commandExists, optionalDepsDir, resolveOptionalDep } from "@localant/gateway";
 import { c, ok, warn } from "./util.js";
 
 /**
@@ -29,16 +30,27 @@ export interface OptionalDep {
   manualHint: string;
 }
 
-const requireFromHere = createRequire(import.meta.url);
-
 /** True when the `playwright` package can be resolved from the install. */
 function playwrightInstalled(): boolean {
-  try {
-    requireFromHere.resolve("playwright");
-    return true;
-  } catch {
-    return false;
+  return resolveOptionalDep("playwright") !== null;
+}
+
+/**
+ * Ensure the isolated optional-deps directory exists with a minimal
+ * `package.json`, so `npm install` there never climbs into a parent workspace
+ * and trips over `workspace:*` protocol deps. Returns the directory path.
+ */
+function ensureDepsDir(): string {
+  const dir = optionalDepsDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const pkgJson = path.join(dir, "package.json");
+  if (!fs.existsSync(pkgJson)) {
+    fs.writeFileSync(
+      pkgJson,
+      JSON.stringify({ name: "localant-optional-deps", version: "0.0.0", private: true }, null, 2) + "\n",
+    );
   }
+  return dir;
 }
 
 export const OPTIONAL_DEPS: readonly OptionalDep[] = [
@@ -49,9 +61,11 @@ export const OPTIONAL_DEPS: readonly OptionalDep[] = [
     supported: true,
     check: async () => playwrightInstalled(),
     install: () => {
-      // Install Playwright next to the CLI, then fetch the Chromium binary.
-      execFileSync("npm", ["install", "playwright"], { stdio: "inherit" });
-      execFileSync("npx", ["playwright", "install", "chromium"], { stdio: "inherit" });
+      // Install Playwright into an isolated dir (never the cwd, which may be a
+      // pnpm/yarn workspace npm can't parse), then fetch the Chromium binary.
+      const dir = ensureDepsDir();
+      execFileSync("npm", ["install", "playwright"], { cwd: dir, stdio: "inherit" });
+      execFileSync("npx", ["playwright", "install", "chromium"], { cwd: dir, stdio: "inherit" });
     },
     manualHint: "npm i playwright && npx playwright install chromium",
   },

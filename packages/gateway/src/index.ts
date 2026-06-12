@@ -11,6 +11,7 @@ export { resolveTailscale, tailscaleEnv } from "./managers/tunnel-manager.js";
 export { PathGuard, PathAccessError } from "./security/path-guard.js";
 export { CommandGuard, CommandRejectedError, parseCommand } from "./security/command-guard.js";
 export { commandExists, execFileSafe } from "./util/exec.js";
+export { optionalDepsDir, resolveOptionalDep } from "./util/optional-deps-path.js";
 export { SecretVault } from "./stores/secret-vault.js";
 export { ApprovalStore } from "./stores/approval-store.js";
 export { ConfigStore } from "./stores/config-store.js";
