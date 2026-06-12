@@ -2,7 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { z } from "zod";
-import { commandExists, execFileSafe } from "../util/exec.js";
 import type { Gateway } from "../gateway.js";
 
 const fsReadFileSync = (file: string): string => fs.readFileSync(file, "utf8");
@@ -17,103 +16,14 @@ const joinCwd = (rel: string): string => path.join(process.cwd(), rel);
 export function registerAdapterTools(gw: Gateway): void {
   const r = gw.registry;
 
-  // ---------- OpenClaw ----------
-  const openclawHint =
-    "OpenClaw was not detected. Install it and ensure the `openclaw` CLI is on PATH, then retry.";
+  // OpenClaw has no dedicated tool surface: drive it (if installed) as a
+  // configured coding agent via the agent_* / coding_agent_* tools, or register
+  // it as a downstream MCP server. The previous openclaw_* CLI wrappers were
+  // removed to keep the tool surface focused.
 
-  r.register({
-    name: "openclaw_status",
-    description: "Check whether OpenClaw is installed and reachable.",
-    risk: 0,
-    inputSchema: z.object({}).strip(),
-    handler: async () => {
-      const available = await commandExists("openclaw");
-      return { available, hint: available ? undefined : openclawHint };
-    },
-  });
-  r.register({
-    name: "openclaw_list_skills",
-    description: "List OpenClaw skills (via the openclaw CLI).",
-    risk: 1,
-    inputSchema: z.object({}).strip(),
-    handler: async () => requireCli("openclaw", ["skills", "list"], openclawHint),
-  });
-  r.register({
-    name: "openclaw_list_sessions",
-    description: "List OpenClaw sessions.",
-    risk: 1,
-    inputSchema: z.object({}).strip(),
-    handler: async () => requireCli("openclaw", ["sessions", "list"], openclawHint),
-  });
-  r.register({
-    name: "openclaw_get_session_history",
-    description: "Get an OpenClaw session history.",
-    risk: 1,
-    inputSchema: z.object({ sessionId: z.string() }),
-    handler: async (i) => requireCli("openclaw", ["sessions", "show", i.sessionId], openclawHint),
-  });
-  r.register({
-    name: "openclaw_list_nodes",
-    description: "List OpenClaw nodes.",
-    risk: 1,
-    inputSchema: z.object({}).strip(),
-    handler: async () => requireCli("openclaw", ["nodes", "list"], openclawHint),
-  });
-  r.register({
-    name: "openclaw_run_skill",
-    description: "Run an OpenClaw skill. Requires approval (risk 3).",
-    risk: 3,
-    inputSchema: z.object({ skill: z.string(), args: z.array(z.string()).default([]) }),
-    summarize: (i) => `openclaw run ${i.skill}`,
-    handler: async (i) => requireCli("openclaw", ["skills", "run", i.skill, ...i.args], openclawHint),
-  });
-  r.register({
-    name: "openclaw_send_session",
-    description: "Send a message to an OpenClaw session. Requires approval (risk 3).",
-    risk: 3,
-    inputSchema: z.object({ sessionId: z.string(), message: z.string() }),
-    summarize: (i) => `openclaw send -> ${i.sessionId}`,
-    handler: async (i) => requireCli("openclaw", ["sessions", "send", i.sessionId, i.message], openclawHint),
-  });
-  r.register({
-    name: "openclaw_node_command",
-    description: "Run a command on an OpenClaw node. Requires approval (risk 3).",
-    risk: 3,
-    inputSchema: z.object({ node: z.string(), command: z.string() }),
-    summarize: (i) => `openclaw node ${i.node}`,
-    handler: async (i) => requireCli("openclaw", ["nodes", "exec", i.node, i.command], openclawHint),
-  });
-
-  // ---------- Desktop Commander ----------
-  r.register({
-    name: "desktop_commander_status",
-    description: "Check whether the Desktop Commander MCP server is configured.",
-    risk: 0,
-    inputSchema: z.object({}).strip(),
-    handler: () => {
-      const configured = Boolean(gw.config().mcpServers["desktop-commander"]);
-      return { configured, hint: configured ? undefined : "Register it with mcp_server_register (name: desktop-commander)." };
-    },
-  });
-  r.register({
-    name: "desktop_commander_list_tools",
-    description: "List tools exposed by a registered Desktop Commander MCP server.",
-    risk: 1,
-    inputSchema: z.object({}).strip(),
-    handler: () => {
-      const s = gw.config().mcpServers["desktop-commander"];
-      if (!s) throw new Error("desktop-commander not registered. Use mcp_server_register.");
-      return { note: "Tool discovery flows through the MCP bridge (mcp_server_list_tools)." };
-    },
-  });
-  r.register({
-    name: "desktop_commander_run_tool",
-    description: "Run a Desktop Commander tool through the gated MCP bridge. Risk 3.",
-    risk: 3,
-    inputSchema: z.object({ tool: z.string(), input: z.unknown().default({}) }),
-    summarize: (i) => `desktop-commander ${i.tool}`,
-    handler: (i) => gw.bridge.callTool("desktop-commander", i.tool, (i.input as Record<string, unknown>) ?? {}),
-  });
+  // Desktop Commander has no dedicated adapter: it is a regular downstream MCP
+  // server. Register it with mcp_server_register (name: desktop-commander) and
+  // drive it through the generic mcp_server_* bridge below.
 
   // ---------- Existing MCP server bridge ----------
   r.register({
@@ -190,7 +100,26 @@ export function registerAdapterTools(gw: Gateway): void {
     description: "List tools of a downstream MCP server (connects lazily).",
     risk: 1,
     inputSchema: z.object({ name: z.string() }),
-    handler: (i) => gw.bridge.listTools(i.name),
+    handler: (i) => {
+      // Pre-flight the config so the caller gets an actionable hint instead of a
+      // bare connection error for the common unregistered/disabled cases.
+      const cfg = gw.config().mcpServers[i.name];
+      if (!cfg) {
+        const known = Object.keys(gw.config().mcpServers);
+        throw new Error(
+          `MCP server '${i.name}' is not registered. ` +
+            (known.length ? `Registered servers: ${known.join(", ")}. ` : "") +
+            "Register one with mcp_server_register.",
+        );
+      }
+      if (!cfg.enabled) {
+        throw new Error(
+          `MCP server '${i.name}' is registered but disabled. ` +
+            "Enable it with mcp_server_register (same name, enabled: true), then retry.",
+        );
+      }
+      return gw.bridge.listTools(i.name);
+    },
   });
   r.register({
     name: "mcp_server_run_tool",
@@ -368,11 +297,4 @@ function parseCodexToml(text: string): Record<string, ImportedServer> {
 
 function stripJsonComments(text: string): string {
   return text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
-}
-
-async function requireCli(cmd: string, args: string[], hint: string): Promise<{ output: string }> {
-  if (!(await commandExists(cmd))) throw new Error(hint);
-  const res = await execFileSafe(cmd, args, { timeoutMs: 60_000, maxOutputBytes: 100_000 });
-  if (res.code !== 0) throw new Error(`${cmd} ${args.join(" ")} failed: ${res.stderr || res.stdout}`);
-  return { output: res.stdout };
 }

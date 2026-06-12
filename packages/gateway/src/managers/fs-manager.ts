@@ -450,7 +450,7 @@ export class FsManager {
   restoreBackup(id: string): { restored: string } {
     const metaFile = fs
       .readdirSync(this.paths.backupsDir)
-      .find((f) => f.endsWith(".meta.json") && f.startsWith(id + "__") === false && JSON.parse(fs.readFileSync(path.join(this.paths.backupsDir, f), "utf8")).id === id);
+      .find((f) => f.endsWith(".meta.json") && JSON.parse(fs.readFileSync(path.join(this.paths.backupsDir, f), "utf8")).id === id);
     if (!metaFile) throw new Error(`Backup not found: ${id}`);
     const meta = JSON.parse(fs.readFileSync(path.join(this.paths.backupsDir, metaFile), "utf8"));
     const backupPath = path.join(this.paths.backupsDir, metaFile.replace(/\.meta\.json$/, ""));

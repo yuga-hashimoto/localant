@@ -10,6 +10,7 @@ import { runDoctor } from "./doctor.js";
 import { ensureServeoRegistration } from "./serveo-setup.js";
 import { ensureTailscaleSetup } from "./tailscale-setup.js";
 import { autostartSupported, isAutostartEnabled, enableAutostart, disableAutostart, bounceAutostart } from "./autostart.js";
+import { OPTIONAL_DEPS, checkOptionalDeps, printOptionalDeps, tryInstallOptionalDep } from "./optional-deps.js";
 
 /** True when `candidate` is a strictly higher semver than `current`. */
 function isNewerVersion(candidate: string, current: string): boolean {
@@ -96,6 +97,24 @@ program
       }
     }
 
+    // Offer to install optional capability dependencies (browser automation,
+    // desktop control). These pull in heavy / platform-specific binaries, so
+    // they are opt-in and default to "no".
+    const optional = await checkOptionalDeps();
+    for (const dep of optional) {
+      if (!dep.supported || dep.installed) continue;
+      console.log("");
+      const install = await promptYesNo(
+        `Enable ${dep.capability}? Installs: ${dep.manualHint}`,
+        false,
+      );
+      if (install) {
+        if (tryInstallOptionalDep(dep)) console.log(ok(`${dep.capability} enabled.`));
+      } else {
+        console.log(c.gray(`Skipped. Enable later with: localant deps install ${dep.id}`));
+      }
+    }
+
     await runGateway(gw, startOpts(o));
   });
 
@@ -170,6 +189,38 @@ program.command("doctor").description("Check the environment").action(async () =
   const passed = await runDoctor();
   process.exit(passed ? 0 : 1);
 });
+
+// ---------- optional capability dependencies ----------
+const deps = program.command("deps").description("Manage optional capability dependencies (browser, desktop control)");
+deps
+  .command("list")
+  .description("Show optional capabilities and whether they are installed")
+  .action(async () => {
+    printOptionalDeps(await checkOptionalDeps());
+  });
+deps
+  .command("install [id]")
+  .description("Install an optional capability dependency (browser|desktop), or all missing ones")
+  .action(async (id?: string) => {
+    const statuses = await checkOptionalDeps();
+    const targets = id ? statuses.filter((d) => d.id === id) : statuses.filter((d) => d.supported && !d.installed);
+    if (id && targets.length === 0) {
+      return console.log(fail(`Unknown dependency '${id}'. Use one of: ${OPTIONAL_DEPS.map((d) => d.id).join(", ")}.`));
+    }
+    if (targets.length === 0) return console.log(ok("All supported optional capabilities are already installed."));
+    for (const dep of targets) {
+      if (!dep.supported) {
+        console.log(warn(`${dep.capability} is not supported on this platform.`));
+        continue;
+      }
+      if (dep.installed) {
+        console.log(ok(`${dep.capability} already installed.`));
+        continue;
+      }
+      console.log(c.gray(`Installing ${dep.capability} … (${dep.manualHint})`));
+      if (tryInstallOptionalDep(dep)) console.log(ok(`${dep.capability} enabled.`));
+    }
+  });
 
 program
   .command("update")

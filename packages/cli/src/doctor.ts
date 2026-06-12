@@ -1,5 +1,6 @@
 import { commandExists, resolveTailscale } from "@localant/gateway";
 import { c, ok, warn, fail } from "./util.js";
+import { checkOptionalDeps, printOptionalDeps } from "./optional-deps.js";
 
 interface Check {
   name: string;
@@ -36,5 +37,7 @@ export async function runDoctor(): Promise<boolean> {
   console.log("");
   if (!allRequired) console.log(fail("Some required tools are missing. Install them and re-run `doctor`."));
   else console.log(ok("All required tools present."));
+
+  printOptionalDeps(await checkOptionalDeps());
   return allRequired;
 }

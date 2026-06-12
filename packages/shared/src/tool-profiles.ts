@@ -92,36 +92,32 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
 export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   ...MINIMAL_PROFILE_TOOLS,
 
-  // --- Filesystem / code editing (standard names + aliases) ---
-  "read",
-  "read_file",
-  "read_file_range",
-  "write",
-  "write_file",
-  "edit",
-  "edit_file",
+  // --- Filesystem / code editing ---
+  // One name per function: the Codex/Claude-Code-native verb. Pure duplicate
+  // aliases are deliberately omitted — exposing read/read_file/fs_read_file for
+  // the same handler only bloats the surface and confuses tool selection. The
+  // canonical `fs_*` read names already come in via the minimal superset.
+  "read", // also fs_read_file (minimal); read_file alias dropped
+  "write", // fs_create_file; write_file alias dropped
+  "edit", // edit_file alias dropped
   "multi_edit",
   "apply_patch",
-  "list_files",
   "glob",
-  "grep",
-  "search_content",
-  "search_files",
-  "get_file_info",
+  "grep", // also fs_search_content (minimal); search_content alias dropped
   "create_directory",
   "move_file",
   "copy_file",
   "delete_file",
-  "diff_file",
+  // dropped duplicates (reachable via the kept name in the comment above):
+  //   read_file, read_file_range→fs_read_file_range, write_file, edit_file,
+  //   list_files→fs_list_files, search_content, search_files→fs_search_files,
+  //   get_file_info→fs_get_file_info, diff_file→git_diff_file
 
   // --- Shell / bash ---
-  "bash",
-  "shell_run",
+  "bash", // shell_run alias dropped
   "shell_run_background",
-  "shell_get_output",
-  "shell_stop",
-  "bash_output",
-  "kill_shell",
+  "shell_get_output", // bash_output alias dropped
+  "shell_stop", // kill_shell alias dropped
   "command_exists",
 
   // --- Git ---

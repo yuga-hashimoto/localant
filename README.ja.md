@@ -50,7 +50,7 @@ LocalAnt  ── ゲートウェイ · リスクエンジン · 承認キュー 
   ├─ Claude Code / Codex（計画 → 承認 → 実行 → 検証 → 差分）
   ├─ ブラウザ（Playwright・分離プロファイル）· Android（ADB）· Computer Use（macOS デスクトップ操作）
   ├─ 記事（Zenn / Qiita / note・スキルで提供）· カスタムスキル
-  └─ アダプタ: OpenClaw · Desktop Commander · 任意の MCP サーバ
+  └─ アダプタ: 任意の MCP サーバ（Desktop Commander など）
 ```
 
 ---
@@ -87,7 +87,7 @@ ChatGPT のための**ローカルファースト MCP ゲートウェイ**です
   キーボード操作（`screencapture` + `cliclick`）。スクリーンショットは MCP 画像
   としてインライン返却され、画像のピクセル座標がそのままクリック座標になります。
   入力系はすべてリスク3で監査対象。詳細は [docs/computer-use.md](docs/computer-use.md)。
-- 🔌 **アダプタ**: OpenClaw、Desktop Commander、任意の MCP サーバ。
+- 🔌 **アダプタ**: 任意の downstream MCP サーバ（Desktop Commander など）。
 
 ## 3分セットアップ
 
@@ -201,6 +201,7 @@ export default defineSkill({
 
 ```bash
 localant setup | start | stop | restart | status | doctor | update | uninstall
+localant deps list | install [browser|desktop]   # 任意機能の依存（Playwright・cliclick）
 localant token rotate | show   # 認証トークンを再発行（シークレットは保持）
 localant tunnel status
 localant approvals list | approve <id> [--session] | deny <id>
