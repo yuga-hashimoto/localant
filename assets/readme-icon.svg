@@ -1,0 +1,68 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">LocalAnt icon</title>
+  <desc id="desc">A rounded black ant mascot with a gold crown and local gateway signal nodes.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#FFF9EC"/>
+      <stop offset="68%" stop-color="#F3EADB"/>
+      <stop offset="100%" stop-color="#E6D8C4"/>
+    </radialGradient>
+    <linearGradient id="body" x1="151" y1="132" x2="363" y2="405" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#22262B"/>
+      <stop offset="100%" stop-color="#050607"/>
+    </linearGradient>
+    <linearGradient id="face" x1="150" y1="160" x2="362" y2="319" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#383D43"/>
+      <stop offset="100%" stop-color="#171A1E"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="178" y1="90" x2="335" y2="186" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFE69A"/>
+      <stop offset="100%" stop-color="#E6A93E"/>
+    </linearGradient>
+    <filter id="shadow" x="78" y="72" width="356" height="369" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="url(#bg)"/>
+  <path d="M91 318C127 292 160 279 201 278" stroke="#111417" stroke-width="18" stroke-linecap="round" opacity="0.92"/>
+  <path d="M421 318C385 292 352 279 311 278" stroke="#111417" stroke-width="18" stroke-linecap="round" opacity="0.92"/>
+  <path d="M122 379C152 346 184 334 225 338" stroke="#111417" stroke-width="20" stroke-linecap="round" opacity="0.92"/>
+  <path d="M390 379C360 346 328 334 287 338" stroke="#111417" stroke-width="20" stroke-linecap="round" opacity="0.92"/>
+
+  <g filter="url(#shadow)">
+    <path d="M150 170C161 110 204 84 256 84C308 84 351 110 362 170" stroke="#111417" stroke-width="17" stroke-linecap="round"/>
+    <circle cx="147" cy="163" r="29" fill="#111417"/>
+    <circle cx="365" cy="163" r="29" fill="#111417"/>
+
+    <path d="M182 115L221 151L256 83L291 151L330 115L314 198H198L182 115Z" fill="url(#gold)"/>
+    <circle cx="181" cy="115" r="15" fill="#F2C86B"/>
+    <circle cx="256" cy="83" r="15" fill="#F2C86B"/>
+    <circle cx="331" cy="115" r="15" fill="#F2C86B"/>
+    <path d="M256 139L269 164L256 190L243 164L256 139Z" fill="#16191D"/>
+
+    <ellipse cx="256" cy="346" rx="93" ry="80" fill="url(#body)"/>
+    <ellipse cx="256" cy="232" rx="130" ry="109" fill="url(#body)"/>
+    <path d="M150 240C169 195 207 181 256 208C305 181 343 195 362 240C350 293 313 325 256 325C199 325 162 293 150 240Z" fill="url(#face)"/>
+
+    <ellipse cx="206" cy="249" rx="30" ry="40" fill="#FFF8E8"/>
+    <ellipse cx="306" cy="249" rx="30" ry="40" fill="#FFF8E8"/>
+    <ellipse cx="217" cy="257" rx="17" ry="27" fill="#111417"/>
+    <ellipse cx="317" cy="257" rx="17" ry="27" fill="#111417"/>
+    <circle cx="198" cy="237" r="8" fill="#FFF8E8"/>
+    <circle cx="298" cy="237" r="8" fill="#FFF8E8"/>
+    <path d="M226 292C239 311 273 311 286 292" stroke="#FFF8E8" stroke-width="12" stroke-linecap="round"/>
+
+    <path d="M188 333C163 344 151 375 161 401" stroke="#111417" stroke-width="27" stroke-linecap="round"/>
+    <path d="M324 333C349 344 361 375 351 401" stroke="#111417" stroke-width="27" stroke-linecap="round"/>
+    <circle cx="160" cy="402" r="19" fill="#111417"/>
+    <circle cx="352" cy="402" r="19" fill="#111417"/>
+  </g>
+
+  <g opacity="0.72">
+    <path d="M102 119H68C54 119 43 130 43 144V180" stroke="#E2B65F" stroke-width="9" stroke-linecap="round"/>
+    <path d="M410 119H444C458 119 469 130 469 144V180" stroke="#E2B65F" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="43" cy="193" r="10" fill="#E2B65F"/>
+    <circle cx="469" cy="193" r="10" fill="#E2B65F"/>
+  </g>
+</svg>

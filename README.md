@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/hero.png" width="320" alt="LocalAnt — ChatGPT-native Local MCP Gateway" />
+  <img src="assets/readme-icon.svg" width="240" alt="LocalAnt — ChatGPT-native Local MCP Gateway" />
 </p>
 
 # LocalAnt
