@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 import type { Gateway } from "../gateway.js";
 
@@ -62,10 +64,60 @@ export function registerFilesystemTools(gw: Gateway): void {
 
   r.register({
     name: "fs_read_file",
-    description: "Read a text file inside the allowlist.",
+    description: "Read a text file inside the allowlist. If the file is an image (PNG, JPEG, GIF, WebP, SVG), it will be automatically read and returned as an image block.",
     risk: 0,
     inputSchema: z.object({ path: z.string() }),
-    handler: (i) => ({ path: i.path, content: gw.fs.readFile(i.path) }),
+    handler: (i) => {
+      const resolved = gw.pathGuard.assertAccess(i.path, "read");
+      const stat = fs.statSync(resolved);
+      const limit = gw.config().security.maxFileSizeBytes;
+      if (stat.size > limit) {
+        throw new Error(`File too large (${stat.size} bytes > ${limit} limit).`);
+      }
+      const ext = path.extname(resolved).toLowerCase();
+      const isImage = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"].includes(ext);
+      if (isImage) {
+        let mimeType = "image/png";
+        if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
+        else if (ext === ".gif") mimeType = "image/gif";
+        else if (ext === ".webp") mimeType = "image/webp";
+        else if (ext === ".svg") mimeType = "image/svg+xml";
+
+        const base64 = fs.readFileSync(resolved).toString("base64");
+        return {
+          path: i.path,
+          __image: { mimeType, base64 },
+        };
+      }
+      return { path: i.path, content: gw.fs.readFile(i.path) };
+    },
+  });
+
+  r.register({
+    name: "fs_read_image",
+    description: "Read an image file (PNG, JPEG, GIF, WebP, SVG) inside the allowlist and return it as an image block.",
+    risk: 0,
+    inputSchema: z.object({ path: z.string() }),
+    handler: (i) => {
+      const resolved = gw.pathGuard.assertAccess(i.path, "read");
+      const stat = fs.statSync(resolved);
+      const limit = gw.config().security.maxFileSizeBytes;
+      if (stat.size > limit) {
+        throw new Error(`File too large (${stat.size} bytes > ${limit} limit).`);
+      }
+      const ext = path.extname(resolved).toLowerCase();
+      let mimeType = "image/png";
+      if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg";
+      else if (ext === ".gif") mimeType = "image/gif";
+      else if (ext === ".webp") mimeType = "image/webp";
+      else if (ext === ".svg") mimeType = "image/svg+xml";
+
+      const base64 = fs.readFileSync(resolved).toString("base64");
+      return {
+        path: i.path,
+        __image: { mimeType, base64 },
+      };
+    },
   });
 
   r.register({
