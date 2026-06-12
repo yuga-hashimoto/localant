@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-06-13
+
 ### Fixed
 - `localant deps install browser` no longer fails with `EUNSUPPORTEDPROTOCOL`
   when run from a pnpm/yarn workspace. Heavy optional dependencies (Playwright)
