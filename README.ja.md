@@ -15,10 +15,25 @@
   <a href="README.md">English</a> · <b>日本語</b>
 </p>
 
+<p align="center">
+  <video src="assets/demo.mp4" width="100%" autoplay loop muted playsinline></video>
+</p>
+
 > **ChatGPT を頭脳に、あなたのローカル PC を手足にする。**
 
 `LocalAnt` は、ChatGPT を頭脳として、ローカル PC を実行環境として使うための
 ツールです。
+
+<table>
+  <tr>
+    <td width="50%"><b>Before (作業前: タスク開始時)</b></td>
+    <td width="50%"><b>After (作業後: PR作成・バリデーション通過)</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/before.png" alt="Before" width="100%" /></td>
+    <td><img src="assets/after.png" alt="After" width="100%" /></td>
+  </tr>
+</table>
 
 安全で権限管理された「スキル」を MCP 経由で ChatGPT に公開します。
 許可済みコマンドの実行、プロジェクトの調査、ファイル操作、Claude Code や Codex
@@ -66,8 +81,7 @@ ChatGPT のための**ローカルファースト MCP ゲートウェイ**です
   **ChatGPT からのスキル生成**（常に無効状態で保存）。
 - 🤖 **コーディングエージェント**: Claude Code / Codex を任意の作業ディレクトリで
   駆動（計画 → 承認 → 実行 → 検証 → 差分）。
-- 🖥️ **ローカルダッシュボード**: ホーム・ツール（スキル / MCP サブタブ）・
-  セキュリティ・承認・監査・シークレット・エージェント・設定。
+- 🖥️ **ローカルダッシュボード**: ホーム・ツール（スキル / MCP サブタブ）・セキュリティ・承認・監査・シークレット・エージェント・設定。
 - 🌐 **3分セットアップ**: デフォルトは Tailscale Funnel、Cloudflare Tunnel / ngrok フォールバック、クリップボードコピー対応。
 - 🖱️ **Computer Use**: macOS デスクトップのスクリーンショット・クリック・
   キーボード操作（`screencapture` + `cliclick`）。スクリーンショットは MCP 画像

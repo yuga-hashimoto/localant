@@ -15,9 +15,24 @@
   <b>English</b> · <a href="README.ja.md">日本語</a>
 </p>
 
+<p align="center">
+  <video src="assets/demo.mp4" width="100%" autoplay loop muted playsinline></video>
+</p>
+
 > **Use ChatGPT as the brain. Use your local computer as the hands.**
 
 `LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
+
+<table>
+  <tr>
+    <td width="50%"><b>Before (Task Start)</b></td>
+    <td width="50%"><b>After (PR Created & Validated)</b></td>
+  </tr>
+  <tr>
+    <td><img src="assets/before.png" alt="Before" width="100%" /></td>
+    <td><img src="assets/after.png" alt="After" width="100%" /></td>
+  </tr>
+</table>
 
 It exposes safe, permissioned local skills to ChatGPT through MCP:
 run approved commands, inspect projects, manage files, call coding agents like
