@@ -6,7 +6,35 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-06-12
+
 ### Added
+- **Interactive Apps SDK widgets for the core LocalAnt workflows.** Eight
+  `text/html;profile=mcp-app` widgets now render tool results as UI instead of
+  raw JSON, and their buttons drive `tools/call` back to the gateway via
+  `window.openai.callTool` (Apps SDK pattern):
+  - **Approval center** (`approval_list_pending` / `approval_get` /
+    `approval_approve` / `approval_deny`) — pending requests as cards showing
+    tool, risk, reason, summary and originating chat, with inline
+    Approve once / Approve session / Deny.
+  - **Coding-agent task panel** (`coding_agent_get_task` / `_start_task` /
+    `_get_result` / `_continue_task`) — status, a polling logs tail, a colorized
+    diff viewer, and Stop / Continue / Refresh.
+  - **Git panel** (`git_status` / `git_list_changed_files` / `git_diff` /
+    `git_commit` / `git_add`) — changed-file list with stage checkboxes, a
+    per-file diff viewer, a commit-message box and Stage / Commit / Refresh, so
+    long diffs never have to be read inline.
+  - **Shell process panel** (`shell_list_processes` / `_get_process_output`) —
+    tracked processes with an output tail and Stop.
+  - **Browser panel** (`browser_open` / `_get_url` / `_console_logs` /
+    `_extract_text`), **ADB panel** (`adb_list_devices` /
+    `_get_current_activity` / `_dump_ui` / `_logcat`), **MCP server panel**
+    (`mcp_server_list` / `_list_tools` / `_status`) and **skill panel**
+    (`skill_list` / `_info` / `_validate` / `_enable` / `_disable`).
+
+  Each widget advertises `_meta.ui.resourceUri` plus the compatibility
+  `openai/outputTemplate`, keeps `structuredContent` model-visible, and shares a
+  single client runtime (`packages/mcp/src/widgets/`).
 - **Apps SDK image viewer for LocalAnt image results.** `fs_read_image`,
   image reads through `fs_read_file`, and `computer_screenshot` now advertise
   a `text/html;profile=mcp-app` image viewer resource via
