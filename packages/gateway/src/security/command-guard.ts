@@ -123,7 +123,7 @@ export class CommandGuard {
         throw new CommandRejectedError(`Command rejected: '${tok}' is a blocked command even after approval.`);
       }
     }
-    if (/\brm\b/.test(normalized) && /-[a-z]*r[a-z]*f/i.test(normalized)) {
+    if (/\brm\b/.test(normalized) && /-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r/i.test(normalized)) {
       throw new CommandRejectedError("Command rejected: 'rm -rf' is blocked even after approval.");
     }
     return normalized;
