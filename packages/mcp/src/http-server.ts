@@ -5,10 +5,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express, { type Request, type Response } from "express";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile } from "@localant/shared";
-import { commandExists, resolveTailscale, type Gateway } from "@localant/gateway";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile, DEFAULT_SESSION_ID } from "@localant/shared";
+import { commandExists, resolveTailscale, closeBrowserSession, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
+
+/** A live, stateful MCP session — one per ChatGPT chat / MCP connection. */
+interface McpSession {
+  server: McpServer;
+  transport: StreamableHTTPServerTransport;
+  lastSeen: number;
+}
+
+/** Sessions with no activity for this long are closed and swept. */
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const SESSION_SWEEP_MS = 5 * 60 * 1000;
 
 const log = createLogger("http");
 
@@ -118,7 +131,29 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
   // tunnel. Generous enough for normal ChatGPT use; keyed by client IP.
   const mcpRateLimit = createRateLimiter(120, 60_000);
 
-  // Streamable HTTP MCP endpoint (stateless: one server+transport per request).
+  // Live MCP sessions, keyed by the server-issued Mcp-Session-Id. ChatGPT opens
+  // one MCP connection per chat, so each session id maps to one chat — this is
+  // how LocalAnt tells chats apart (audit, tasks, browser state, approvals).
+  const mcpSessions = new Map<string, McpSession>();
+  const sweeper = setInterval(() => {
+    const now = Date.now();
+    for (const [sid, s] of mcpSessions) {
+      if (now - s.lastSeen > SESSION_TTL_MS) {
+        mcpSessions.delete(sid);
+        void s.transport.close();
+        void s.server.close();
+        void closeBrowserSession(sid);
+        log.info(`mcp session expired: ${sid}`);
+      }
+    }
+  }, SESSION_SWEEP_MS);
+  sweeper.unref();
+
+  // Streamable HTTP MCP endpoint. Stateful: ChatGPT's `initialize` mints a
+  // session id we keep, and subsequent calls carry `Mcp-Session-Id` so we route
+  // them back to the same per-chat server. Clients that never negotiate a
+  // session (CLI probes, legacy callers) fall back to a stateless per-request
+  // server tagged with DEFAULT_SESSION_ID.
   app.post("/mcp", async (req, res) => {
     const ip = req.ip ?? req.socket.remoteAddress ?? "unknown";
     if (!mcpRateLimit(ip)) {
@@ -127,6 +162,46 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
     }
     if (!requireAuth(req, res)) return;
     try {
+      const sid = req.header("mcp-session-id");
+
+      // Route to an existing chat session.
+      if (sid) {
+        const existing = mcpSessions.get(sid);
+        if (existing) {
+          existing.lastSeen = Date.now();
+          await existing.transport.handleRequest(req, res, req.body);
+          return;
+        }
+        // Unknown session id (e.g. gateway restarted) — fall through and let the
+        // SDK reject non-initialize calls, or start fresh on initialize.
+      }
+
+      // New chat: mint a stateful session on the initialize handshake. The
+      // session id is assigned while handling the initialize request, so we
+      // register the session immediately afterwards (before any follow-up call
+      // for it can be processed on this single-threaded event loop).
+      if (!sid && isInitializeRequest(req.body)) {
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => crypto.randomUUID(),
+        });
+        const server = buildMcpServer(gw, () => transport.sessionId ?? DEFAULT_SESSION_ID);
+        transport.onclose = () => {
+          const closedId = transport.sessionId;
+          if (closedId && mcpSessions.delete(closedId)) {
+            void closeBrowserSession(closedId);
+            log.info(`mcp session closed: ${closedId}`);
+          }
+        };
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+        if (transport.sessionId) {
+          mcpSessions.set(transport.sessionId, { server, transport, lastSeen: Date.now() });
+          log.info(`mcp session initialized: ${transport.sessionId}`);
+        }
+        return;
+      }
+
+      // Stateless fallback: one server+transport for this single request.
       const server = buildMcpServer(gw);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on("close", () => {
@@ -140,10 +215,28 @@ export async function startHttpServers(gw: Gateway): Promise<Servers> {
       if (!res.headersSent) res.status(500).json({ error: "Internal MCP error" });
     }
   });
+
   const methodNotAllowed = (_req: Request, res: Response) =>
     res.status(405).json({ error: "Method not allowed. Use POST for /mcp." });
-  app.get("/mcp", methodNotAllowed);
-  app.delete("/mcp", methodNotAllowed);
+
+  // GET (SSE stream) and DELETE (session teardown) are only meaningful for an
+  // established session. Without a known session id we preserve the historical
+  // 405 so unauthenticated probes get the same answer as before.
+  const handleSessionRequest = async (req: Request, res: Response) => {
+    const sid = req.header("mcp-session-id");
+    const existing = sid ? mcpSessions.get(sid) : undefined;
+    if (!existing) return methodNotAllowed(req, res);
+    if (!requireAuth(req, res)) return;
+    existing.lastSeen = Date.now();
+    try {
+      await existing.transport.handleRequest(req, res);
+    } catch (err) {
+      log.error("mcp session request failed", err);
+      if (!res.headersSent) res.status(500).json({ error: "Internal MCP error" });
+    }
+  };
+  app.get("/mcp", handleSessionRequest);
+  app.delete("/mcp", handleSessionRequest);
 
   // OAuth 認可エンドポイント
   app.get("/oauth/authorize", (req, res) => {

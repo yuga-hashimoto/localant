@@ -24,6 +24,7 @@ export class AuditLog {
     approval: AuditEntry["approval"];
     durationMs: number;
     error?: string;
+    sessionId?: string;
   }): AuditEntry {
     const secrets = this.secretsProvider();
     const full: AuditEntry = {
@@ -36,6 +37,7 @@ export class AuditLog {
       outputSummary: truncate(redact(safeStringify(entry.output), secrets), 500),
       approval: entry.approval,
       durationMs: entry.durationMs,
+      ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
       ...(entry.error ? { error: truncate(redact(entry.error, secrets), 500) } : {}),
     };
     fs.appendFileSync(this.file, JSON.stringify(full) + "\n");

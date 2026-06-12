@@ -83,4 +83,23 @@ describe("ApprovalStore", () => {
     expect(s.approve("nope")).toBeUndefined();
     expect(s.deny("nope")).toBeUndefined();
   });
+
+  it("only lets the owning session consume a session-tagged once-approval", () => {
+    const s = store();
+    const req = s.create({ ...baseReq, requirement: "single", sessionId: "chat-a" });
+    s.approve(req.id, "once");
+    // A different chat must not be able to consume chat-a's approval.
+    expect(s.findApprovedForTool("fs_create_file", "chat-b")).toBeUndefined();
+    // The owning chat can.
+    expect(s.findApprovedForTool("fs_create_file", "chat-a")?.id).toBe(req.id);
+  });
+
+  it("treats legacy approvals without a sessionId as consumable by anyone", () => {
+    const s = store();
+    const req = s.create({ ...baseReq, requirement: "single" });
+    s.approve(req.id, "once");
+    // No sessionId recorded → any session (or none) can consume it.
+    expect(s.findApprovedForTool("fs_create_file", "chat-x")?.id).toBe(req.id);
+    expect(s.findApprovedForTool("fs_create_file")?.id).toBe(req.id);
+  });
 });

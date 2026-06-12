@@ -282,6 +282,71 @@ describe("lsp", () => {
   });
 });
 
+describe("coding agent sessions & repo lock", () => {
+  // A fake "agent" that just sleeps, so the task stays in `running` while we
+  // assert lock / session behavior. The task prompt is appended as a trailing
+  // arg that node ignores.
+  function gwWithFakeAgent() {
+    const g = createGateway(base);
+    g.saveConfig({
+      ...g.config(),
+      tools: { profile: "full" },
+      security: { ...g.config().security, mode: "yolo", allowedDirectories: [base] },
+      codingAgents: {
+        ...g.config().codingAgents,
+        fake: {
+          enabled: true,
+          command: "node",
+          args: [],
+          planArgs: [],
+          executeArgs: ["-e", "setTimeout(() => {}, 60000)"],
+          dangerArgs: [],
+          defaultPermissionMode: "execute",
+          maxTurns: 1,
+          timeoutMs: 600_000,
+        },
+      },
+    });
+    return g;
+  }
+
+  it("rejects a second task on the same repo and frees the lock on stop", async () => {
+    const g = gwWithFakeAgent();
+    const first = await g.agents.startTask("fake", proj, "task one", { createBranch: false, sessionId: "chat-a" });
+    expect(first.taskId).toBeTruthy();
+
+    // Same working tree, different chat → blocked by the repo lock.
+    await expect(
+      g.agents.startTask("fake", proj, "task two", { createBranch: false, sessionId: "chat-b" }),
+    ).rejects.toThrow(/already running in this repo/i);
+
+    // Stopping the first releases the lock so a new task can start.
+    g.agents.stopTask(first.taskId);
+    const third = await g.agents.startTask("fake", proj, "task three", { createBranch: false, sessionId: "chat-b" });
+    expect(third.taskId).toBeTruthy();
+    g.agents.stopTask(third.taskId);
+  });
+
+  it("filters listTasks by session but shows all when unfiltered", async () => {
+    const g = gwWithFakeAgent();
+    const projB = path.join(base, "projB");
+    fs.mkdirSync(projB, { recursive: true });
+
+    const a = await g.agents.startTask("fake", proj, "a", { createBranch: false, sessionId: "chat-a" });
+    const b = await g.agents.startTask("fake", projB, "b", { createBranch: false, sessionId: "chat-b" });
+
+    const onlyA = g.agents.listTasks("chat-a");
+    expect(onlyA.map((t) => t.id)).toEqual([a.taskId]);
+    expect(onlyA[0]!.sessionId).toBe("chat-a");
+
+    const all = g.agents.listTasks();
+    expect(all.map((t) => t.id).sort()).toEqual([a.taskId, b.taskId].sort());
+
+    g.agents.stopTask(a.taskId);
+    g.agents.stopTask(b.taskId);
+  });
+});
+
 describe("audit redaction", () => {
   it("redacts secret values from bash output", async () => {
     const g = gw();

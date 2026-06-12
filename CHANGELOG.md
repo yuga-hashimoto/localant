@@ -6,6 +6,36 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Apps SDK image viewer for LocalAnt image results.** `fs_read_image`,
+  image reads through `fs_read_file`, and `computer_screenshot` now advertise
+  a `text/html;profile=mcp-app` image viewer resource via
+  `_meta.ui.resourceUri` and the ChatGPT compatibility `openai/outputTemplate`.
+  Image bytes are delivered in tool-result `_meta` for the widget while
+  `structuredContent` stays lightweight and the existing MCP image content
+  block remains available for compatible clients.
+- **Per-chat session isolation.** Each ChatGPT chat opens its own MCP
+  connection, so LocalAnt now mints a stateful `Mcp-Session-Id` per chat
+  instead of tagging every call with the fixed id `"chatgpt"`. Sessions are
+  tracked server-side, time out after 30 min idle, and are torn down on the
+  client's `DELETE`. Stateless/legacy callers fall back to `chatgpt-default`.
+- Audit entries now record the originating `sessionId`, so the dashboard audit
+  log can tell chats apart.
+
+### Changed
+- **Browser state is now per session.** `browser_open` / `browser_*` keep a
+  separate browser + page + console log per chat, so two chats no longer
+  overwrite each other's tab. A session's browser is closed when the session
+  ends or is swept for idleness.
+- **Coding agents are session-aware and repo-locked.** Tasks carry their
+  originating `sessionId`; `listTasks` can filter by it (dashboard still sees
+  all). A repo lock refuses to start a second execution task against the same
+  working tree, preventing branch/diff corruption when two chats target the
+  same repo — this holds even in `yolo` mode where approval gates are off.
+- **Once-approvals are bound to their session.** A pending once-approval can
+  only be consumed by the chat that created it, so a different chat can't steal
+  it. Legacy approvals without a session id remain consumable by anyone.
+
 ## [1.3.0] - 2026-06-12
 
 ### Fixed

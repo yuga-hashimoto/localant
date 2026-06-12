@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import fs from "node:fs";
 import { nanoid } from "nanoid";
 import type { CodingAgentConfig, Config } from "@localant/shared";
 import { commandExists, execFileSafe } from "../util/exec.js";
@@ -17,6 +18,17 @@ interface RunningTask {
   createdAt: string;
   finishedAt?: string;
   exitCode?: number | null;
+  sessionId?: string;
+}
+
+/** Resolve a path to its canonical form for use as a repo-lock key. Falls back
+ * to the raw path when the directory does not exist yet. */
+function repoKey(cwd: string): string {
+  try {
+    return fs.realpathSync(cwd);
+  } catch {
+    return cwd;
+  }
 }
 
 /**
@@ -27,6 +39,10 @@ interface RunningTask {
  */
 export class CodingAgentManager {
   private readonly tasks = new Map<string, RunningTask>();
+  /** Canonical repo path -> id of the execution task currently holding it.
+   * Prevents two chats from running agents against the same working tree at
+   * once (which would corrupt branches / diffs). */
+  private readonly repoLocks = new Map<string, string>();
 
   constructor(
     private readonly config: () => Config,
@@ -88,24 +104,42 @@ export class CodingAgentManager {
     agent: string,
     cwd: string,
     task: string,
-    opts: { createBranch?: boolean; branchName?: string } = {},
+    opts: { createBranch?: boolean; branchName?: string; sessionId?: string } = {},
   ): Promise<{ taskId: string; branch?: string; warning?: string }> {
     const cfg = this.agentConfig(agent);
     if (!cfg.enabled) throw new Error(`Agent '${agent}' is disabled in config.`);
     if (!(await commandExists(cfg.command))) throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
 
-    let warning: string | undefined;
-    if (await this.git.isDirty(cwd)) {
-      warning = "Working tree was dirty before the task started. Existing changes may be mixed in.";
+    // Refuse to run two execution tasks against the same working tree at once.
+    // Reserve the lock synchronously, before any `await`, so two concurrent
+    // starts can't both pass the check — then release it if setup fails.
+    const key = repoKey(cwd);
+    const holder = this.repoLocks.get(key);
+    if (holder) {
+      const other = this.tasks.get(holder);
+      const who = other?.sessionId ? ` (session ${other.sessionId})` : "";
+      throw new Error(
+        `Task ${holder}${who} is already running in this repo (${cwd}). Wait for it to finish or stop it first.`,
+      );
     }
-
-    let branch: string | undefined;
-    if (opts.createBranch !== false) {
-      branch = opts.branchName ?? `cla/${agent}-${Date.now()}`;
-      await this.git.createBranch(cwd, branch);
-    }
-
     const id = nanoid(8);
+    this.repoLocks.set(key, id);
+
+    let warning: string | undefined;
+    let branch: string | undefined;
+    try {
+      if (await this.git.isDirty(cwd)) {
+        warning = "Working tree was dirty before the task started. Existing changes may be mixed in.";
+      }
+      if (opts.createBranch !== false) {
+        branch = opts.branchName ?? `cla/${agent}-${Date.now()}`;
+        await this.git.createBranch(cwd, branch);
+      }
+    } catch (e) {
+      this.repoLocks.delete(key);
+      throw e;
+    }
+
     const prompt = `Implement the following task. Run tests/validation when done.\n\n${task}`;
     const isYolo = this.config().security.mode === "yolo";
     const args = [...cfg.args, ...cfg.executeArgs, ...(isYolo ? cfg.dangerArgs : []), prompt];
@@ -123,6 +157,7 @@ export class CodingAgentManager {
       child,
       logs: "",
       createdAt: new Date().toISOString(),
+      sessionId: opts.sessionId,
     };
     const cap = 500_000;
     child.stdout?.on("data", (d: Buffer) => {
@@ -135,6 +170,7 @@ export class CodingAgentManager {
       rec.exitCode = code;
       rec.status = code === 0 ? "completed" : "failed";
       rec.finishedAt = new Date().toISOString();
+      if (this.repoLocks.get(key) === id) this.repoLocks.delete(key);
     });
     const timer = setTimeout(() => child.kill("SIGKILL"), cfg.timeoutMs);
     child.on("close", () => clearTimeout(timer));
@@ -148,9 +184,14 @@ export class CodingAgentManager {
     return this.summarizeTask(t);
   }
 
-  /** All tasks (most recent first), without child handles or logs. */
-  listTasks() {
+  /**
+   * Tasks (most recent first), without child handles or logs. When `sessionId`
+   * is given, only that session's tasks are returned — so a ChatGPT chat sees
+   * its own tasks. Omit it (dashboard / CLI) to see every task.
+   */
+  listTasks(sessionId?: string) {
     return [...this.tasks.values()]
+      .filter((t) => sessionId === undefined || t.sessionId === sessionId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .map((t) => this.summarizeTask(t));
   }
@@ -167,6 +208,7 @@ export class CodingAgentManager {
       createdAt: t.createdAt,
       finishedAt: t.finishedAt,
       exitCode: t.exitCode,
+      sessionId: t.sessionId,
     };
   }
 
@@ -181,13 +223,15 @@ export class CodingAgentManager {
     if (!t) throw new Error(`Task not found: ${id}`);
     t.child?.kill("SIGTERM");
     t.status = "stopped";
+    const key = repoKey(t.cwd);
+    if (this.repoLocks.get(key) === id) this.repoLocks.delete(key);
     return { id, stopped: true };
   }
 
   async continueTask(id: string, task: string): Promise<{ taskId: string; branch?: string }> {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
-    return this.startTask(t.agent, t.cwd, task, { createBranch: false });
+    return this.startTask(t.agent, t.cwd, task, { createBranch: false, sessionId: t.sessionId });
   }
 
   async getDiff(id: string): Promise<string> {

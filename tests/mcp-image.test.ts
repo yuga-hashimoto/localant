@@ -21,7 +21,7 @@ describe("extractImage", () => {
       __image: { mimeType: "image/png", base64: "QUJD" },
     };
     const { image, rest } = extractImage(data);
-    expect(image).toEqual({ mimeType: "image/png", base64: "QUJD" });
+    expect(image).toEqual({ mimeType: "image/png", base64: "QUJD", sizeBytes: 3 });
     expect(rest).toEqual({ path: "/tmp/pic.png" });
     expect(rest).not.toHaveProperty("__image");
   });

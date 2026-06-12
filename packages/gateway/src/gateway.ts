@@ -211,6 +211,7 @@ export class Gateway {
           output: { approvalRequired: gate.approvalId },
           approval: "denied",
           durationMs: Date.now() - start,
+          sessionId: ctx.sessionId,
         });
         return {
           ok: false,
@@ -235,6 +236,7 @@ export class Gateway {
         output: safe,
         approval: requirement === "none" ? "not-required" : "approved",
         durationMs: Date.now() - start,
+        sessionId: ctx.sessionId,
       });
       return { ok: true, data: safe };
     } catch (e) {
@@ -248,6 +250,7 @@ export class Gateway {
         approval: requirement === "none" ? "not-required" : "approved",
         durationMs: Date.now() - start,
         error: msg,
+        sessionId: ctx.sessionId,
       });
       return { ok: false, error: msg };
     }
@@ -263,7 +266,7 @@ export class Gateway {
     if (this.approvals.hasSessionGrant(ctx.sessionId, tool)) {
       return { allowed: true };
     }
-    const approved = this.approvals.findApprovedForTool(tool);
+    const approved = this.approvals.findApprovedForTool(tool, ctx.sessionId);
     if (approved) {
       this.approvals.consume(approved.id);
       log.info(`consumed approval ${approved.id} for ${tool}`);
