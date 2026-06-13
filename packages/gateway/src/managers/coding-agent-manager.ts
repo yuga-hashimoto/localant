@@ -203,6 +203,39 @@ export class CodingAgentManager {
     return { taskId: id, branch, warning };
   }
 
+  /**
+   * Run an agent to completion (blocking) and return the raw exec outcome.
+   * Used by the Autopilot engine, which needs a deterministic exit code /
+   * stdout / stderr to classify failures and decide fallbacks — unlike
+   * `startTask`, which detaches and returns a task id immediately.
+   *
+   * No repo lock is taken here: the engine serializes its own attempts per cwd.
+   */
+  async runBlocking(
+    agent: string,
+    opts: { cwd: string; prompt: string; stage: "plan" | "execute"; timeoutMs?: number; createBranch?: boolean; branchName?: string },
+  ): Promise<{ code: number | null; stdout: string; stderr: string; timedOut: boolean; branch?: string; spawnFailed: boolean }> {
+    const cfg = this.agentConfig(agent);
+    if (!cfg.enabled) throw new Error(`Agent '${agent}' is disabled in config.`);
+
+    let branch: string | undefined;
+    if (opts.stage === "execute" && opts.createBranch !== false) {
+      branch = opts.branchName ?? `cla/autopilot-${agent}-${Date.now()}`;
+      await this.git.createBranch(opts.cwd, branch);
+    }
+
+    const isYolo = this.config().security.mode === "yolo";
+    const stageArgs = opts.stage === "plan" ? cfg.planArgs : cfg.executeArgs;
+    const baseArgs = [...cfg.args, ...stageArgs, ...(isYolo ? cfg.dangerArgs : [])];
+    const args = assembleAgentArgs(baseArgs, opts.prompt);
+    const res = await execFileSafe(cfg.command, args, {
+      cwd: opts.cwd,
+      timeoutMs: opts.timeoutMs ?? cfg.timeoutMs,
+      maxOutputBytes: 500_000,
+    });
+    return { code: res.code, stdout: res.stdout, stderr: res.stderr, timedOut: res.timedOut, branch, spawnFailed: res.code === null };
+  }
+
   getTask(id: string) {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);

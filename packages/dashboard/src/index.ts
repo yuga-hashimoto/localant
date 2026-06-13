@@ -626,6 +626,15 @@ const VIEWS = {
       +'</div>'
       +'</div>'
 
+      +'<div class="card"><h2>Autopilot Settings</h2>'
+      +'<p class="muted" style="margin-top:0">ChatGPT delegates local work through the single <code>autopilot</code> tool — it never names a backend. These settings pick the automation provider (Claude Code, Codex, opencode, OpenClaw, Antigravity, Hermes) and the fallback chain.</p>'
+      +'<div class="field"><label>Primary provider</label><select id="apPrimary" style="width:220px"></select></div>'
+      +'<div class="field"><label>Providers (enabled)</label><div id="apProviders"></div></div>'
+      +'<div class="field"><label>Fallback chain (tried in order after the primary fails)</label><ul id="apFallbacks" style="padding-left:0;list-style:none;margin:0 0 8px"></ul>'
+        +'<div class="row" style="gap:8px"><select id="apAddFb" style="width:200px"></select><button class="btn ghost sm" id="apAddFbBtn">Add to chain</button></div></div>'
+      +'<div class="field"><label>Fallback policy (advance to the next provider when…)</label><div id="apPolicy"></div></div>'
+      +'</div>'
+
       +'<div class="card"><h2>Auth token</h2>'
       +'<p class="muted" style="margin-top:0">The token authenticates ChatGPT (it is embedded in the MCP URL). Keep it secret.</p>'
       +'<div class="row" style="gap:8px"><input type="password" id="authTok" value="" placeholder="•••••••• (click Reveal)" readonly style="flex:1" /><button class="btn ghost sm" id="authReveal">Reveal</button><button class="btn ghost sm" id="authCopy">Copy</button></div>'
@@ -673,6 +682,68 @@ const VIEWS = {
     document.getElementById('secMode').onchange=async(e)=>{ try{ await saveSec({mode:e.target.value}); toast('Mode → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('approveRisk1').onchange=async(e)=>{ try{ await saveSec({approveRisk1:e.target.checked}); toast('Saved'); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('toolProfile').onchange=async(e)=>{ try{ await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tools:{profile:e.target.value}})}); toast('Tool profile → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
+
+    // --- Autopilot Settings ---
+    (function(){
+      var APLABELS={'claude-code':'Claude Code','codex':'Codex','opencode':'opencode','openclaw':'OpenClaw','antigravity-cli':'Antigravity (agy)','hermes-agent':'Hermes Agent'};
+      var POLICY=[['onTimeout','Timeout'],['onNonZeroExit','Non-zero exit'],['onEmptyOutput','Empty output'],['onNoChanges','No changes'],['onRateLimit','Rate / usage limit'],['onCommandNotFound','Command not found'],['onSafetyBlock','Safety block (off by default)'],['onApprovalRequired','Approval required (off by default)']];
+      var apIds=Object.keys(c.codingAgents||{});
+      if(!apIds.length) return;
+      var st=JSON.parse(JSON.stringify(c.autopilot||{}));
+      st.primary=apIds.indexOf(st.primary)!==-1?st.primary:apIds[0];
+      st.fallbacks=(st.fallbacks||[]).filter(function(x){return apIds.indexOf(x)!==-1;});
+      st.providers=st.providers||{};
+      st.fallbackPolicy=st.fallbackPolicy||{};
+      function lbl(id){return APLABELS[id]||id;}
+      function enabled(id){return !(st.providers[id]&&st.providers[id].enabled===false);}
+      function save(){return api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({autopilot:st})});}
+      function ok(){toast('Saved');}
+      function err(e){toast(e.message,'err');}
+      function paintPrimary(){
+        var sel=document.getElementById('apPrimary'); if(!sel)return;
+        sel.innerHTML=apIds.map(function(id){return '<option value="'+esc(id)+'"'+(st.primary===id?' selected':'')+'>'+esc(lbl(id))+'</option>';}).join('');
+        sel.onchange=function(e){ st.primary=e.target.value; save().then(function(){toast('Primary → '+lbl(st.primary));}).catch(err); };
+      }
+      function paintProviders(){
+        var d=document.getElementById('apProviders'); if(!d)return; d.innerHTML='';
+        apIds.forEach(function(id){
+          var lab=el('<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:4px"><input type="checkbox"'+(enabled(id)?' checked':'')+' style="width:auto"/> '+esc(lbl(id))+'</label>');
+          lab.querySelector('input').onchange=function(e){ st.providers[id]={enabled:e.target.checked}; save().then(ok).catch(err); };
+          d.appendChild(lab);
+        });
+      }
+      function paintFallbacks(){
+        var ul=document.getElementById('apFallbacks'); if(!ul)return; ul.innerHTML='';
+        if(!st.fallbacks.length){ ul.innerHTML='<li class="muted">None — primary only.</li>'; return; }
+        st.fallbacks.forEach(function(id,i){
+          var li=el('<li style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1"><code>'+esc(lbl(id))+'</code></span></li>');
+          var up=el('<button class="btn ghost sm">↑</button>'); up.disabled=i===0; up.onclick=function(){ var a=st.fallbacks,t=a[i-1]; a[i-1]=a[i]; a[i]=t; save().then(paintFallbacks).catch(err); };
+          var dn=el('<button class="btn ghost sm">↓</button>'); dn.disabled=i===st.fallbacks.length-1; dn.onclick=function(){ var a=st.fallbacks,t=a[i+1]; a[i+1]=a[i]; a[i]=t; save().then(paintFallbacks).catch(err); };
+          var rm=el('<button class="btn ghost sm">Remove</button>'); rm.onclick=function(){ st.fallbacks=st.fallbacks.filter(function(x){return x!==id;}); save().then(function(){paintFallbacks();paintAdd();}).catch(err); };
+          li.appendChild(up); li.appendChild(dn); li.appendChild(rm); ul.appendChild(li);
+        });
+      }
+      function paintAdd(){
+        var sel=document.getElementById('apAddFb'); if(!sel)return;
+        var avail=apIds.filter(function(id){return st.fallbacks.indexOf(id)===-1&&id!==st.primary;});
+        sel.innerHTML=avail.map(function(id){return '<option value="'+esc(id)+'">'+esc(lbl(id))+'</option>';}).join('');
+        sel.disabled=!avail.length;
+        var btn=document.getElementById('apAddFbBtn'); if(btn)btn.disabled=!avail.length;
+      }
+      function paintPolicy(){
+        var d=document.getElementById('apPolicy'); if(!d)return; d.innerHTML='';
+        POLICY.forEach(function(p){
+          var def=!(p[0]==='onSafetyBlock'||p[0]==='onApprovalRequired');
+          var val=st.fallbackPolicy[p[0]]; if(val===undefined)val=def;
+          var lab=el('<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:4px"><input type="checkbox"'+(val?' checked':'')+' style="width:auto"/> '+esc(p[1])+'</label>');
+          lab.querySelector('input').onchange=function(e){ st.fallbackPolicy[p[0]]=e.target.checked; save().then(ok).catch(err); };
+          d.appendChild(lab);
+        });
+      }
+      var addBtn=document.getElementById('apAddFbBtn');
+      if(addBtn)addBtn.onclick=function(){ var sel=document.getElementById('apAddFb'); if(sel&&sel.value){ st.fallbacks.push(sel.value); save().then(function(){paintFallbacks();paintAdd();}).catch(err); } };
+      paintPrimary(); paintProviders(); paintFallbacks(); paintAdd(); paintPolicy();
+    })();
 
     const authTok=document.getElementById('authTok');
     document.getElementById('authReveal').onclick=action(document.getElementById('authReveal'),async()=>{

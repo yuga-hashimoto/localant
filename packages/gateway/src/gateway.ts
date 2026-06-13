@@ -28,6 +28,8 @@ import { CodingAgentManager } from "./managers/coding-agent-manager.js";
 import { AssetManager } from "./managers/asset-manager.js";
 import { TunnelManager } from "./managers/tunnel-manager.js";
 import { McpBridge } from "./managers/mcp-bridge.js";
+import { ProviderRegistry } from "./autopilot/provider-registry.js";
+import { AutopilotEngine } from "./autopilot/engine.js";
 import { ToolRegistry, type ToolCallContext } from "./registry.js";
 
 const log = createLogger("gateway");
@@ -67,6 +69,8 @@ export class Gateway {
   readonly shell: ShellManager;
   readonly skills: SkillRuntime;
   readonly agents: CodingAgentManager;
+  readonly providers: ProviderRegistry;
+  readonly autopilot: AutopilotEngine;
   readonly tunnel: TunnelManager;
   readonly bridge: McpBridge;
   readonly registry = new ToolRegistry();
@@ -120,6 +124,10 @@ export class Gateway {
     this.shell = new ShellManager(this.commandGuard, this.pathGuard, () => this.cfg);
     this.skills = new SkillRuntime(this.paths, (names) => this.resolveSecrets(names));
     this.agents = new CodingAgentManager(() => this.cfg, this.git, this.commandGuard, this.pathGuard);
+    // Autopilot wraps the coding-agent CLIs as internal providers. The agents
+    // are no longer public tools; ChatGPT reaches them only via `autopilot`.
+    this.providers = new ProviderRegistry(() => this.cfg, this.agents, this.git);
+    this.autopilot = new AutopilotEngine(() => this.cfg, this.providers, this.pathGuard);
     this.tunnel = new TunnelManager(
       () => this.cfg,
       (patch) => {
@@ -193,7 +201,7 @@ export class Gateway {
         ok: false,
         error:
           `Tool "${name}" is not available in the "${profile}" tool profile. ` +
-          `Use shell_run_allowed_command, a coding agent (coding_agent_start_task), ` +
+          `Use shell_run_allowed_command, the high-level autopilot tool, ` +
           `or a skill (skill_run) instead — or set tools.profile to "full" in the config.`,
       };
     }

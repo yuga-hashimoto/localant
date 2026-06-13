@@ -60,14 +60,7 @@ export function registerAliasTools(gw: Gateway): void {
   // web browsing, which it already does). ---
   registerAlias(gw, "browser_wait", "browser_wait_for");
 
-  // --- Agent delegation ---
-  registerAlias(gw, "agent_list", "coding_agent_list");
-  registerAlias(gw, "agent_status", "coding_agent_status");
-  registerAlias(gw, "agent_plan", "coding_agent_plan");
-  registerAlias(gw, "agent_continue", "coding_agent_continue_task");
-  registerAlias(gw, "agent_stop", "coding_agent_stop_task");
-  registerAlias(gw, "agent_get_logs", "coding_agent_get_logs");
-  registerAlias(gw, "agent_get_result", "coding_agent_get_result");
-  registerAlias(gw, "agent_get_diff", "coding_agent_get_diff");
-  registerAlias(gw, "agent_run_validation", "coding_agent_run_validation");
+  // NOTE: agent_* / coding_agent_* delegation aliases were retired. The agent
+  // CLIs are no longer public tools — ChatGPT delegates via the high-level
+  // `autopilot` tool, which selects an internal provider from Autopilot Settings.
 }

@@ -2,7 +2,6 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WidgetDef } from "./runtime.js";
 import { imageViewer } from "./image-viewer.js";
 import { approvalCenter } from "./approval-center.js";
-import { codingAgentPanel } from "./coding-agent-panel.js";
 import { gitPanel } from "./git-panel.js";
 import { shellPanel } from "./shell-panel.js";
 import { browserPanel } from "./browser-panel.js";
@@ -19,7 +18,6 @@ const APPS_RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 export const WIDGETS: readonly WidgetDef[] = [
   imageViewer,
   approvalCenter,
-  codingAgentPanel,
   gitPanel,
   shellPanel,
   browserPanel,

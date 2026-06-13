@@ -251,11 +251,36 @@ describe("project validation", () => {
 });
 
 describe("agent / removed-tool surface", () => {
-  it("agent_list alias resolves to coding_agent_list", async () => {
+  it("no longer registers the per-agent delegation tools (autopilot subsumes them)", () => {
     const g = gw();
-    const res = await g.executeTool("agent_list", {}, { caller: "test" });
-    expect(res.ok).toBe(true);
-    expect(Array.isArray(res.data)).toBe(true);
+    for (const name of [
+      "agent_run",
+      "agent_list",
+      "agent_plan",
+      "coding_agent_list",
+      "coding_agent_start_task",
+      "coding_agent_continue_task",
+      "localant_autopilot_start",
+    ]) {
+      expect(g.registry.get(name), `${name} should not be registered`).toBeUndefined();
+    }
+  });
+
+  it("registers the high-level autopilot tool with no provider/agent argument", () => {
+    const g = gw();
+    const tool = g.registry.get("autopilot");
+    expect(tool).toBeDefined();
+    const shape = (tool!.inputSchema as unknown as { shape: Record<string, unknown> }).shape;
+    expect(Object.keys(shape).sort()).toEqual(["constraints", "cwd", "mode", "task", "timeoutMs"]);
+    // The backend is never named on the ChatGPT-facing surface.
+    expect(tool!.description.toLowerCase()).not.toMatch(/claude|codex|opencode|openclaw|hermes|agy|antigravity/);
+  });
+
+  it("registers the read-only localant_doctor diagnostics tool", () => {
+    const g = gw();
+    const tool = g.registry.get("localant_doctor");
+    expect(tool).toBeDefined();
+    expect(tool!.risk).toBe(0);
   });
 
   it("does not register ChatGPT-duplicate tools (todo/question/webfetch/websearch)", async () => {
