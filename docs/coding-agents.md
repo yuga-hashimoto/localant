@@ -1,7 +1,37 @@
 # Coding Agents
 
-Drive local AI coding agents (Claude Code, Codex, or a custom command) from
-ChatGPT. ChatGPT acts as PM/reviewer; the agent implements locally.
+Drive local AI coding agents (Claude Code, Codex, Antigravity, Hermes, OpenCode,
+OpenClaw, or a custom command) from ChatGPT. ChatGPT acts as PM/reviewer; the
+agent implements locally.
+
+## Supported agents and their invocations
+
+Each CLI has a different non-interactive entry point. LocalAnt ships defaults
+that call each one correctly (the prompt is the trailing positional unless an
+arg contains the `{{prompt}}` placeholder, in which case it is substituted):
+
+| Agent (`agent` id) | Command | Execute | Resume (continue) |
+|---|---|---|---|
+| `claude-code` | `claude` | `claude -p <prompt>` | `claude -p -c <prompt>` |
+| `antigravity-cli` | `agy` | `agy --print <prompt>` | `agy --print -c <prompt>` |
+| `codex` | `codex` | `codex exec --skip-git-repo-check <prompt>` | `codex exec resume --last <prompt>` |
+| `opencode` | `opencode` | `opencode run <prompt>` | `opencode run --continue <prompt>` |
+| `hermes-agent` | `hermes` | `hermes chat -q <prompt>` | `hermes chat --continue -q <prompt>` |
+| `openclaw` | `openclaw` | `openclaw agent --local -m <prompt>` | (same; one agent turn) |
+
+> `--local`/`--skip-git-repo-check` and provider auth (`claude /login`,
+> `codex login`, …) are per-agent prerequisites — LocalAnt invokes the CLI but
+> does not log you in. If an agent returns "not logged in", authenticate that
+> CLI in the same shell environment LocalAnt runs under.
+
+### Turn-based dialogue with the agent
+
+`coding_agent_continue_task` resumes the agent's **previous session** (via each
+CLI's resume flag, configured as `resumeArgs`) on the same work branch. This
+lets ChatGPT hold a back-and-forth: read the agent's output, send a follow-up,
+and the agent continues with its prior context. (True interactive prompting —
+the agent pausing mid-run to ask a question — is not supported; these CLIs run
+one prompt per invocation and have no TTY.)
 
 ## Configure
 
@@ -39,7 +69,8 @@ directory; in `open`/`yolo` mode any path outside the sensitive blocklist works.
 4. coding_agent_get_logs / coding_agent_get_task
 5. coding_agent_run_validation(cwd, command)      # runs the given validate/test command
 6. coding_agent_get_diff(taskId)                  # review the changes
-7. coding_agent_continue_task / coding_agent_stop_task as needed
+7. coding_agent_continue_task (resumes the session for a follow-up turn) /
+     coding_agent_stop_task as needed
 ```
 
 ## Tools

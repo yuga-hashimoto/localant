@@ -23,6 +23,24 @@ interface RunningTask {
   sessionId?: string;
 }
 
+/** Token that, when present in an agent's arg list, is replaced by the prompt.
+ * When absent, the prompt is appended as the trailing positional argument. */
+const PROMPT_PLACEHOLDER = "{{prompt}}";
+
+/**
+ * Assemble the final argv for an agent invocation. Most CLIs take the prompt as
+ * a trailing positional, so by default the prompt is appended. CLIs that need
+ * the prompt in a non-final position (or as a flag value) can place
+ * `{{prompt}}` anywhere in their plan/execute/resume args, and every occurrence
+ * is substituted instead of appending. This keeps simple agents zero-config
+ * while supporting the awkward ones.
+ */
+export function assembleAgentArgs(base: readonly string[], prompt: string): string[] {
+  const hasPlaceholder = base.some((a) => a.includes(PROMPT_PLACEHOLDER));
+  if (!hasPlaceholder) return [...base, prompt];
+  return base.map((a) => a.split(PROMPT_PLACEHOLDER).join(prompt));
+}
+
 /** Resolve a path to its canonical form for use as a repo-lock key. Falls back
  * to the raw path when the directory does not exist yet. */
 function repoKey(cwd: string): string {
@@ -80,7 +98,7 @@ export class CodingAgentManager {
       throw new Error(`Agent binary '${cfg.command}' not found on PATH.`);
     }
     const prompt = `You are in PLAN MODE. Do NOT modify files. Produce a concise implementation plan for:\n\n${task}`;
-    const args = [...cfg.args, ...cfg.planArgs, prompt];
+    const args = assembleAgentArgs([...cfg.args, ...cfg.planArgs], prompt);
     const res = await execFileSafe(cfg.command, args, {
       cwd,
       timeoutMs: cfg.timeoutMs,
@@ -107,7 +125,7 @@ export class CodingAgentManager {
     agent: string,
     cwd: string,
     task: string,
-    opts: { createBranch?: boolean; branchName?: string; sessionId?: string } = {},
+    opts: { createBranch?: boolean; branchName?: string; sessionId?: string; resume?: boolean } = {},
   ): Promise<{ taskId: string; branch?: string; warning?: string }> {
     const cfg = this.agentConfig(agent);
     if (!cfg.enabled) throw new Error(`Agent '${agent}' is disabled in config.`);
@@ -145,7 +163,11 @@ export class CodingAgentManager {
 
     const prompt = `Implement the following task. Run tests/validation when done.\n\n${task}`;
     const isYolo = this.config().security.mode === "yolo";
-    const args = [...cfg.args, ...cfg.executeArgs, ...(isYolo ? cfg.dangerArgs : []), prompt];
+    // Resume continues a prior session for turn-based dialogue; fall back to a
+    // fresh execute invocation when the agent has no resumeArgs configured.
+    const stageArgs = opts.resume && cfg.resumeArgs.length > 0 ? cfg.resumeArgs : cfg.executeArgs;
+    const baseArgs = [...cfg.args, ...stageArgs, ...(isYolo ? cfg.dangerArgs : [])];
+    const args = assembleAgentArgs(baseArgs, prompt);
     // stdin is /dev/null: spawned agents have no TTY, and an open-but-empty
     // stdin pipe makes interactive CLIs hang waiting for input that never EOFs.
     const child = spawn(cfg.command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
@@ -251,7 +273,9 @@ export class CodingAgentManager {
   async continueTask(id: string, task: string): Promise<{ taskId: string; branch?: string }> {
     const t = this.tasks.get(id);
     if (!t) throw new Error(`Task not found: ${id}`);
-    return this.startTask(t.agent, t.cwd, task, { createBranch: false, sessionId: t.sessionId });
+    // Reuse the same branch and resume the agent's prior session so ChatGPT can
+    // hold a turn-based conversation with the agent.
+    return this.startTask(t.agent, t.cwd, task, { createBranch: false, sessionId: t.sessionId, resume: true });
   }
 
   async getDiff(id: string): Promise<string> {
