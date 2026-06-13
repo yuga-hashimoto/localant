@@ -18,6 +18,7 @@ import { registerAdbTools } from "./adb.js";
 import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
 import { registerAdapterTools } from "./adapters.js";
+import { registerAssetTools } from "./assets.js";
 import { registerAliasTools } from "./aliases.js";
 
 /** Register every built-in tool family onto the gateway registry. */
@@ -42,6 +43,7 @@ export function registerAllTools(gw: Gateway): void {
   registerComputerTools(gw);
   registerBrowserTools(gw);
   registerAdapterTools(gw);
+  registerAssetTools(gw);
   // Aliases must run last: they wrap already-registered tools.
   registerAliasTools(gw);
 }

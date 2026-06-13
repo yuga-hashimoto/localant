@@ -359,6 +359,21 @@ article-publisher` first):
 
 Publish actions are **risk 4 (double approval)**. See [docs/articles.md](docs/articles.md).
 
+## Asset bridge (images → repo)
+
+One tool, `asset_save_image`, lands an image produced or referenced in a ChatGPT
+conversation as a real file on disk. `source.kind` selects how the bytes arrive:
+
+- **`base64`** — inline data (best for small generated icons/diagrams; base64 is
+  kept out of the audit log).
+- **`url`** — fetch a public http(s) image, SSRF-guarded (no
+  localhost/private/metadata hosts; redirects re-validated and capped).
+- **`latest_download`** — adopt the newest image from your Downloads folder.
+
+All routes share one validation path (magic-byte sniff → MIME allowlist →
+SVG-safety scan → sha256 → atomic write with backup). Risk 2 (no approval in
+`open` mode). See [docs/asset-bridge.md](docs/asset-bridge.md).
+
 ## Browser automation
 
 Playwright-based (optional peer dependency), using an **isolated profile** by

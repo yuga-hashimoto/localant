@@ -108,6 +108,9 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "move_file",
   "copy_file",
   "delete_file",
+
+  // --- Asset bridge (get conversation images onto the local repo) ---
+  "asset_save_image",
   // dropped duplicates (reachable via the kept name in the comment above):
   //   read_file, read_file_range→fs_read_file_range, write_file, edit_file,
   //   list_files→fs_list_files, search_content, search_files→fs_search_files,

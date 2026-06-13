@@ -20,13 +20,14 @@ in `yolo` mode, so a client is never told a mutating tool is read-only.
 
 ## Tool families
 
-The catalog is ~227 tools. Risk varies *within* a family by operation (a `git_status`
+The catalog is ~228 tools. Risk varies *within* a family by operation (a `git_status`
 is risk 0; a `git_reset --hard` is risk 4), so ranges are shown.
 
 | Family | Tools | Risk range | Notes |
 |--------|------:|------------|-------|
 | Read / Search | 7 | 0 | `read`, `read_file_range`, `grep`, `glob`, `list_files`, `get_file_info`. Never mutates. |
 | Edit | 10 | 2–3 | `write`, `edit`, `multi_edit`, `apply_patch`, `move_file`, `copy_file`, `create_directory`, `delete_file`. |
+| Asset bridge | 1 | 2 | `asset_save_image` — one tool, `source.kind` = `base64` / `url` / `latest_download`. Magic-byte + SSRF + SVG-safety checked. See [asset-bridge.md](asset-bridge.md). |
 | Shell | 16 | 0–3 | `bash`, background shell control, `command_exists`. Screened by CommandGuard + PathGuard. |
 | Git | 22 | 0–4 | Status/diff/log are 0; `git_commit`/`git_add` are 2–3; `git_reset`/destructive ops reach 4. |
 | Validate / Project | 8 | 0–3 | `project_run_tests`/`lint`/`typecheck`/`build`/`validation`; reads scripts at 0. |

@@ -25,6 +25,7 @@ import { GitManager } from "./managers/git-manager.js";
 import { ShellManager } from "./managers/shell-manager.js";
 import { SkillRuntime } from "./managers/skill-runtime.js";
 import { CodingAgentManager } from "./managers/coding-agent-manager.js";
+import { AssetManager } from "./managers/asset-manager.js";
 import { TunnelManager } from "./managers/tunnel-manager.js";
 import { McpBridge } from "./managers/mcp-bridge.js";
 import { ToolRegistry, type ToolCallContext } from "./registry.js";
@@ -60,6 +61,7 @@ export class Gateway {
   readonly pathGuard: PathGuard;
   readonly commandGuard: CommandGuard;
   readonly fs: FsManager;
+  readonly assetBridge: AssetManager;
   readonly git: GitManager;
   readonly lsp: LspService;
   readonly shell: ShellManager;
@@ -112,6 +114,7 @@ export class Gateway {
     this.commandGuard.setMode(this.cfg.security.mode);
 
     this.fs = new FsManager(this.pathGuard, this.paths, () => this.cfg);
+    this.assetBridge = new AssetManager(this.fs, () => this.cfg);
     this.git = new GitManager(this.pathGuard);
     this.lsp = new LspService(this.pathGuard);
     this.shell = new ShellManager(this.commandGuard, this.pathGuard, () => this.cfg);
@@ -203,6 +206,10 @@ export class Gateway {
       return { ok: false, error: `Invalid input for ${name}: ${describeError(e)}` };
     }
 
+    // What gets written to the audit log — a tool may sanitize bulky/sensitive
+    // payloads (e.g. base64 image chunks) out of the recorded input.
+    const auditInput = tool.auditInput ? safeAuditInput(tool, input) : input;
+
     const requirement = approvalRequirementForMode(this.cfg.security.mode, tool.risk, this.cfg.security.approveRisk1);
     if (requirement !== "none") {
       const gate = this.checkApproval(name, tool.risk, requirement, ctx, summarize(tool, input));
@@ -211,7 +218,7 @@ export class Gateway {
           tool: name,
           caller: ctx.caller,
           risk: tool.risk,
-          input,
+          input: auditInput,
           output: { approvalRequired: gate.approvalId },
           approval: "denied",
           durationMs: Date.now() - start,
@@ -236,7 +243,7 @@ export class Gateway {
         tool: name,
         caller: ctx.caller,
         risk: tool.risk,
-        input,
+        input: auditInput,
         output: safe,
         approval: requirement === "none" ? "not-required" : "approved",
         durationMs: Date.now() - start,
@@ -249,7 +256,7 @@ export class Gateway {
         tool: name,
         caller: ctx.caller,
         risk: tool.risk,
-        input,
+        input: auditInput,
         output: null,
         approval: requirement === "none" ? "not-required" : "approved",
         durationMs: Date.now() - start,
@@ -334,6 +341,14 @@ export function approvalRequirementForMode(
   if (mode === "yolo") return "none";
   if (mode === "open") return risk >= 4 ? approvalFor(risk, { approveRisk1 }) : "none";
   return approvalFor(risk, { approveRisk1 });
+}
+
+function safeAuditInput(tool: { auditInput?: (i: any) => unknown }, input: unknown): unknown {
+  try {
+    return tool.auditInput ? tool.auditInput(input) : input;
+  } catch {
+    return "(input omitted)";
+  }
 }
 
 function summarize(tool: { summarize?: (i: any) => string }, input: unknown): string {
