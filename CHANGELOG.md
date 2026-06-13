@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.6] - 2026-06-14
+
+### Added
+- **Autopilot page** (dashboard): a dedicated **Autopilot** tab that answers
+  "which agent runs when ChatGPT calls `autopilot`?". It shows the resolved
+  provider chain with live availability (ready / disabled / CLI not on PATH),
+  and lets you pick the primary provider, enable/disable providers, reorder the
+  fallback chain, and configure the fallback policy — all in one place.
+- **Autopilot test** (read-only): run the real provider chain against a
+  directory in a non-mutating mode (`plan` / `review`) to confirm the
+  configured agent answers — no edits, no branch. Surfaces each attempt in
+  order (ok / skipped / failed + reason) plus the output.
+- New dashboard API: `GET /api/autopilot` (config + resolved order + per-provider
+  availability) and `POST /api/autopilot/test` (mutating modes are coerced to
+  `plan`).
+
+### Changed
+- The Autopilot controls moved out of **Settings** into the new **Autopilot**
+  tab; Settings now links to it.
+
 ## [1.4.5] - 2026-06-14
 
 ### Added

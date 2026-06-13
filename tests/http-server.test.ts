@@ -244,6 +244,42 @@ describe("dashboard api routes", () => {
     expect(res.status).toBe(404);
   });
 
+  it("exposes the autopilot chain, primary and per-provider availability", async () => {
+    const res = await apiGet("autopilot");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      primary: string;
+      fallbacks: string[];
+      order: string[];
+      providersDetail: { id: string; label: string; enabled: boolean; available: boolean }[];
+    };
+    expect(typeof body.primary).toBe("string");
+    expect(Array.isArray(body.order)).toBe(true);
+    const claude = body.providersDetail.find((p) => p.id === "claude-code");
+    expect(claude).toBeDefined();
+    expect(claude!.label).toBe("Claude Code");
+  });
+
+  it("validates the autopilot test endpoint (cwd + task required)", async () => {
+    expect((await apiSend("autopilot/test", "POST", { task: "hi" })).status).toBe(400);
+    expect((await apiSend("autopilot/test", "POST", { cwd: apiBaseDir })).status).toBe(400);
+  });
+
+  it("autopilot test fails clearly when no provider is enabled", async () => {
+    // Disable every provider so the engine refuses to run instead of spawning a
+    // real agent CLI (which would hang waiting on an LLM). Deterministic + fast.
+    const cfg = apiGw.config();
+    const allDisabled = Object.fromEntries(Object.keys(cfg.codingAgents).map((id) => [id, { enabled: false }]));
+    apiGw.saveConfig({ ...cfg, autopilot: { ...cfg.autopilot, providers: allDisabled } });
+    try {
+      const res = await apiSend("autopilot/test", "POST", { cwd: apiBaseDir, task: "summarize" });
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toMatch(/no automation provider/i);
+    } finally {
+      apiGw.saveConfig({ ...apiGw.config(), autopilot: { ...cfg.autopilot, providers: {} } });
+    }
+  });
+
   it("bulk-approves all pending approvals via /approvals/approve-all", async () => {
     apiGw.approvals.create({ tool: "fs_a", risk: 2, requirement: "single", reason: "r", summary: "s", caller: "t" });
     apiGw.approvals.create({ tool: "fs_b", risk: 2, requirement: "single", reason: "r", summary: "s", caller: "t" });
