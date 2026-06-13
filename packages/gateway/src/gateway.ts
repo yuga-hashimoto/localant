@@ -101,6 +101,9 @@ export class Gateway {
     this.vault.migrate();
     this.audit = new AuditLog(this.paths);
     this.audit.setSecretsProvider(() => this.vault.allValues());
+    // Prune audit entries older than the configured retention window (on startup
+    // here, then throttled as new entries are recorded).
+    this.audit.setRetentionProvider(() => this.cfg.security.logRetentionDays);
     this.approvals = new ApprovalStore(this.paths);
 
     this.pathGuard = new PathGuard(this.cfg.security.allowedDirectories);

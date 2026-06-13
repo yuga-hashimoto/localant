@@ -77,7 +77,8 @@ export function registerCodingAgentTools(gw: Gateway): void {
 
   r.register({
     name: "coding_agent_continue_task",
-    description: "Continue a task with additional instructions on the same branch.",
+    description:
+      "Continue a task with additional instructions, resuming the agent's prior session on the same branch. Use this to hold a turn-based back-and-forth with the agent (read its output, then send a follow-up).",
     risk: 3,
     inputSchema: z.object({ taskId: z.string(), task: z.string() }),
     summarize: (i) => `continue task ${i.taskId}`,

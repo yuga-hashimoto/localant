@@ -2,10 +2,19 @@ import fs from "node:fs";
 import { nanoid } from "nanoid";
 import { redact, truncate, type AppPaths, type AuditEntry, type RiskLevel } from "@localant/shared";
 
-/** Append-only audit log backed by a JSONL file. Secrets are redacted. */
+/** How often the log is opportunistically pruned during a long-running process,
+ * on top of the prune performed at startup. */
+const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/** Append-only audit log backed by a JSONL file. Secrets are redacted. Entries
+ * older than the configured retention window are pruned (on startup and
+ * throttled thereafter). */
 export class AuditLog {
   private readonly file: string;
   private secretsProvider: () => string[] = () => [];
+  /** Retention window in days; 0 / non-positive disables pruning. */
+  private retentionDaysProvider: () => number = () => 0;
+  private lastPruneAt = 0;
 
   constructor(paths: AppPaths) {
     this.file = paths.auditLog;
@@ -13,6 +22,12 @@ export class AuditLog {
 
   setSecretsProvider(fn: () => string[]): void {
     this.secretsProvider = fn;
+  }
+
+  /** Wire the retention policy and prune once immediately. */
+  setRetentionProvider(fn: () => number): void {
+    this.retentionDaysProvider = fn;
+    this.prune();
   }
 
   record(entry: {
@@ -41,7 +56,40 @@ export class AuditLog {
       ...(entry.error ? { error: truncate(redact(entry.error, secrets), 500) } : {}),
     };
     fs.appendFileSync(this.file, JSON.stringify(full) + "\n");
+    this.maybePrune();
     return full;
+  }
+
+  /** Run a prune at most once per PRUNE_INTERVAL_MS, so a long-lived process
+   * eventually drops entries that aged past the retention window. */
+  private maybePrune(now = Date.now()): void {
+    if (now - this.lastPruneAt < PRUNE_INTERVAL_MS) return;
+    this.prune(now);
+  }
+
+  /**
+   * Drop entries older than `logRetentionDays`. Rewrites the file atomically
+   * (temp file + rename) only when something is actually removed. Returns the
+   * number of pruned entries. A non-positive retention disables pruning.
+   */
+  prune(now = Date.now()): number {
+    this.lastPruneAt = now;
+    const days = this.retentionDaysProvider();
+    if (!Number.isFinite(days) || days <= 0) return 0;
+    const cutoff = now - days * 24 * 60 * 60 * 1000;
+    const all = this.readAll();
+    if (all.length === 0) return 0;
+    const kept = all.filter((e) => {
+      const t = Date.parse(e.timestamp);
+      // Keep entries with an unparseable timestamp rather than silently dropping.
+      return Number.isNaN(t) || t >= cutoff;
+    });
+    const removed = all.length - kept.length;
+    if (removed === 0) return 0;
+    const tmp = `${this.file}.tmp-${nanoid(6)}`;
+    fs.writeFileSync(tmp, kept.map((e) => JSON.stringify(e)).join("\n") + (kept.length ? "\n" : ""));
+    fs.renameSync(tmp, this.file);
+    return removed;
   }
 
   list(limit = 100, offset = 0): AuditEntry[] {

@@ -8,6 +8,13 @@ Diagnose your environment. Run this first when something isn't working:
 localant doctor
 ```
 
+Add `--json` for a machine-readable report (handy in scripts / CI):
+
+```bash
+localant doctor --json   # { "ok": true, "node": "...", "checks": [...] }
+localant status --json   # { "running": true, "mcpEndpoint": "...", ... }
+```
+
 ## Common issues
 
 ### Gateway won't start — port already in use

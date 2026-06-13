@@ -88,6 +88,25 @@ export class ApprovalStore {
     return updated;
   }
 
+  /** Approve every pending request by one step (scope applied to each).
+   * Returns the number of requests advanced. */
+  approveAllPending(scope: "once" | "session" = "once"): number {
+    let n = 0;
+    for (const r of this.listPending()) {
+      if (this.approve(r.id, scope)) n++;
+    }
+    return n;
+  }
+
+  /** Deny every pending request. Returns the number denied. */
+  denyAllPending(): number {
+    let n = 0;
+    for (const r of this.listPending()) {
+      if (this.deny(r.id)) n++;
+    }
+    return n;
+  }
+
   deny(id: string): ApprovalRequest | undefined {
     const items = this.read();
     const idx = items.findIndex((r) => r.id === id);

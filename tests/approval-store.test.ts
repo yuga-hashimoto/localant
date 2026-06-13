@@ -102,4 +102,30 @@ describe("ApprovalStore", () => {
     expect(s.findApprovedForTool("fs_create_file", "chat-x")?.id).toBe(req.id);
     expect(s.findApprovedForTool("fs_create_file")?.id).toBe(req.id);
   });
+
+  it("approveAllPending advances every pending request and clears the queue", () => {
+    const s = store();
+    s.create({ ...baseReq, requirement: "single" });
+    s.create({ ...baseReq, tool: "fs_delete", requirement: "single" });
+    const n = s.approveAllPending("once");
+    expect(n).toBe(2);
+    expect(s.listPending()).toHaveLength(0);
+  });
+
+  it("approveAllPending with double requirement leaves them pending after one pass", () => {
+    const s = store();
+    s.create({ ...baseReq, requirement: "double" });
+    const n = s.approveAllPending("once");
+    expect(n).toBe(1); // advanced one step…
+    expect(s.listPending()).toHaveLength(1); // …but still needs a second approval
+  });
+
+  it("denyAllPending denies every pending request", () => {
+    const s = store();
+    s.create({ ...baseReq, requirement: "single" });
+    s.create({ ...baseReq, tool: "fs_delete", requirement: "single" });
+    const n = s.denyAllPending();
+    expect(n).toBe(2);
+    expect(s.listPending()).toHaveLength(0);
+  });
 });

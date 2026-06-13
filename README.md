@@ -23,6 +23,16 @@
 
 `LocalAnt` lets you use ChatGPT as the brain and your local computer as the hands.
 
+## Demo
+
+<p align="center">
+  <a href="assets/demo.mp4">
+    <img src="assets/demo.gif" width="100%" alt="LocalAnt demo — ChatGPT reads a repo, fixes a bug, validates, and shows the diff." />
+  </a>
+</p>
+
+<p align="center"><sub>ChatGPT drives a real task on the local machine through LocalAnt. <a href="assets/demo.mp4">▶ Full-quality MP4</a></sub></p>
+
 <table>
   <tr>
     <td width="50%"><b>Before (Task Start)</b></td>
@@ -135,6 +145,9 @@ rejected even in `yolo`).
 localant tools profile coding   # switch profile
 localant tools list             # see what's exposed
 ```
+
+Every tool's risk level (0–4) and how each family is gated is documented in
+[docs/tools.md](docs/tools.md).
 
 Then just ask ChatGPT:
 

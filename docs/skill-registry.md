@@ -30,7 +30,16 @@ Point `config.skillRegistry.sources` at one or more `registry.json` URLs:
 }
 ```
 
-Search with `skill_search_registry({ query })`.
+Search from the CLI:
+
+```bash
+localant skills search            # list everything across configured registries
+localant skills search qiita      # filter by name/description
+localant skills search --json     # machine-readable
+```
+
+or the `skill_search_registry({ query })` tool. Installs are still explicit and
+saved disabled — searching never runs anything.
 
 ## Publishing requirements
 

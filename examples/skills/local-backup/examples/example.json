@@ -1,0 +1,4 @@
+{
+  "local_backup_create": { "dir": "/Users/you/code/myapp", "outDir": "/Users/you/Backups" },
+  "local_backup_list": { "outDir": "/Users/you/Backups" }
+}

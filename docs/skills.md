@@ -82,7 +82,30 @@ Tools: `skill_list`, `skill_info`, `skill_validate`, `skill_enable`,
 `skill_install_from_git`, `skill_publish_to_git`, `skill_uninstall`,
 `skill_permissions`, `skill_update_permissions`, `skill_search_registry`.
 
-CLI: `localant skills <list|info|enable|disable|validate|install|publish>`.
+CLI: `localant skills <new|list|info|enable|disable|validate|search|install|publish>`.
+
+### Scaffold a new skill
+
+```bash
+localant skills new my-skill -d "What it does" --risk 1
+# edit ~/.localant/skills/my-skill/src/index.ts
+localant skills validate my-skill
+localant skills enable my-skill          # requires approval
+```
+
+The skeleton is created **disabled** with a manifest, a typed handler, a test,
+and a README — fill in the handler and tighten the permissions before enabling.
+
+## Example skills
+
+Ready-to-read references live in [`examples/skills/`](../examples/skills):
+
+| Skill | What it shows |
+|-------|---------------|
+| `hello-world` | The minimal shape of a skill (no permissions). |
+| `file-organizer` | Filesystem writes — sort a folder by type/date. A "local hands" chore ChatGPT can't do itself. |
+| `local-backup` | Shell allowlist (`tar` only) — timestamped `.tar.gz` snapshots. |
+| `article-publisher` | Network + secrets + git — publish to Zenn/Qiita/note. |
 
 ## Generating a skill from ChatGPT
 

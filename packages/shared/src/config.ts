@@ -106,6 +106,10 @@ const CodingAgentConfig = z.object({
   args: z.array(z.string()).default([]),
   planArgs: z.array(z.string()).default([]),
   executeArgs: z.array(z.string()).default([]),
+  // Args used to resume/continue a prior session (turn-based dialogue). When a
+  // task is continued and resumeArgs is non-empty, these replace executeArgs so
+  // the agent picks up its previous context. Empty -> continuation starts fresh.
+  resumeArgs: z.array(z.string()).default([]),
   // Flags appended only when security.mode is "yolo" to auto-approve tool use.
   // These differ per agent (e.g. claude/agy use --dangerously-skip-permissions),
   // so they are configured here rather than hardcoded.
@@ -161,7 +165,10 @@ export const ConfigSchema = z.object({
       subdomain: z.string().optional(),
       subdomainConfirmed: z.boolean().default(false),
     })
-    .default({ provider: "tailscale" }),
+    // prefault (not default): parse this partial through the schema so the
+    // other fields' defaults are applied. Zod 4's `.default()` would require a
+    // fully-resolved object.
+    .prefault({ provider: "tailscale" }),
   security: z
     .object({
       mode: z.enum(["strict", "open", "yolo"]).default("open"),
@@ -174,16 +181,23 @@ export const ConfigSchema = z.object({
       commandTimeoutMs: z.number().int().positive().default(120_000),
       logRetentionDays: z.number().int().positive().default(30),
     })
-    .default({}),
+    // prefault: an empty object parsed through the schema yields all defaults.
+    .prefault({}),
   codingAgents: z
     .record(z.string(), CodingAgentConfig)
-    .default({
+    // prefault: each agent literal omits some defaulted fields, so parse the
+    // map through the schema rather than requiring fully-resolved entries.
+    .prefault({
       "claude-code": {
         enabled: true,
         command: "claude",
         args: [],
+        // -p/--print runs a single prompt non-interactively. The prompt is the
+        // trailing positional, so it is appended after these args.
         planArgs: ["-p"],
         executeArgs: ["-p"],
+        // -c/--continue resumes the most recent conversation in the cwd.
+        resumeArgs: ["-p", "-c"],
         dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
@@ -193,8 +207,13 @@ export const ConfigSchema = z.object({
         enabled: true,
         command: "codex",
         args: [],
-        planArgs: [],
-        executeArgs: [],
+        // `codex exec <prompt>` is the non-interactive entry point. Bare
+        // `codex <prompt>` opens the interactive TUI and fails without a TTY.
+        // --skip-git-repo-check lets it run outside a trusted git repo.
+        planArgs: ["exec", "--skip-git-repo-check"],
+        executeArgs: ["exec", "--skip-git-repo-check"],
+        // `codex exec resume --last <prompt>` continues the most recent session.
+        resumeArgs: ["exec", "resume", "--last", "--skip-git-repo-check"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,
@@ -203,8 +222,12 @@ export const ConfigSchema = z.object({
         enabled: true,
         command: "openclaw",
         args: [],
-        planArgs: [],
-        executeArgs: [],
+        // `openclaw agent --local -m <prompt>` runs one embedded agent turn
+        // non-interactively (requires provider API keys in the shell). The bare
+        // command otherwise treats the prompt as an unknown subcommand.
+        planArgs: ["agent", "--local", "-m"],
+        executeArgs: ["agent", "--local", "-m"],
+        resumeArgs: ["agent", "--local", "-m"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,
@@ -217,6 +240,8 @@ export const ConfigSchema = z.object({
         // without a TTY. --print runs a single prompt non-interactively.
         planArgs: ["--print"],
         executeArgs: ["--print"],
+        // -c/--continue resumes the most recent agy conversation.
+        resumeArgs: ["--print", "-c"],
         dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
@@ -226,8 +251,13 @@ export const ConfigSchema = z.object({
         enabled: true,
         command: "hermes",
         args: [],
-        planArgs: [],
-        executeArgs: [],
+        // `hermes chat -q <prompt>` is the single-query non-interactive mode.
+        // The bare prompt was previously passed as a subcommand and rejected.
+        planArgs: ["chat", "-q"],
+        executeArgs: ["chat", "-q"],
+        // --continue resumes the most recent hermes session.
+        resumeArgs: ["chat", "--continue", "-q"],
+        dangerArgs: ["--yolo"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,
@@ -236,8 +266,10 @@ export const ConfigSchema = z.object({
         enabled: true,
         command: "opencode",
         args: [],
-        planArgs: [],
-        executeArgs: [],
+        // `opencode run <prompt>` runs non-interactively.
+        planArgs: ["run"],
+        executeArgs: ["run"],
+        resumeArgs: ["run", "--continue"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,

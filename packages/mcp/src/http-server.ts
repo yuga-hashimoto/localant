@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile, DEFAULT_SESSION_ID } from "@localant/shared";
+import type { McpServerConfigT } from "@localant/shared";
 import { commandExists, resolveTailscale, closeBrowserSession, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
@@ -436,6 +437,12 @@ function mountDashboardApi(
     s.json({ token });
   });
   r.get("/approvals", (_q, s) => s.json(gw.approvals.listPending()));
+  // Bulk routes are registered before the :id routes so "approve-all" / "deny-all"
+  // are never captured as an :id.
+  r.post("/approvals/approve-all", (q, s) =>
+    s.json({ approved: gw.approvals.approveAllPending(q.body?.scope === "session" ? "session" : "once") }),
+  );
+  r.post("/approvals/deny-all", (_q, s) => s.json({ denied: gw.approvals.denyAllPending() }));
   r.post("/approvals/:id/approve", (q, s) => s.json(gw.approvals.approve(q.params.id, q.body?.scope === "session" ? "session" : "once") ?? { error: "not found" }));
   r.post("/approvals/:id/deny", (q, s) => s.json(gw.approvals.deny(q.params.id) ?? { error: "not found" }));
   r.get("/audit", (q, s) => {
@@ -607,7 +614,9 @@ function mountDashboardApi(
   });
 
   r.get("/mcp-servers", (_q, s) => {
-    const servers = gw.config().mcpServers;
+    // Zod 4 infers the refined record's value as `unknown`; the runtime shape is
+    // McpServerConfigT, so narrow it explicitly for the response mapping.
+    const servers = gw.config().mcpServers as Record<string, McpServerConfigT>;
     s.json(
       Object.entries(servers).map(([name, cfg]) => ({
         name,
@@ -752,23 +761,38 @@ function listen(app: express.Express, port: number, host: string): Promise<http.
   });
 }
 
+/**
+ * Render a human-readable type string for a Zod field. Handles both Zod 4
+ * (`_def.type` is a lowercase kind, e.g. "optional"/"array"/"enum") and the
+ * legacy Zod 3 shape (`_def.typeName`, e.g. "ZodOptional") so the introspection
+ * survives the version bump.
+ */
 function getZodTypeString(f: any): string {
-  if (!f || !f._def) return "unknown";
-  const typeName = f._def.typeName;
-  if (typeName === "ZodOptional") {
-    return `${getZodTypeString(f._def.innerType)} (optional)`;
+  const def = f?._def;
+  if (!def) return "unknown";
+  // Zod 4 uses `type`; Zod 3 used `typeName`. Normalize to a lowercase kind.
+  const kind = String(def.type ?? def.typeName ?? "").replace(/^Zod/, "").toLowerCase();
+  switch (kind) {
+    case "optional":
+      return `${getZodTypeString(def.innerType)} (optional)`;
+    case "nullable":
+      return `${getZodTypeString(def.innerType)} (nullable)`;
+    case "default":
+    case "catch":
+      // Unwrap wrappers that don't change the surfaced type.
+      return getZodTypeString(def.innerType);
+    case "array":
+      // Zod 4: element; Zod 3: type.
+      return `${getZodTypeString(def.element ?? def.type)}[]`;
+    case "enum": {
+      // Zod 4: entries map; Zod 3: values array.
+      const values = def.entries ? Object.keys(def.entries) : (def.values ?? []);
+      return `enum (${values.join(" | ")})`;
+    }
+    case "pipe":
+    case "effects":
+      return getZodTypeString(def.schema ?? def.in ?? def.out);
+    default:
+      return kind || "unknown";
   }
-  if (typeName === "ZodNullable") {
-    return `${getZodTypeString(f._def.innerType)} (nullable)`;
-  }
-  if (typeName === "ZodArray") {
-    return `${getZodTypeString(f._def.type)}[]`;
-  }
-  if (typeName === "ZodEnum") {
-    return `enum (${f._def.values.join(" | ")})`;
-  }
-  if (typeName === "ZodEffects") {
-    return getZodTypeString(f._def.schema);
-  }
-  return typeName.replace(/^Zod/, "").toLowerCase();
 }

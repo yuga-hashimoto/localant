@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import { createLogger, type Config } from "@localant/shared";
-import { commandExists, execFileSafe } from "../util/exec.js";
+import { commandExists, execFileSafe, resolveExecutable } from "../util/exec.js";
 
 const log = createLogger("tunnel");
 
@@ -217,7 +217,7 @@ export class TunnelManager {
       } else {
         args = ["tunnel", "--url", `http://127.0.0.1:${port}`];
       }
-      const child = spawn("cloudflared", args, { shell: false });
+      const child = spawn(resolveExecutable("cloudflared"), args, { shell: false });
       this.child = child;
 
       if (cfg.token) {
@@ -260,7 +260,7 @@ export class TunnelManager {
       if (cfg.token) {
         args.push("--authtoken", cfg.token);
       }
-      const child = spawn("ngrok", args, { shell: false });
+      const child = spawn(resolveExecutable("ngrok"), args, { shell: false });
       this.child = child;
       const onData = (buf: Buffer) => {
         const text = buf.toString("utf8");
