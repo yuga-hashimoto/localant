@@ -15,8 +15,10 @@ import type { ToolCallContext } from "../registry.js";
  * State is keyed per MCP session so that separate ChatGPT chats drive their own
  * browser + page and never overwrite each other's tab.
  */
-type PwPage = { goto: (u: string) => Promise<unknown>; url: () => string; screenshot: (o: { path: string }) => Promise<unknown>; content: () => Promise<string>; innerText: (s: string) => Promise<string>; click: (s: string) => Promise<unknown>; fill: (s: string, v: string) => Promise<unknown>; waitForSelector: (s: string, o?: unknown) => Promise<unknown>; pdf: (o: { path: string }) => Promise<unknown>; keyboard: { press: (k: string) => Promise<unknown> }; selectOption: (s: string, v: string) => Promise<unknown>; evaluate: (fn: string) => Promise<unknown>; mouse: { wheel: (x: number, y: number) => Promise<unknown> }; on: (ev: string, cb: (msg: { text: () => string }) => void) => void; };
+type PwPage = { goto: (u: string) => Promise<unknown>; title: () => Promise<string>; url: () => string; screenshot: (o: { path: string }) => Promise<unknown>; content: () => Promise<string>; innerText: (s: string) => Promise<string>; click: (s: string) => Promise<unknown>; fill: (s: string, v: string) => Promise<unknown>; waitForSelector: (s: string, o?: unknown) => Promise<unknown>; pdf: (o: { path: string }) => Promise<unknown>; keyboard: { press: (k: string) => Promise<unknown> }; selectOption: (s: string, v: string) => Promise<unknown>; evaluate: (fn: string) => Promise<unknown>; mouse: { wheel: (x: number, y: number) => Promise<unknown> }; on: (ev: string, cb: (msg: { text: () => string }) => void) => void; };
 type PwBrowser = { newPage: () => Promise<PwPage>; close: () => Promise<unknown> };
+type PlaywrightRuntime = { chromium: { launch: (o?: unknown) => Promise<PwBrowser> } };
+type PlaywrightImportShape = Partial<PlaywrightRuntime> & { default?: Partial<PlaywrightRuntime> };
 
 interface BrowserSession {
   browser?: PwBrowser;
@@ -58,19 +60,38 @@ export async function closeBrowserSession(sessionId: string): Promise<void> {
   sessions.delete(sessionId);
 }
 
-async function loadPlaywright(): Promise<{ chromium: { launch: (o?: unknown) => Promise<PwBrowser> } }> {
-  type Pw = { chromium: { launch: (o?: unknown) => Promise<PwBrowser> } };
+/**
+ * Normalize both ESM and CommonJS Playwright module shapes.
+ *
+ * `playwright` is published as CommonJS today. Dynamic `import()` from ESM may
+ * therefore return `{ default: { chromium } }` instead of `{ chromium }`,
+ * depending on Node/version/resolution path. Without this normalization the
+ * native browser tools fail at runtime with `chromium` undefined.
+ */
+export function normalizePlaywrightModule(mod: unknown): PlaywrightRuntime {
+  const imported = mod as PlaywrightImportShape;
+  const runtime = imported.chromium ? imported : imported.default;
+  if (typeof runtime?.chromium?.launch !== "function") {
+    throw new Error(
+      "Playwright is installed, but LocalAnt could not load its Chromium launcher. " +
+        "Try `localant deps install browser` again or reinstall Playwright manually.",
+    );
+  }
+  return runtime as PlaywrightRuntime;
+}
+
+async function loadPlaywright(): Promise<PlaywrightRuntime> {
   // Prefer normal resolution (dev tree / bundled installs); fall back to the
   // isolated optional-deps dir that `localant deps install browser` populates.
   try {
     // @ts-ignore optional dependency resolved at runtime (may be absent at build time)
-    return (await import("playwright")) as Pw;
+    return normalizePlaywrightModule(await import("playwright"));
   } catch {
     /* not resolvable from here — try the optional-deps dir below */
   }
   const entry = resolveOptionalDep("playwright");
   if (entry) {
-    return (await import(pathToFileURL(entry).href)) as Pw;
+    return normalizePlaywrightModule(await import(pathToFileURL(entry).href));
   }
   throw new Error(
     "Playwright is not installed. Enable browser tools with `localant deps install browser` " +
@@ -113,7 +134,7 @@ export function registerBrowserTools(gw: Gateway): void {
       s.consoleLogs.length = 0;
       s.page.on("console", (msg) => s.consoleLogs.push(msg.text()));
       await s.page.goto(i.url);
-      return { opened: i.url, isolatedProfile: !s.useDefaultProfile };
+      return { opened: i.url, title: await s.page.title(), isolatedProfile: !s.useDefaultProfile };
     },
   });
 
