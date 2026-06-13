@@ -4,7 +4,7 @@ import { nanoid } from "nanoid";
 import type { CodingAgentConfig, Config } from "@localant/shared";
 import type { CommandGuard } from "../security/command-guard.js";
 import type { PathGuard } from "../security/path-guard.js";
-import { commandExists, execFileSafe } from "../util/exec.js";
+import { commandExists, execFileSafe, resolveExecutable } from "../util/exec.js";
 import type { GitManager } from "./git-manager.js";
 
 interface RunningTask {
@@ -170,7 +170,7 @@ export class CodingAgentManager {
     const args = assembleAgentArgs(baseArgs, prompt);
     // stdin is /dev/null: spawned agents have no TTY, and an open-but-empty
     // stdin pipe makes interactive CLIs hang waiting for input that never EOFs.
-    const child = spawn(cfg.command, args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(resolveExecutable(cfg.command), args, { cwd, shell: false, stdio: ["ignore", "pipe", "pipe"] });
     const rec: RunningTask = {
       id,
       agent,

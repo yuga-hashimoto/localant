@@ -32,7 +32,11 @@ open an issue or discussion to propose changes. Items are not commitments.
 - [ ] Optional richer dashboard (React/Vite) as a separate workspace
 - [ ] More coding agents beyond Claude Code / Codex
 - [ ] Signed skills and a trust policy for third-party skills
-- [ ] Windows-first parity pass (paths, ADB, browser profiles)
+- [ ] Windows-first parity pass (paths, ADB, browser profiles) — _in progress_:
+      config/data paths use `os.homedir()`; shell selection uses `cmd /c`;
+      external CLIs (agents, cloudflared, ngrok) now resolve `.cmd`/`.exe`
+      shims via PATHEXT (`resolveExecutable`). Still needs verification on a real
+      Windows host + ADB/browser-profile audit.
 
 ## Ideas / discussion
 
