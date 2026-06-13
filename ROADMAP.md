@@ -17,7 +17,7 @@ open an issue or discussion to propose changes. Items are not commitments.
 
 - [ ] One-command setup recording / demo GIF in the README
 - [x] `localant skills new <name>` scaffolder for the skill SDK
-- [ ] Skill registry: browse/search/install from curated sources
+- [x] Skill registry: browse/search/install from curated sources (`localant skills search`)
 - [ ] Per-session approval UX improvements in the dashboard
 - [ ] Listing on the MCP registry and awesome-mcp-servers (drafts in [docs/distribution.md](docs/distribution.md))
 - [x] Japanese README (`README.ja.md`); `docs/` parity still pending

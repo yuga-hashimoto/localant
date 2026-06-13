@@ -468,6 +468,25 @@ skills.command("validate <name>").action((name) => {
   const gw = createGateway();
   console.log(JSON.stringify(gw.skills.validate(name), null, 2));
 });
+skills
+  .command("search [query]")
+  .description("Search configured skill registries for skills to install")
+  .option("--json", "output results as JSON")
+  .action(async (query: string | undefined, o) => {
+    const gw = createGateway();
+    const res = await gw.executeTool("skill_search_registry", { query: query ?? "" }, { caller: "cli" });
+    const data = res.data as { results: { name: string; description?: string; source: string }[]; sources: string[] };
+    if (o.json) return console.log(JSON.stringify(res.data, null, 2));
+    if (!data.sources.length) {
+      console.log(warn("No skill registries configured. Add sources under config.skillRegistry.sources."));
+      return;
+    }
+    if (!data.results.length) return console.log("No matching skills found.");
+    for (const s of data.results) {
+      console.log(`${c.bold(s.name)} ${c.gray(s.description ?? "")}`);
+      console.log(`  ${c.cyan(s.source)} — install: localant skills install <git-url>`);
+    }
+  });
 skills.command("install <gitUrl>").action(async (url) => {
   const gw = createGateway();
   const res = await gw.executeTool("skill_install_from_git", { url }, { caller: "cli" });
