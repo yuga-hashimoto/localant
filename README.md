@@ -361,18 +361,18 @@ Publish actions are **risk 4 (double approval)**. See [docs/articles.md](docs/ar
 
 ## Asset bridge (images → repo)
 
-Land an image produced or referenced in a ChatGPT conversation as a real file on
-disk, via three routes that share one validation path (magic-byte sniff → MIME
-allowlist → SVG-safety scan → sha256 → atomic write with backup):
+One tool, `asset_save_image`, lands an image produced or referenced in a ChatGPT
+conversation as a real file on disk. `source.kind` selects how the bytes arrive:
 
-- **base64 chunk relay** — `asset_receive_start/chunk/commit` stream the bytes
-  in (base64 payloads are kept out of the audit log).
-- **URL import** — `asset_import_url` fetches a public image URL, SSRF-guarded
-  (no localhost/private/metadata hosts; redirects re-validated and capped).
-- **latest download** — `asset_import_latest_download` adopts the newest image
-  from your Downloads folder.
+- **`base64`** — inline data (best for small generated icons/diagrams; base64 is
+  kept out of the audit log).
+- **`url`** — fetch a public http(s) image, SSRF-guarded (no
+  localhost/private/metadata hosts; redirects re-validated and capped).
+- **`latest_download`** — adopt the newest image from your Downloads folder.
 
-Risk 1–2 (no approval in `open` mode). See [docs/asset-bridge.md](docs/asset-bridge.md).
+All routes share one validation path (magic-byte sniff → MIME allowlist →
+SVG-safety scan → sha256 → atomic write with backup). Risk 2 (no approval in
+`open` mode). See [docs/asset-bridge.md](docs/asset-bridge.md).
 
 ## Browser automation
 

@@ -11,7 +11,7 @@ export { assembleAgentArgs } from "./managers/coding-agent-manager.js";
 export { resolveTailscale, tailscaleEnv } from "./managers/tunnel-manager.js";
 export { PathGuard, PathAccessError } from "./security/path-guard.js";
 export { AssetManager } from "./managers/asset-manager.js";
-export type { AssetResult } from "./managers/asset-manager.js";
+export type { AssetResult, AssetSource } from "./managers/asset-manager.js";
 export { detectImageMime, looksLikeSvg, svgHasActiveContent, extensionForMime } from "./util/image-bytes.js";
 export type { ImageMime } from "./util/image-bytes.js";
 export { assertSafeUrl, isPrivateAddress, SsrfError } from "./util/ssrf.js";

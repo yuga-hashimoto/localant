@@ -2,7 +2,15 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { createGateway, detectImageMime, looksLikeSvg, svgHasActiveContent, assertSafeUrl, isPrivateAddress, SsrfError } from "@localant/gateway";
+import {
+  createGateway,
+  detectImageMime,
+  looksLikeSvg,
+  svgHasActiveContent,
+  assertSafeUrl,
+  isPrivateAddress,
+  SsrfError,
+} from "@localant/gateway";
 import type { Gateway } from "@localant/gateway";
 
 let base: string;
@@ -17,6 +25,11 @@ const PNG = Buffer.from(
 
 function ctx() {
   return { caller: "test" };
+}
+
+/** Convenience: call the single asset tool. */
+function save(source: unknown, destination: string, overwrite = false) {
+  return gw.executeTool("asset_save_image", { source, destination, overwrite }, ctx());
 }
 
 beforeEach(() => {
@@ -76,115 +89,80 @@ describe("ssrf guard", () => {
   });
 });
 
-describe("base64 chunk relay", () => {
-  it("transfers, validates and writes an image across chunks", async () => {
+describe("asset_save_image — base64 source", () => {
+  it("validates and writes an inline base64 image", async () => {
     const dest = path.join(workdir, "out.png");
     const sha = crypto.createHash("sha256").update(PNG).digest("hex");
-
-    const startRes = await gw.executeTool(
-      "asset_receive_start",
-      { fileName: "x.png", totalBytes: PNG.length, destination: dest, sha256: sha },
-      ctx(),
-    );
-    expect(startRes.ok).toBe(true);
-    const transferId = (startRes.data as { transferId: string }).transferId;
-
-    // Split into two chunks.
-    const mid = Math.floor(PNG.length / 2);
-    const c0 = PNG.subarray(0, mid).toString("base64");
-    const c1 = PNG.subarray(mid).toString("base64");
-
-    expect((await gw.executeTool("asset_receive_chunk", { transferId, index: 0, dataBase64: c0 }, ctx())).ok).toBe(true);
-    expect((await gw.executeTool("asset_receive_chunk", { transferId, index: 1, dataBase64: c1 }, ctx())).ok).toBe(true);
-
-    const commit = await gw.executeTool("asset_receive_commit", { transferId }, ctx());
-    expect(commit.ok).toBe(true);
-    const data = commit.data as { path: string; mimeType: string; sha256: string; bytes: number };
+    const res = await save({ kind: "base64", data: PNG.toString("base64"), sha256: sha }, dest);
+    expect(res.ok).toBe(true);
+    const data = res.data as { path: string; mimeType: string; sha256: string; source: string };
     expect(data.mimeType).toBe("image/png");
     expect(data.sha256).toBe(sha);
+    expect(data.source).toBe("base64");
     expect(fs.readFileSync(dest)).toEqual(PNG);
   });
 
-  it("rejects a checksum mismatch on commit", async () => {
+  it("rejects a checksum mismatch", async () => {
     const dest = path.join(workdir, "bad.png");
-    const start = await gw.executeTool(
-      "asset_receive_start",
-      { fileName: "x.png", totalBytes: PNG.length, destination: dest, sha256: "deadbeef" },
-      ctx(),
-    );
-    const transferId = (start.data as { transferId: string }).transferId;
-    await gw.executeTool("asset_receive_chunk", { transferId, index: 0, dataBase64: PNG.toString("base64") }, ctx());
-    const commit = await gw.executeTool("asset_receive_commit", { transferId }, ctx());
-    expect(commit.ok).toBe(false);
-    expect(commit.error).toMatch(/checksum mismatch/i);
+    const res = await save({ kind: "base64", data: PNG.toString("base64"), sha256: "deadbeef" }, dest);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/checksum mismatch/i);
     expect(fs.existsSync(dest)).toBe(false);
   });
 
-  it("rejects non-image content even when bytes transfer cleanly", async () => {
+  it("rejects non-image content even when bytes decode cleanly", async () => {
     const dest = path.join(workdir, "evil.png");
     const payload = Buffer.from("#!/bin/sh\nrm -rf /\n");
-    const start = await gw.executeTool(
-      "asset_receive_start",
-      { fileName: "x.png", totalBytes: payload.length, destination: dest },
-      ctx(),
-    );
-    const transferId = (start.data as { transferId: string }).transferId;
-    await gw.executeTool("asset_receive_chunk", { transferId, index: 0, dataBase64: payload.toString("base64") }, ctx());
-    const commit = await gw.executeTool("asset_receive_commit", { transferId }, ctx());
-    expect(commit.ok).toBe(false);
-    expect(commit.error).toMatch(/unsupported|unrecognized/i);
+    const res = await save({ kind: "base64", data: payload.toString("base64") }, dest);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/unsupported|unrecognized/i);
     expect(fs.existsSync(dest)).toBe(false);
   });
 
   it("rejects an SVG with active content", async () => {
     const dest = path.join(workdir, "x.svg");
     const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
-    const start = await gw.executeTool(
-      "asset_receive_start",
-      { fileName: "x.svg", totalBytes: svg.length, destination: dest },
-      ctx(),
-    );
-    const transferId = (start.data as { transferId: string }).transferId;
-    await gw.executeTool("asset_receive_chunk", { transferId, index: 0, dataBase64: svg.toString("base64") }, ctx());
-    const commit = await gw.executeTool("asset_receive_commit", { transferId }, ctx());
-    expect(commit.ok).toBe(false);
-    expect(commit.error).toMatch(/active content/i);
+    const res = await save({ kind: "base64", data: svg.toString("base64") }, dest);
+    expect(res.ok).toBe(false);
+    expect(res.error).toMatch(/active content/i);
   });
 
-  it("keeps base64 payloads out of the audit log", async () => {
+  it("keeps the base64 payload out of the audit log", async () => {
     const dest = path.join(workdir, "audited.png");
-    const start = await gw.executeTool(
-      "asset_receive_start",
-      { fileName: "x.png", totalBytes: PNG.length, destination: dest },
-      ctx(),
-    );
-    const transferId = (start.data as { transferId: string }).transferId;
     const b64 = PNG.toString("base64");
-    await gw.executeTool("asset_receive_chunk", { transferId, index: 0, dataBase64: b64 }, ctx());
-    const entries = gw.audit.readAll();
-    const chunkEntry = entries.find((e) => e.tool === "asset_receive_chunk");
-    expect(chunkEntry).toBeDefined();
-    expect(chunkEntry!.inputSummary).not.toContain(b64.slice(0, 32));
-    expect(chunkEntry!.inputSummary).toMatch(/base64Len/);
+    await save({ kind: "base64", data: b64 }, dest);
+    const entry = gw.audit.readAll().find((e) => e.tool === "asset_save_image");
+    expect(entry).toBeDefined();
+    expect(entry!.inputSummary).not.toContain(b64.slice(0, 32));
+    expect(entry!.inputSummary).toMatch(/base64Len/);
+  });
+
+  it("backs up an existing file on overwrite", async () => {
+    const dest = path.join(workdir, "dup.png");
+    fs.writeFileSync(dest, Buffer.from("old"));
+    const ok = await save({ kind: "base64", data: PNG.toString("base64") }, dest, true);
+    expect(ok.ok).toBe(true);
+    expect((ok.data as { backupId?: string }).backupId).toBeDefined();
+    // Without overwrite, refuses.
+    const refuse = await save({ kind: "base64", data: PNG.toString("base64") }, dest, false);
+    expect(refuse.ok).toBe(false);
+    expect(refuse.error).toMatch(/exists/i);
   });
 });
 
-describe("latest download import", () => {
+describe("asset_save_image — latest_download source", () => {
   it("adopts the newest matching image from the downloads dir", async () => {
     const downloads = fs.mkdtempSync(path.join(process.cwd(), ".tmp-tests", "asset-dl-"));
-    // Point the bridge at our fake downloads dir.
-    const cfg = gw.config();
-    gw.saveConfig({ ...cfg, assets: { ...cfg.assets, downloadsDir: downloads } });
+    gw.saveConfig({ ...gw.config(), assets: { ...gw.config().assets, downloadsDir: downloads } });
 
     fs.writeFileSync(path.join(downloads, "old.png"), PNG);
-    // Make a clearly-newer file.
     const newest = path.join(downloads, "new.png");
     fs.writeFileSync(newest, PNG);
     const future = Date.now() / 1000 + 10;
     fs.utimesSync(newest, future, future);
 
     const dest = path.join(workdir, "adopted.png");
-    const res = await gw.executeTool("asset_import_latest_download", { destination: dest }, ctx());
+    const res = await save({ kind: "latest_download" }, dest);
     expect(res.ok).toBe(true);
     const data = res.data as { source: string; mimeType: string };
     expect(path.basename(data.source)).toBe("new.png");
@@ -195,13 +173,8 @@ describe("latest download import", () => {
 
   it("errors when no matching image exists", async () => {
     const downloads = fs.mkdtempSync(path.join(process.cwd(), ".tmp-tests", "asset-dl-empty-"));
-    const cfg = gw.config();
-    gw.saveConfig({ ...cfg, assets: { ...cfg.assets, downloadsDir: downloads } });
-    const res = await gw.executeTool(
-      "asset_import_latest_download",
-      { destination: path.join(workdir, "x.png") },
-      ctx(),
-    );
+    gw.saveConfig({ ...gw.config(), assets: { ...gw.config().assets, downloadsDir: downloads } });
+    const res = await save({ kind: "latest_download" }, path.join(workdir, "x.png"));
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/no matching image/i);
     fs.rmSync(downloads, { recursive: true, force: true });

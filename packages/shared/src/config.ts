@@ -190,9 +190,6 @@ export const ConfigSchema = z.object({
       // the text-file limit. Caps both the declared transfer size and the bytes
       // actually downloaded over the network.
       maxAssetBytes: z.number().int().positive().default(26_214_400), // 25 MiB
-      // How long an in-progress chunked transfer may stay open before it is
-      // evicted (also bounds the in-memory buffer lifetime).
-      transferTtlMs: z.number().int().positive().default(300_000), // 5 min
       // MIME allowlist for imported/received assets. Enforced against the
       // detected magic bytes, not just the declared MIME.
       allowedMimeTypes: z
