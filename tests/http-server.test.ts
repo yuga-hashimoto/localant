@@ -244,6 +244,23 @@ describe("dashboard api routes", () => {
     expect(res.status).toBe(404);
   });
 
+  it("bulk-approves all pending approvals via /approvals/approve-all", async () => {
+    apiGw.approvals.create({ tool: "fs_a", risk: 2, requirement: "single", reason: "r", summary: "s", caller: "t" });
+    apiGw.approvals.create({ tool: "fs_b", risk: 2, requirement: "single", reason: "r", summary: "s", caller: "t" });
+    const res = await apiSend("approvals/approve-all", "POST", { scope: "once" });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { approved: number }).toEqual({ approved: 2 });
+    expect(apiGw.approvals.listPending()).toHaveLength(0);
+  });
+
+  it("bulk-denies all pending approvals via /approvals/deny-all", async () => {
+    apiGw.approvals.create({ tool: "fs_c", risk: 2, requirement: "single", reason: "r", summary: "s", caller: "t" });
+    const res = await apiSend("approvals/deny-all", "POST");
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { denied: number }).toEqual({ denied: 1 });
+    expect(apiGw.approvals.listPending()).toHaveLength(0);
+  });
+
   it("lists skills with skillsDir and bundled flag", async () => {
     const res = await apiGet("skills");
     expect(res.status).toBe(200);

@@ -436,6 +436,12 @@ function mountDashboardApi(
     s.json({ token });
   });
   r.get("/approvals", (_q, s) => s.json(gw.approvals.listPending()));
+  // Bulk routes are registered before the :id routes so "approve-all" / "deny-all"
+  // are never captured as an :id.
+  r.post("/approvals/approve-all", (q, s) =>
+    s.json({ approved: gw.approvals.approveAllPending(q.body?.scope === "session" ? "session" : "once") }),
+  );
+  r.post("/approvals/deny-all", (_q, s) => s.json({ denied: gw.approvals.denyAllPending() }));
   r.post("/approvals/:id/approve", (q, s) => s.json(gw.approvals.approve(q.params.id, q.body?.scope === "session" ? "session" : "once") ?? { error: "not found" }));
   r.post("/approvals/:id/deny", (q, s) => s.json(gw.approvals.deny(q.params.id) ?? { error: "not found" }));
   r.get("/audit", (q, s) => {

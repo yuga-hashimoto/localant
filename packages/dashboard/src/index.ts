@@ -75,6 +75,10 @@ export function dashboardHtml(token = ""): string {
     nav button { width:auto; flex:0 0 auto; }
     main { padding:16px; }
     header { padding:12px 16px; }
+    /* Approvals are the action most likely done from a phone — make every
+       choice a full-width, thumb-sized tap target stacked vertically. */
+    .approval-actions { flex-direction:column; align-items:stretch; }
+    .approval-actions .btn { width:100%; padding:12px; font-size:15px; }
   }
 </style>
 </head>
@@ -318,14 +322,23 @@ const VIEWS = {
 
   async Approvals(m){
     const list=await api('approvals');
-    m.innerHTML='<div class="card"><h2>Pending approvals</h2><div id="ap"></div></div>';
+    m.innerHTML='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Pending approvals <span class="tag" id="apCount">'+list.length+'</span></h2><div class="row" id="apBulk"></div></div><div id="ap"></div></div>';
     const ap=document.getElementById('ap');
     if(!list.length){ ap.innerHTML='<p class="muted">No pending approvals.</p>'; return; }
+    // Bulk actions — handy on mobile when several requests queue up at once.
+    if(list.length>1){
+      const bulk=document.getElementById('apBulk');
+      const allOnce=el('<button class="btn ok sm">Approve all</button>');
+      const allDeny=el('<button class="btn danger sm">Deny all</button>');
+      allOnce.onclick=action(allOnce,async()=>{await api('approvals/approve-all',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scope:'once'})});render();});
+      allDeny.onclick=action(allDeny,async()=>{if(confirm('Deny all '+list.length+' pending approvals?')){await api('approvals/deny-all',{method:'POST'});render();}});
+      bulk.appendChild(allOnce); bulk.appendChild(allDeny);
+    }
     for(const a of list){
-      const d=el('<div class="card" style="background:var(--panel2)"><div class="row"><b>'+esc(a.tool)+'</b> <span class="tag '+riskClass(a.risk)+'">risk '+a.risk+'</span> <span class="tag">'+esc(a.requirement)+'</span></div>'
+      const d=el('<div class="card approval" style="background:var(--panel2)"><div class="row"><b>'+esc(a.tool)+'</b> <span class="tag '+riskClass(a.risk)+'">risk '+a.risk+'</span> <span class="tag">'+esc(a.requirement)+'</span></div>'
         +'<p class="muted">'+esc(a.summary)+'</p><p class="muted">'+esc(a.reason)+'</p>'
-        +'<div class="row"><button class="btn ok">Approve once</button><button class="btn">Approve for session</button><button class="btn danger">Deny</button></div></div>');
-      const [once,sess,deny]=d.querySelectorAll('button');
+        +'<div class="row approval-actions"><button class="btn ok">Approve once</button><button class="btn">Approve for session</button><button class="btn danger">Deny</button></div></div>');
+      const [once,sess,deny]=d.querySelectorAll('.approval-actions button');
       once.onclick=action(once,async()=>{await api('approvals/'+a.id+'/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scope:'once'})});render();});
       sess.onclick=action(sess,async()=>{await api('approvals/'+a.id+'/approve',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({scope:'session'})});render();});
       deny.onclick=action(deny,async()=>{await api('approvals/'+a.id+'/deny',{method:'POST'});render();});
