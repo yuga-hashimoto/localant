@@ -165,30 +165,56 @@ program
 program
   .command("status")
   .description("Show gateway status")
-  .action(() => {
+  .option("--json", "output status as JSON")
+  .action((o) => {
     const gw = createGateway();
-    if (!fs.existsSync(gw.paths.runtimeFile)) return console.log(warn("Gateway has not been started yet."));
-    const rt = JSON.parse(fs.readFileSync(gw.paths.runtimeFile, "utf8"));
-    let alive = false;
+    const started = fs.existsSync(gw.paths.runtimeFile);
+    const rt = started ? JSON.parse(fs.readFileSync(gw.paths.runtimeFile, "utf8")) : null;
+    let running = false;
     if (fs.existsSync(gw.paths.pidFile)) {
       const pid = Number(fs.readFileSync(gw.paths.pidFile, "utf8").trim());
       try {
         process.kill(pid, 0);
-        alive = true;
+        running = true;
       } catch {
-        alive = false;
+        running = false;
       }
     }
-    console.log(alive ? ok("Gateway is running") : warn("Gateway is not running (stale runtime info shown)"));
+
+    if (o.json) {
+      console.log(
+        JSON.stringify(
+          {
+            started,
+            running,
+            version: APP_VERSION,
+            gateway: rt?.gateway ?? null,
+            dashboard: rt?.dashboard ?? null,
+            mcpEndpoint: rt?.mcpEndpoint ?? null,
+            tunnel: rt?.tunnel ?? null,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
+    }
+
+    if (!started) return console.log(warn("Gateway has not been started yet."));
+    console.log(running ? ok("Gateway is running") : warn("Gateway is not running (stale runtime info shown)"));
     console.log(`  Gateway:   ${c.cyan(rt.gateway)}`);
     console.log(`  Dashboard: ${c.cyan(rt.dashboard ?? "(disabled)")}`);
     console.log(`  MCP URL:   ${c.cyan(rt.mcpEndpoint ?? "(tunnel off)")}`);
   });
 
-program.command("doctor").description("Check the environment").action(async () => {
-  const passed = await runDoctor();
-  process.exit(passed ? 0 : 1);
-});
+program
+  .command("doctor")
+  .description("Check the environment")
+  .option("--json", "output the report as JSON")
+  .action(async (o) => {
+    const passed = await runDoctor({ json: Boolean(o.json) });
+    process.exit(passed ? 0 : 1);
+  });
 
 // ---------- optional capability dependencies ----------
 const deps = program.command("deps").description("Manage optional capability dependencies (browser, desktop control)");
