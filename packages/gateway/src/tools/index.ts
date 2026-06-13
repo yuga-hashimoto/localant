@@ -8,12 +8,11 @@ import { registerShellTools } from "./shell.js";
 import { registerBashTools } from "./bash.js";
 import { registerValidationTools } from "./validation.js";
 import { registerQuestionTools } from "./question.js";
-import { registerAgentRunTool } from "./agent.js";
 import { registerLspTools } from "./lsp.js";
 import { registerControlTools } from "./control.js";
 import { registerSkillTools } from "./skill.js";
-import { registerCodingAgentTools } from "./coding-agent.js";
 import { registerAutopilotTools } from "./autopilot.js";
+import { registerDoctorTools } from "./doctor.js";
 import { registerAdbTools } from "./adb.js";
 import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
@@ -33,12 +32,13 @@ export function registerAllTools(gw: Gateway): void {
   registerBashTools(gw);
   registerValidationTools(gw);
   registerQuestionTools(gw);
-  registerAgentRunTool(gw);
   registerLspTools(gw);
   registerControlTools(gw);
   registerSkillTools(gw);
-  registerCodingAgentTools(gw);
+  // Agent CLIs are no longer public tools: ChatGPT reaches them only through
+  // the high-level `autopilot` tool, which selects an internal provider.
   registerAutopilotTools(gw);
+  registerDoctorTools(gw);
   registerAdbTools(gw);
   registerComputerTools(gw);
   registerBrowserTools(gw);

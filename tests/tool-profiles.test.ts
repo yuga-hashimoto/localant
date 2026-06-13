@@ -1,7 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { isToolInProfile, MINIMAL_PROFILE_TOOLS, CODING_PROFILE_TOOLS, defaultConfig } from "@localant/shared";
 
-const AUTOPILOT_TOOLS = [
+/** The per-agent delegation tools that were retired in favor of `autopilot`.
+ * None of them may appear in any non-`full` advertised profile. */
+const RETIRED_AGENT_TOOLS = [
+  "agent_run",
+  "agent_list",
+  "agent_status",
+  "agent_plan",
+  "agent_continue",
+  "agent_stop",
+  "agent_get_logs",
+  "agent_get_result",
+  "agent_get_diff",
+  "agent_run_validation",
+  "coding_agent_list",
+  "coding_agent_status",
+  "coding_agent_plan",
+  "coding_agent_start_task",
+  "coding_agent_get_task",
+  "coding_agent_get_logs",
+  "coding_agent_stop_task",
+  "coding_agent_continue_task",
+  "coding_agent_get_result",
+  "coding_agent_get_diff",
+  "coding_agent_run_validation",
   "localant_autopilot_start",
   "localant_autopilot_status",
   "localant_autopilot_get_logs",
@@ -11,15 +34,50 @@ const AUTOPILOT_TOOLS = [
   "localant_autopilot_run_validation",
 ] as const;
 
+/** Low-level tools that must remain reachable. */
+const LOW_LEVEL_TOOLS = [
+  "shell_run_allowed_command",
+  "bash",
+  "git_status",
+  "git_commit",
+  "fs_read_file",
+  "fs_create_file",
+  "browser_open",
+  "adb_tap",
+  "browser_screenshot",
+] as const;
+
 describe("tool profiles", () => {
   it("defaults the config to the minimal profile", () => {
     expect(defaultConfig().tools.profile).toBe("minimal");
   });
 
-  it("keeps the three delegation pillars in the minimal surface", () => {
+  it("exposes the high-level autopilot + doctor surface in the minimal profile", () => {
+    expect(MINIMAL_PROFILE_TOOLS.has("autopilot")).toBe(true);
+    expect(MINIMAL_PROFILE_TOOLS.has("localant_doctor")).toBe(true);
     expect(MINIMAL_PROFILE_TOOLS.has("shell_run_allowed_command")).toBe(true);
-    expect(MINIMAL_PROFILE_TOOLS.has("coding_agent_start_task")).toBe(true);
     expect(MINIMAL_PROFILE_TOOLS.has("skill_run")).toBe(true);
+  });
+
+  it("excludes every retired agent-style tool from the minimal AND coding profiles", () => {
+    for (const name of RETIRED_AGENT_TOOLS) {
+      expect(MINIMAL_PROFILE_TOOLS.has(name), `minimal still has ${name}`).toBe(false);
+      expect(CODING_PROFILE_TOOLS.has(name), `coding still has ${name}`).toBe(false);
+      expect(isToolInProfile(name, "minimal"), `minimal admits ${name}`).toBe(false);
+      expect(isToolInProfile(name, "coding"), `coding admits ${name}`).toBe(false);
+    }
+  });
+
+  it("keeps the low-level operation tools available in the coding profile", () => {
+    for (const name of ["shell_run_allowed_command", "bash", "git_status", "git_commit", "browser_open"]) {
+      expect(isToolInProfile(name, "coding"), `coding missing ${name}`).toBe(true);
+    }
+  });
+
+  it("keeps the low-level operation tools available in the full profile", () => {
+    for (const name of LOW_LEVEL_TOOLS) {
+      expect(isToolInProfile(name, "full"), `full missing ${name}`).toBe(true);
+    }
   });
 
   it("exposes only read/status MCP bridge tools in the minimal surface", () => {
@@ -37,15 +95,13 @@ describe("tool profiles", () => {
       "fs_create_file",
       "skill_create",
       "mcp_server_register",
-      "mcp_server_unregister",
-      "mcp_server_run_tool",
     ]) {
       expect(MINIMAL_PROFILE_TOOLS.has(name)).toBe(false);
     }
   });
 
   it("minimal profile only admits listed tools", () => {
-    expect(isToolInProfile("shell_run_allowed_command", "minimal")).toBe(true);
+    expect(isToolInProfile("autopilot", "minimal")).toBe(true);
     expect(isToolInProfile("git_commit", "minimal")).toBe(false);
   });
 
@@ -66,17 +122,11 @@ describe("tool profiles", () => {
       "glob",
       "git_diff",
       "project_run_validation",
-      "agent_run",
+      "autopilot",
       "lsp_diagnostics",
       "lsp_document_symbols",
       "approval_request",
     ]) {
-      expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
-    }
-  });
-
-  it("coding profile exposes the Autopilot tools", () => {
-    for (const name of AUTOPILOT_TOOLS) {
       expect(isToolInProfile(name, "coding"), `missing ${name}`).toBe(true);
     }
   });
@@ -88,8 +138,6 @@ describe("tool profiles", () => {
   });
 
   it("coding profile hides destructive/authoring tools and ChatGPT-duplicates", () => {
-    // websearch/webfetch/todowrite/question excluded: ChatGPT does those natively.
-    // approval_approve excluded: ChatGPT must not self-approve.
     for (const name of [
       "git_reset_hard",
       "secret_remove",
@@ -108,7 +156,6 @@ describe("tool profiles", () => {
   });
 
   it("coding profile drops pure duplicate aliases (one name per function)", () => {
-    // Each removed alias must still be reachable via the kept canonical name.
     const droppedToKept: Record<string, string> = {
       read_file: "read",
       read_file_range: "fs_read_file_range",

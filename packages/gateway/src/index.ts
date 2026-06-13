@@ -8,6 +8,19 @@ export { buildKeyComboArgs, buildTypeArgs, SPECIAL_KEYS, MODIFIERS } from "./too
 export type { Modifier } from "./tools/computer.js";
 export { McpBridge } from "./managers/mcp-bridge.js";
 export { assembleAgentArgs } from "./managers/coding-agent-manager.js";
+export { ProviderRegistry } from "./autopilot/provider-registry.js";
+export { AutopilotEngine } from "./autopilot/engine.js";
+export type { AutopilotRunInput, AutopilotRunResult, AutopilotAttempt } from "./autopilot/engine.js";
+export { resolveProviderOrder, isProviderEnabled } from "./autopilot/settings.js";
+export { shouldFallback, looksRateLimited, looksCommandNotFound } from "./autopilot/fallback-policy.js";
+export { providerLabel } from "./autopilot/labels.js";
+export { CodingAgentProvider } from "./autopilot/coding-agent-provider.js";
+export type {
+  AutopilotProvider,
+  AutopilotProviderInput,
+  AutopilotProviderResult,
+  ProviderAvailability,
+} from "./autopilot/types.js";
 export { resolveTailscale, tailscaleEnv } from "./managers/tunnel-manager.js";
 export { PathGuard, PathAccessError } from "./security/path-guard.js";
 export { AssetManager } from "./managers/asset-manager.js";

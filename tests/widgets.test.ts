@@ -11,12 +11,16 @@ function scriptBlocks(html: string): string[] {
 }
 
 describe("widget documents", () => {
-  it("registers at least the approval, coding-agent and git widgets", () => {
+  it("registers at least the approval and git widgets", () => {
     const ids = WIDGETS.map((w) => w.id);
     expect(ids).toContain("approval-center");
-    expect(ids).toContain("coding-agent-panel");
     expect(ids).toContain("git-panel");
     expect(ids).toContain("image-viewer");
+  });
+
+  it("no longer registers the retired coding-agent widget", () => {
+    const ids = WIDGETS.map((w) => w.id);
+    expect(ids).not.toContain("coding-agent-panel");
   });
 
   it("every widget's embedded scripts are syntactically valid JavaScript", () => {
@@ -80,7 +84,6 @@ describe("widgetMetaForTool", () => {
   });
 
   it("maps each top-priority panel tool to its widget", () => {
-    expect(widgetMetaForTool("coding_agent_get_task")!["openai/outputTemplate"]).toBe("ui://localant/coding-agent-panel-v1.html");
     expect(widgetMetaForTool("git_status")!["openai/outputTemplate"]).toBe("ui://localant/git-panel-v1.html");
     expect(widgetMetaForTool("shell_list_processes")!["openai/outputTemplate"]).toBe("ui://localant/shell-panel-v1.html");
     expect(widgetMetaForTool("skill_list")!["openai/outputTemplate"]).toBe("ui://localant/skill-panel-v1.html");
@@ -89,6 +92,8 @@ describe("widgetMetaForTool", () => {
   it("returns undefined for tools without a widget", () => {
     expect(widgetMetaForTool("audit_list_logs")).toBeUndefined();
     expect(widgetMetaForTool("does_not_exist")).toBeUndefined();
+    // The coding-agent widget + its tools were retired.
+    expect(widgetMetaForTool("coding_agent_get_task")).toBeUndefined();
   });
 
   it("never claims the same tool for two widgets", () => {

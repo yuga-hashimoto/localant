@@ -1,12 +1,8 @@
 import { z } from "zod";
+import { AUTOPILOT_MODES } from "@localant/shared";
 import type { Gateway } from "../gateway.js";
+import type { AutopilotRunResult } from "../autopilot/engine.js";
 
-const READ_ONLY_ANNOTATIONS = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false,
-} as const;
 const MUTATING_ANNOTATIONS = {
   readOnlyHint: false,
   destructiveHint: false,
@@ -15,12 +11,11 @@ const MUTATING_ANNOTATIONS = {
 } as const;
 
 /**
- * High-level task / command text that Autopilot refuses to delegate. This is a
- * defence-in-depth hint, not the real enforcement boundary: PathGuard and
- * CommandGuard remain the authoritative gates. It keeps an obviously dangerous
- * delegation (publish/deploy, force pushes, secret material, recursive removal)
- * from being kicked off through the high-level surface without a dedicated tool
- * and explicit user approval.
+ * High-level task text that Autopilot refuses to delegate. Defence-in-depth on
+ * top of PathGuard / CommandGuard / the approval queue: it keeps an obviously
+ * dangerous delegation (publish/deploy, force pushes, secret material, recursive
+ * removal) from being kicked off through the high-level surface without a
+ * dedicated tool and explicit user approval.
  */
 const DENIED_TERMS = [
   "publish",
@@ -45,96 +40,69 @@ const DENIED_TERMS = [
 function assertAutopilotTextAllowed(value: string, field: string): void {
   const normalized = value.toLowerCase().replace(/\s+/g, " ").trim();
   if (DENIED_TERMS.some((term) => normalized.includes(term))) {
-    throw new Error(`Autopilot refused ${field}: this operation requires a dedicated tool and explicit user approval.`);
+    throw new Error(
+      `Autopilot refused ${field}: this operation requires a dedicated tool and explicit user approval.`,
+    );
   }
+}
+
+/**
+ * Shape the engine result for ChatGPT. Deliberately omits provider identity
+ * (`providerId` / `providerLabel`): the automation backend is never named on
+ * the ChatGPT-facing surface — only in the Web UI and localant_doctor. The full
+ * provider-attributed record still goes to the audit log.
+ */
+function publicResult(r: AutopilotRunResult): Record<string, unknown> {
+  return {
+    ok: r.ok,
+    mode: r.mode,
+    cwd: r.cwd,
+    branch: r.branch,
+    changed: r.changed,
+    diff: r.diff,
+    output: r.output,
+    status: r.ok
+      ? "completed"
+      : r.stoppedReason
+        ? `stopped: ${r.stoppedReason}`
+        : r.exhausted
+          ? "all automation attempts failed"
+          : "failed",
+    attempts: r.attempts.length,
+  };
 }
 
 export function registerAutopilotTools(gw: Gateway): void {
   const r = gw.registry;
 
   r.register({
-    name: "localant_autopilot_start",
-    description: "Start a high-level LocalAnt coding task through a configured coding agent.",
+    name: "autopilot",
+    description:
+      "Delegate a natural-language local task to LocalAnt's automation system. It plans, implements, reviews, or fixes code in a working directory using your configured automation, on a fresh work branch, behind LocalAnt's safety gates and approvals. " +
+      "modes: plan (no changes), execute (implement), review (read-only assessment), fix (diagnose + repair + validate), pr (implement and prepare a PR — it does NOT push or open the PR). " +
+      "Does not push, publish, deploy, or open PRs — those stay behind explicit approval. Risk 3.",
     risk: 3,
     annotations: MUTATING_ANNOTATIONS,
     inputSchema: z.object({
-      agent: z.string().default("claude-code"),
-      cwd: z.string(),
-      task: z.string(),
-      branchName: z.string().optional(),
-      createBranch: z.boolean().default(true),
+      task: z.string().describe("What you want done, in plain language."),
+      cwd: z.string().describe("Absolute path to the working directory / repo. Must be inside an allowed directory."),
+      mode: z.enum(AUTOPILOT_MODES).default("plan"),
+      constraints: z.string().optional().describe("Optional constraints: scope, style, files to avoid, etc."),
+      timeoutMs: z.number().int().positive().max(1_800_000).optional(),
     }),
-    summarize: (i) => `autopilot ${i.agent} on ${i.cwd}`,
-    handler: (i, ctx) => {
+    summarize: (i) => `autopilot ${i.mode} on ${i.cwd}`,
+    handler: async (i, ctx) => {
       assertAutopilotTextAllowed(i.task, "task");
-      return gw.agents.startTask(i.agent, i.cwd, i.task, {
-        createBranch: i.createBranch,
-        branchName: i.branchName,
+      if (i.constraints) assertAutopilotTextAllowed(i.constraints, "constraints");
+      const result = await gw.autopilot.run({
+        task: i.task,
+        cwd: i.cwd,
+        mode: i.mode,
+        constraints: i.constraints,
+        timeoutMs: i.timeoutMs,
         sessionId: ctx.sessionId,
       });
-    },
-  });
-
-  r.register({
-    name: "localant_autopilot_status",
-    description: "Get one Autopilot task status, or list this session's Autopilot tasks when no taskId is provided.",
-    risk: 0,
-    annotations: READ_ONLY_ANNOTATIONS,
-    inputSchema: z.object({ taskId: z.string().optional() }).strip(),
-    handler: (i, ctx) => (i.taskId ? gw.agents.getTask(i.taskId) : { tasks: gw.agents.listTasks(ctx.sessionId) }),
-  });
-
-  r.register({
-    name: "localant_autopilot_get_logs",
-    description: "Get captured logs for an Autopilot task.",
-    risk: 0,
-    annotations: READ_ONLY_ANNOTATIONS,
-    inputSchema: z.object({ taskId: z.string() }),
-    handler: (i) => ({ logs: gw.agents.getLogs(i.taskId) }),
-  });
-
-  r.register({
-    name: "localant_autopilot_get_diff",
-    description: "Get the git diff for an Autopilot task.",
-    risk: 0,
-    annotations: READ_ONLY_ANNOTATIONS,
-    inputSchema: z.object({ taskId: z.string() }),
-    handler: async (i) => ({ diff: await gw.agents.getDiff(i.taskId) }),
-  });
-
-  r.register({
-    name: "localant_autopilot_continue",
-    description: "Continue an existing Autopilot coding task with additional high-level instructions.",
-    risk: 3,
-    annotations: MUTATING_ANNOTATIONS,
-    inputSchema: z.object({ taskId: z.string(), task: z.string() }),
-    summarize: (i) => `autopilot continue ${i.taskId}`,
-    handler: (i) => {
-      assertAutopilotTextAllowed(i.task, "task");
-      return gw.agents.continueTask(i.taskId, i.task);
-    },
-  });
-
-  r.register({
-    name: "localant_autopilot_stop",
-    description: "Stop a running Autopilot task.",
-    risk: 2,
-    annotations: MUTATING_ANNOTATIONS,
-    inputSchema: z.object({ taskId: z.string() }),
-    summarize: (i) => `autopilot stop ${i.taskId}`,
-    handler: (i) => gw.agents.stopTask(i.taskId),
-  });
-
-  r.register({
-    name: "localant_autopilot_run_validation",
-    description: "Run a guarded validation command for an Autopilot task or repository.",
-    risk: 3,
-    annotations: MUTATING_ANNOTATIONS,
-    inputSchema: z.object({ cwd: z.string(), command: z.string().describe("e.g. pnpm validate") }),
-    summarize: (i) => `autopilot validate ${i.cwd}`,
-    handler: (i) => {
-      assertAutopilotTextAllowed(i.command, "validation command");
-      return gw.agents.runValidation(i.cwd, i.command);
+      return publicResult(result);
     },
   });
 }

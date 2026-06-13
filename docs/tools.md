@@ -32,7 +32,8 @@ is risk 0; a `git_reset --hard` is risk 4), so ranges are shown.
 | Git | 22 | 0–4 | Status/diff/log are 0; `git_commit`/`git_add` are 2–3; `git_reset`/destructive ops reach 4. |
 | Validate / Project | 8 | 0–3 | `project_run_tests`/`lint`/`typecheck`/`build`/`validation`; reads scripts at 0. |
 | Code intel (LSP) | 9 | 0–2 | `lsp_*` — diagnostics/symbols/hover at 0; `lsp_rename_symbol` mutates (2). |
-| Coding agents | 13 | 0–3 | `coding_agent_*`, `agent_run`. Plans/reads at 0; execute/continue/validate at 3. |
+| Autopilot | 1 | 3 | `autopilot` — one high-level tool (`task`/`cwd`/`mode`/`constraints`). Selects an internal provider from the dashboard's Autopilot Settings; ChatGPT never names a backend. The per-agent `coding_agent_*` / `agent_run` tools were retired. See [coding-agents.md](coding-agents.md). |
+| Diagnostics | 1 | 0 | `localant_doctor` — read-only structured health report (connection, tools, runtimes, provider availability, recent errors/blocks/timeouts). |
 | Skills | 14 | 0–4 | List/info/validate at 0; create/run at 2–3; `skill_publish_to_git` at 4. |
 | Browser | 17 | 1–4 | Playwright in an isolated profile; navigation/read low, downloads/uploads high. |
 | Android (ADB) | 20 | 0–3 | Device read at 0; input/install/file-push at 2–3. |

@@ -94,9 +94,12 @@ and audit.
 - 🧾 **Full audit log**: every tool call recorded (with secrets redacted).
 - 🧩 **Skill system**: create, validate, enable, run, install-from-git,
   publish, and **generate skills from ChatGPT** (always saved disabled).
-- 🤖 **Coding agents**: drive Claude Code / Codex (plan → approve → execute →
-  validate → diff) on any working directory.
-- 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, agents.
+- 🤖 **Autopilot**: one high-level `autopilot` tool delegates natural-language
+  tasks (plan / execute / review / fix / pr) to a local automation backend you
+  pick in the dashboard — Claude Code / Codex / opencode / OpenClaw / Antigravity
+  / Hermes — with an ordered fallback chain. ChatGPT never names a backend.
+- 🩺 **Diagnostics**: `localant_doctor` — a read-only, structured health report.
+- 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, Autopilot.
 - 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
 - 🖱️ **Computer Use**: screenshot + mouse + keyboard control of the macOS
   desktop (`screencapture` + `cliclick`). Screenshots come back as inline MCP
@@ -121,7 +124,7 @@ It exposes the standard **Codex / Claude Code / OpenCode**-style tool names:
 | Validate | `project_run_tests` · `project_run_lint` · `project_run_typecheck` · `project_run_build` · `project_run_validation` · `project_get_package_scripts` |
 | Code intel | `lsp_status` · `lsp_diagnostics` · `lsp_document_symbols` · `lsp_go_to_definition` · `lsp_find_references` · `lsp_hover` · `lsp_rename_symbol` |
 | Approve | `approval_request` (the human approves in the dashboard / CLI) |
-| Delegate | `agent_run` (claude-code · codex · opencode · openclaw · antigravity-cli · hermes-agent) |
+| Delegate | `autopilot` (high-level; selects an internal provider from the dashboard's Autopilot Settings — ChatGPT never names a backend) |
 
 > **No web search / web fetch / todo / "ask the user" tools** — ChatGPT already
 > does web search, browsing, planning, and asking you directly, so tool-ifying
@@ -323,21 +326,23 @@ README, source and tests, **infers permissions**, sets it **disabled**, and runs
 validation. You review permissions in the dashboard, then `skill_enable` (which
 requires approval). See [docs/skills.md](docs/skills.md).
 
-## How to connect Claude Code
+## How to delegate with Autopilot
 
-Enable an agent in config (`codingAgents.claude-code.enabled = true`), then point
-it at a working directory:
+Pick your automation backend in the dashboard → **Settings → Autopilot
+Settings** (primary + ordered fallback chain). Then ChatGPT delegates with one
+tool, in plain language — it never names a backend:
 
 ```text
-coding_agent_plan(agent:"claude-code", cwd:"/Users/me/Documents/my-app", task:"Plan SEO improvements")
+autopilot(task:"Plan SEO improvements",      cwd:"/Users/me/Documents/my-app", mode:"plan")
 # review the plan, approve, then:
-coding_agent_start_task(agent:"claude-code", cwd:"/Users/me/Documents/my-app", task:"Implement the plan")
-# creates a work branch, runs the agent, then:
-coding_agent_get_diff(taskId) · coding_agent_run_validation(cwd, command:"pnpm validate")
+autopilot(task:"Implement the SEO plan",     cwd:"/Users/me/Documents/my-app", mode:"execute")
+# or: mode:"review" (read-only), mode:"fix" (diagnose + repair + validate), mode:"pr"
 ```
 
-Execution is risk-3 (approval required), runs on a fresh branch, warns on a dirty
-tree, and is followed by diff + validation. See [docs/coding-agents.md](docs/coding-agents.md).
+Execution is risk-3 (approval required), runs on a fresh branch, and falls back
+through the chain on failure per your fallback policy. Push / PR / publish stay
+behind explicit approval. The low-level bash/git/file/browser/adb tools remain
+available. See [docs/coding-agents.md](docs/coding-agents.md).
 
 ## Codex example
 

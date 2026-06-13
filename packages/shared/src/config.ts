@@ -120,6 +120,70 @@ const CodingAgentConfig = z.object({
 });
 export type CodingAgentConfig = z.infer<typeof CodingAgentConfig>;
 
+/**
+ * Reasons an Autopilot provider attempt can fail in a way the fallback policy
+ * may act on. `safety_block` and `approval_required` are listed so the policy
+ * can explicitly *refuse* to fall back on them (the defaults below do).
+ */
+export const AUTOPILOT_FALLBACK_REASONS = [
+  "timeout",
+  "non_zero_exit",
+  "empty_output",
+  "no_changes",
+  "rate_limit",
+  "command_not_found",
+  "safety_block",
+  "approval_required",
+] as const;
+export type AutopilotFallbackReason = (typeof AUTOPILOT_FALLBACK_REASONS)[number];
+
+export const AUTOPILOT_MODES = ["plan", "execute", "review", "fix", "pr"] as const;
+export type AutopilotMode = (typeof AUTOPILOT_MODES)[number];
+
+/** Per-provider toggle in Autopilot Settings. A disabled provider is never
+ * selected as primary or fallback, regardless of its CLI availability. */
+const AutopilotProviderSetting = z.object({
+  enabled: z.boolean().default(true),
+});
+
+/**
+ * Fallback policy: which failure reasons permit advancing to the next provider.
+ * Safety blocks and approval-required gates default to NOT falling back — a
+ * provider-agnostic guard rejection means every provider would hit the same
+ * wall, and approvals are the human's to grant.
+ */
+const AutopilotFallbackPolicy = z
+  .object({
+    onTimeout: z.boolean().default(true),
+    onNonZeroExit: z.boolean().default(true),
+    onEmptyOutput: z.boolean().default(true),
+    onNoChanges: z.boolean().default(true),
+    onRateLimit: z.boolean().default(true),
+    onCommandNotFound: z.boolean().default(true),
+    onSafetyBlock: z.boolean().default(false),
+    onApprovalRequired: z.boolean().default(false),
+  })
+  .prefault({});
+export type AutopilotFallbackPolicyT = z.infer<typeof AutopilotFallbackPolicy>;
+
+/**
+ * Autopilot Settings. The public `autopilot` tool never names a provider; it
+ * reads `primary` + ordered `fallbacks` from here, skips disabled providers,
+ * and advances through them per `fallbackPolicy`. Provider ids are
+ * `codingAgents` keys (claude-code / codex / opencode / openclaw /
+ * antigravity-cli / hermes-agent).
+ */
+const AutopilotConfig = z
+  .object({
+    primary: z.string().default("claude-code"),
+    // Ordered fallback chain. Tried top-to-bottom after the primary fails in a
+    // way the policy permits. Disabled providers and the primary are skipped.
+    fallbacks: z.array(z.string()).default(["codex", "opencode"]),
+    providers: z.record(z.string(), AutopilotProviderSetting).default({}),
+    fallbackPolicy: AutopilotFallbackPolicy,
+  })
+  .prefault({});
+
 const McpServerConfig = z
   .object({
     transport: z.enum(["stdio", "streamable-http"]).default("stdio"),
@@ -292,6 +356,7 @@ export const ConfigSchema = z.object({
         timeoutMs: 600_000,
       },
     }),
+  autopilot: AutopilotConfig,
   tools: z
     .object({
       // Exposure profile for the MCP surface. `minimal` advertises only the

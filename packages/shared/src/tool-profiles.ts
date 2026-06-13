@@ -6,11 +6,11 @@
  * profiles trade surface area against capability:
  *
  *  - `minimal` (legacy default): the small delegation core — shell allowlist,
- *    coding agent, skill, read-only fs, MCP bridge, control plane.
+ *    autopilot (high-level delegation), skill, read-only fs, MCP bridge,
+ *    control plane, doctor.
  *  - `coding`: the surface needed to use ChatGPT itself as a coding agent —
  *    read/write/edit/multi_edit/apply_patch, grep/glob, bash, git, project
- *    validation, todo/task/plan, question, agent delegation, MCP, webfetch,
- *    basic browser.
+ *    validation, question, autopilot delegation, MCP, webfetch, basic browser.
  *  - `full`: every registered tool (browser full, adb, skill authoring, config
  *    mutation, secret management, destructive git, …).
  */
@@ -30,6 +30,7 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "get_dashboard_url",
   "get_mcp_endpoint",
   "get_tunnel_status",
+  "localant_doctor",
 
   // --- Approvals + audit (read-only; the human approves in the dashboard) ---
   "approval_list_pending",
@@ -47,18 +48,11 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "shell_get_process_output",
   "shell_stop_process",
 
-  // --- Pillar 2: coding Agent ---
-  "coding_agent_list",
-  "coding_agent_status",
-  "coding_agent_plan",
-  "coding_agent_start_task",
-  "coding_agent_get_task",
-  "coding_agent_get_logs",
-  "coding_agent_stop_task",
-  "coding_agent_continue_task",
-  "coding_agent_get_result",
-  "coding_agent_get_diff",
-  "coding_agent_run_validation",
+  // --- Pillar 2: Autopilot (high-level delegation) ---
+  // The agent CLIs (Claude Code / Codex / opencode / …) are NOT exposed as
+  // tools. ChatGPT delegates via the single `autopilot` tool, which selects an
+  // internal provider from the dashboard's Autopilot Settings.
+  "autopilot",
 
   // --- Pillar 3: Skill ---
   "skill_list",
@@ -160,26 +154,9 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   // the dashboard / CLI).
   "approval_request",
 
-  // --- Agent delegation (aliases over coding_agent_*) ---
-  "agent_list",
-  "agent_status",
-  "agent_run",
-  "agent_plan",
-  "agent_continue",
-  "agent_stop",
-  "agent_get_logs",
-  "agent_get_result",
-  "agent_get_diff",
-  "agent_run_validation",
-
-  // --- High-level Autopilot delegation ---
-  "localant_autopilot_start",
-  "localant_autopilot_status",
-  "localant_autopilot_get_logs",
-  "localant_autopilot_get_diff",
-  "localant_autopilot_continue",
-  "localant_autopilot_stop",
-  "localant_autopilot_run_validation",
+  // --- High-level delegation ---
+  // `autopilot` (the only delegation surface) is inherited from the minimal
+  // superset above. The per-agent coding_agent_* / agent_* tools were retired.
 
   // --- LSP / code intelligence ---
   "lsp_status",
