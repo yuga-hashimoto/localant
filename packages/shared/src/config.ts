@@ -165,7 +165,10 @@ export const ConfigSchema = z.object({
       subdomain: z.string().optional(),
       subdomainConfirmed: z.boolean().default(false),
     })
-    .default({ provider: "tailscale" }),
+    // prefault (not default): parse this partial through the schema so the
+    // other fields' defaults are applied. Zod 4's `.default()` would require a
+    // fully-resolved object.
+    .prefault({ provider: "tailscale" }),
   security: z
     .object({
       mode: z.enum(["strict", "open", "yolo"]).default("open"),
@@ -178,10 +181,13 @@ export const ConfigSchema = z.object({
       commandTimeoutMs: z.number().int().positive().default(120_000),
       logRetentionDays: z.number().int().positive().default(30),
     })
-    .default({}),
+    // prefault: an empty object parsed through the schema yields all defaults.
+    .prefault({}),
   codingAgents: z
     .record(z.string(), CodingAgentConfig)
-    .default({
+    // prefault: each agent literal omits some defaulted fields, so parse the
+    // map through the schema rather than requiring fully-resolved entries.
+    .prefault({
       "claude-code": {
         enabled: true,
         command: "claude",
