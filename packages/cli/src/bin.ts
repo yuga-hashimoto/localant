@@ -423,6 +423,28 @@ skills.command("list").action(() => {
     console.log(`${c.bold(s.manifest.name)} v${s.manifest.version} ${state} risk${s.manifest.riskLevel}${s.generated ? c.gray(" [generated]") : ""}${s.valid ? "" : c.red(" [invalid]")}`);
   }
 });
+skills
+  .command("new <name>")
+  .description("Scaffold a new local skill skeleton (created disabled)")
+  .option("-d, --description <text>", "what the skill does", "A local skill.")
+  .option("--risk <n>", "risk level 0-3", "1")
+  .action((name, o) => {
+    const gw = createGateway();
+    const risk = Number(o.risk);
+    if (!Number.isInteger(risk) || risk < 0 || risk > 3) {
+      return console.log(fail("--risk must be an integer 0-3."));
+    }
+    try {
+      const state = gw.skills.generate({ name, description: o.description, riskLevel: risk as 0 | 1 | 2 | 3 });
+      console.log(ok(`Created skill '${name}' (disabled).`));
+      console.log(`  ${c.gray(state.dir)}`);
+      console.log(c.gray("  Edit src/index.ts, then:"));
+      console.log(`    localant skills validate ${name}`);
+      console.log(`    localant skills enable ${name}`);
+    } catch (e) {
+      console.log(fail((e as Error).message));
+    }
+  });
 skills.command("info <name>").action((name) => {
   const gw = createGateway();
   const s = gw.skills.get(name);

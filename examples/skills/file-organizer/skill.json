@@ -1,0 +1,48 @@
+{
+  "name": "file-organizer",
+  "displayName": "File Organizer",
+  "version": "0.1.0",
+  "description": "Tidy a local folder by sorting files into subfolders by type or by date — something ChatGPT cannot do without local hands.",
+  "author": "LocalAnt",
+  "license": "MIT",
+  "entry": "src/index.ts",
+  "riskLevel": 2,
+  "permissions": {
+    "filesystem": { "mode": "write", "allowedDirectories": [] },
+    "shell": { "mode": "none", "allowedCommands": [] },
+    "network": { "mode": "none", "allowedHosts": [] },
+    "secrets": [],
+    "browser": "none",
+    "adb": "none",
+    "git": "none",
+    "agent": "none"
+  },
+  "tools": [
+    {
+      "name": "file_organizer_plan",
+      "description": "Preview how files in a directory would be organized (no changes).",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dir": { "type": "string" },
+          "by": { "type": "string", "enum": ["type", "date"] }
+        },
+        "required": ["dir"]
+      }
+    },
+    {
+      "name": "file_organizer_apply",
+      "description": "Move files in a directory into subfolders by type or date.",
+      "riskLevel": 2,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dir": { "type": "string" },
+          "by": { "type": "string", "enum": ["type", "date"] }
+        },
+        "required": ["dir"]
+      }
+    }
+  ]
+}

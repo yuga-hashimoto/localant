@@ -1,0 +1,45 @@
+{
+  "name": "local-backup",
+  "displayName": "Local Backup",
+  "version": "0.1.0",
+  "description": "Create and list timestamped .tar.gz snapshots of a local folder — local-only work ChatGPT cannot perform itself.",
+  "author": "LocalAnt",
+  "license": "MIT",
+  "entry": "src/index.ts",
+  "riskLevel": 2,
+  "permissions": {
+    "filesystem": { "mode": "read", "allowedDirectories": [] },
+    "shell": { "mode": "allowlist", "allowedCommands": ["tar"] },
+    "network": { "mode": "none", "allowedHosts": [] },
+    "secrets": [],
+    "browser": "none",
+    "adb": "none",
+    "git": "none",
+    "agent": "none"
+  },
+  "tools": [
+    {
+      "name": "local_backup_create",
+      "description": "Create a timestamped .tar.gz snapshot of a directory into the skill workspace (or a given output dir).",
+      "riskLevel": 2,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dir": { "type": "string" },
+          "outDir": { "type": "string" }
+        },
+        "required": ["dir"]
+      }
+    },
+    {
+      "name": "local_backup_list",
+      "description": "List backup archives previously created in the workspace (or a given output dir).",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": { "outDir": { "type": "string" } },
+        "required": []
+      }
+    }
+  ]
+}

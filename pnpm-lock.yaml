@@ -73,7 +73,19 @@ importers:
         specifier: workspace:*
         version: link:../../../packages/skill-sdk
 
+  examples/skills/file-organizer:
+    dependencies:
+      '@localant/skill-sdk':
+        specifier: workspace:*
+        version: link:../../../packages/skill-sdk
+
   examples/skills/hello-world:
+    dependencies:
+      '@localant/skill-sdk':
+        specifier: workspace:*
+        version: link:../../../packages/skill-sdk
+
+  examples/skills/local-backup:
     dependencies:
       '@localant/skill-sdk':
         specifier: workspace:*
