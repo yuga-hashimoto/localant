@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.5] - 2026-06-14
+
+### Added
+- **Autopilot**: a single high-level `autopilot` tool replaces the per-agent
+  delegation surface. ChatGPT delegates in natural language (`task` / `cwd` /
+  `mode` = plan · execute · review · fix · pr / `constraints` / `timeoutMs`)
+  and never names a backend. The automation provider is chosen by the user.
+- **Autopilot Settings** (dashboard): pick the primary provider, enable/disable
+  providers, reorder the fallback chain, and configure the fallback policy.
+  Persisted in `config.autopilot`.
+- **Fallback policy**: on primary failure, Autopilot advances through the
+  fallback chain — timeout / non-zero exit / empty output / no changes / rate
+  limit / command-not-found fall back by default; **safety block** and
+  **approval required** do not. The next provider receives the prior failure
+  reason, an output summary, and the existing diff, and continues from the
+  current working-tree state on the same branch.
+- **`localant_doctor`**: read-only structured diagnostics (connection/version,
+  exposed tool count, allowed dirs, tunnel/Tailscale, OS permissions, screenshot
+  capability, Git/GitHub CLI, Node/pnpm/Python, browser automation, ADB,
+  automation-provider availability, and recent errors/blocks/timeouts).
+
+### Changed
+- The agent CLIs (Claude Code / Codex / opencode / OpenClaw / Antigravity /
+  Hermes) are no longer public tools — they live on as **internal Autopilot
+  providers**. Provider names appear only in the Web UI and `localant_doctor`,
+  never on the ChatGPT-facing `autopilot` surface.
+
+### Removed
+- The per-agent public tools (`coding_agent_*`, `agent_run` and the `agent_*`
+  aliases, the previous `localant_autopilot_*` set) and the coding-agent widget.
+  The low-level bash/git/file/browser/adb/screenshot tools are unchanged.
+
 ## [1.4.4] - 2026-06-13
 
 ### Added
