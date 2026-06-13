@@ -295,7 +295,9 @@ export class FsManager {
         `edit failed: oldString matches ${count} times in '${target}'. Pass replaceAll=true or provide more context.`,
       );
     }
-    const after = replaceAll ? before.split(oldString).join(newString) : before.replace(oldString, newString);
+    // Use a function replacer so `$`-sequences in newString ($$, $&, $`, $')
+    // are inserted literally rather than interpreted by String.prototype.replace.
+    const after = replaceAll ? before.split(oldString).join(newString) : before.replace(oldString, () => newString);
     const backup = this.backup(resolved);
     fs.writeFileSync(resolved, after);
     return { path: resolved, backupId: backup.id, replacements: replaceAll ? count : 1, diff: simpleDiff(before, after) };
@@ -321,7 +323,7 @@ export class FsManager {
       if (count > 1 && !e.replaceAll) {
         throw new Error(`multi_edit failed at edit #${idx + 1}: oldString matches ${count} times (pass replaceAll).`);
       }
-      buf = e.replaceAll ? buf.split(e.oldString).join(e.newString) : buf.replace(e.oldString, e.newString);
+      buf = e.replaceAll ? buf.split(e.oldString).join(e.newString) : buf.replace(e.oldString, () => e.newString);
     });
     const backup = this.backup(resolved);
     fs.writeFileSync(resolved, buf);
@@ -424,7 +426,9 @@ export class FsManager {
           if (FsManager.DEFAULT_IGNORES.has(e.name)) continue;
           walk(full);
         } else {
-          const rel = path.relative(root, full);
+          // Normalize to forward slashes so path-aware globs (** and /)
+          // match on Windows, where path.relative yields backslashes.
+          const rel = path.relative(root, full).split(path.sep).join("/");
           if (rx.test(rel) || rx.test(e.name)) out.push(full);
         }
       }
@@ -508,12 +512,12 @@ function globToRegExp(glob: string, pathAware = false): RegExp {
   // Path-aware: handle ** before * using placeholders.
   let re = glob.replace(/[.+^${}()|[\]\\]/g, "\\$&");
   re = re
-    .replace(/\*\*\//g, " SLASHSTAR ")
-    .replace(/\*\*/g, " DOUBLESTAR ")
+    .replace(/\*\*\//g, "\uE000SLASHSTAR\uE000")
+    .replace(/\*\*/g, "\uE000DOUBLESTAR\uE000")
     .replace(/\*/g, "[^/]*")
     .replace(/\?/g, "[^/]")
-    .replace(/ SLASHSTAR /g, "(?:.*/)?")
-    .replace(/ DOUBLESTAR /g, ".*");
+    .replace(/\uE000SLASHSTAR\uE000/g, "(?:.*/)?")
+    .replace(/\uE000DOUBLESTAR\uE000/g, ".*");
   return new RegExp(`^${re}$`, "i");
 }
 
