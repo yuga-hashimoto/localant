@@ -9,7 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { createLogger, findAvailablePort, APP_VERSION, ConfigSchema, isToolInProfile, DEFAULT_SESSION_ID } from "@localant/shared";
 import type { McpServerConfigT } from "@localant/shared";
-import { commandExists, resolveTailscale, closeBrowserSession, type Gateway } from "@localant/gateway";
+import { commandExists, resolveTailscale, closeBrowserSession, resolveProviderOrder, type Gateway } from "@localant/gateway";
 import { dashboardHtml } from "@localant/dashboard";
 import { buildMcpServer } from "./mcp-server.js";
 
@@ -610,6 +610,59 @@ function mountDashboardApi(
       s.json(await gw.agents.stopTask(q.params.id));
     } catch (e) {
       s.status(404).json({ error: (e as Error).message });
+    }
+  });
+
+  // --- Autopilot: which provider runs, the fallback chain, and a safe test ---
+  // The public `autopilot` tool never names a provider; these dashboard-only
+  // routes expose the selection so the user can see and configure it.
+  r.get("/autopilot", async (_q, s) => {
+    const cfg = gw.config();
+    const detail = await Promise.all(
+      gw.providers.list().map(async (p) => {
+        const av = await p.available();
+        return {
+          id: p.id,
+          label: p.label,
+          supportedModes: p.supportedModes,
+          enabled: av.enabled,
+          available: av.available,
+          reason: av.reason,
+        };
+      }),
+    );
+    s.json({
+      primary: cfg.autopilot.primary,
+      fallbacks: cfg.autopilot.fallbacks,
+      providers: cfg.autopilot.providers,
+      fallbackPolicy: cfg.autopilot.fallbackPolicy,
+      // The effective order the engine will try (primary + enabled fallbacks).
+      order: resolveProviderOrder(cfg),
+      providersDetail: detail,
+    });
+  });
+
+  // Read-only test: exercises the real provider chain in a non-mutating mode
+  // (plan/review) so users can verify the configured agent answers without
+  // touching the working tree. Mutating modes are rejected here on purpose.
+  r.post("/autopilot/test", async (q, s) => {
+    const cwd = String(q.body?.cwd ?? "").trim();
+    const task = String(q.body?.task ?? "").trim();
+    const requested = String(q.body?.mode ?? "plan");
+    const mode = requested === "review" ? "review" : "plan";
+    if (!cwd) {
+      s.status(400).json({ error: "cwd (working directory) is required" });
+      return;
+    }
+    if (!task) {
+      s.status(400).json({ error: "task is required" });
+      return;
+    }
+    try {
+      const result = await gw.autopilot.run({ task, cwd, mode });
+      s.json(result);
+    } catch (e) {
+      s.status(400).json({ error: (e as Error).message });
     }
   });
 

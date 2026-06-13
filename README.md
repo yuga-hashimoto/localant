@@ -124,7 +124,7 @@ It exposes the standard **Codex / Claude Code / OpenCode**-style tool names:
 | Validate | `project_run_tests` · `project_run_lint` · `project_run_typecheck` · `project_run_build` · `project_run_validation` · `project_get_package_scripts` |
 | Code intel | `lsp_status` · `lsp_diagnostics` · `lsp_document_symbols` · `lsp_go_to_definition` · `lsp_find_references` · `lsp_hover` · `lsp_rename_symbol` |
 | Approve | `approval_request` (the human approves in the dashboard / CLI) |
-| Delegate | `autopilot` (high-level; selects an internal provider from the dashboard's Autopilot Settings — ChatGPT never names a backend) |
+| Delegate | `autopilot` (high-level; selects an internal provider from the dashboard's Autopilot tab — ChatGPT never names a backend) |
 
 > **No web search / web fetch / todo / "ask the user" tools** — ChatGPT already
 > does web search, browsing, planning, and asking you directly, so tool-ifying
@@ -328,9 +328,11 @@ requires approval). See [docs/skills.md](docs/skills.md).
 
 ## How to delegate with Autopilot
 
-Pick your automation backend in the dashboard → **Settings → Autopilot
-Settings** (primary + ordered fallback chain). Then ChatGPT delegates with one
-tool, in plain language — it never names a backend:
+Pick your automation backend in the dashboard → **Autopilot** tab (primary +
+enabled providers + ordered fallback chain + fallback policy). The page shows
+the resolved chain with live availability and lets you run a read-only test to
+confirm the configured agent answers. Then ChatGPT delegates with one tool, in
+plain language — it never names a backend:
 
 ```text
 autopilot(task:"Plan SEO improvements",      cwd:"/Users/me/Documents/my-app", mode:"plan")

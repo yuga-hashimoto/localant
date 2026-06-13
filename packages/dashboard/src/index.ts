@@ -96,7 +96,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Agents","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Agents","Autopilot","Settings"];
 let current = "Home";
 let toolSub = "tools";
 let pendingApprovals = 0;
@@ -545,6 +545,142 @@ const VIEWS = {
     }
   },
 
+  // Dedicated Autopilot page: shows which provider actually runs (the resolved
+  // chain with live availability), lets you configure the primary / fallback
+  // chain / fallback policy, and runs a safe read-only test against a directory.
+  async Autopilot(m){
+    const d=await api('autopilot');
+    const POLICY=[['onTimeout','Timeout'],['onNonZeroExit','Non-zero exit'],['onEmptyOutput','Empty output'],['onNoChanges','No changes'],['onRateLimit','Rate / usage limit'],['onCommandNotFound','Command not found'],['onSafetyBlock','Safety block (off by default)'],['onApprovalRequired','Approval required (off by default)']];
+    const detail={}; (d.providersDetail||[]).forEach(function(p){ detail[p.id]=p; });
+    const apIds=(d.providersDetail||[]).map(function(p){return p.id;});
+    function lbl(id){ return (detail[id]&&detail[id].label)||id; }
+    function availBadge(id){
+      const p=detail[id]; if(!p) return '';
+      if(!p.enabled) return '<span class="tag" style="opacity:.7">disabled</span>';
+      if(!p.available) return '<span class="tag risk4">CLI not on PATH</span>';
+      return '<span class="tag risk0">ready</span>';
+    }
+
+    if(!apIds.length){ m.innerHTML='<div class="card"><h2>Autopilot</h2><p class="muted">No coding agents are configured.</p></div>'; return; }
+
+    var st={ primary:d.primary, fallbacks:(d.fallbacks||[]).slice(), providers:JSON.parse(JSON.stringify(d.providers||{})), fallbackPolicy:JSON.parse(JSON.stringify(d.fallbackPolicy||{})) };
+    function enabled(id){ return !(st.providers[id]&&st.providers[id].enabled===false); }
+    function save(){ return api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({autopilot:st})}); }
+    function err(e){ toast(e.message,'err'); }
+
+    m.innerHTML='<div class="card"><h2>What runs when ChatGPT calls <code>autopilot</code></h2>'
+      +'<p class="muted" style="margin-top:0">ChatGPT delegates through one <code>autopilot</code> tool and never names a backend. LocalAnt tries the providers below <b>in order</b>, skipping any that are disabled or whose CLI is missing, and advances on failure per your fallback policy.</p>'
+      +'<ol id="apChain" style="margin:0;padding-left:22px"></ol></div>'
+
+      +'<div class="card"><h2>Primary provider</h2>'
+      +'<p class="muted" style="margin-top:0">The first agent Autopilot tries.</p>'
+      +'<select id="apPrimary" style="width:240px"></select></div>'
+
+      +'<div class="card"><h2>Providers</h2>'
+      +'<p class="muted" style="margin-top:0">Only enabled providers are eligible. A provider with no CLI on PATH stays installed but is skipped at run time — install its CLI to use it.</p>'
+      +'<table><thead><tr><th>Provider</th><th>CLI</th><th>Enabled</th></tr></thead><tbody id="apProviders"></tbody></table></div>'
+
+      +'<div class="card"><h2>Fallback chain</h2>'
+      +'<p class="muted" style="margin-top:0">Tried top-to-bottom after the primary fails in a way the policy permits.</p>'
+      +'<ul id="apFallbacks" style="padding-left:0;list-style:none;margin:0 0 8px"></ul>'
+      +'<div class="row" style="gap:8px"><select id="apAddFb" style="width:220px"></select><button class="btn ghost sm" id="apAddFbBtn">Add to chain</button></div></div>'
+
+      +'<div class="card"><h2>Fallback policy</h2>'
+      +'<p class="muted" style="margin-top:0">Advance to the next provider when the current one fails because of…</p>'
+      +'<div id="apPolicy"></div></div>'
+
+      +'<div class="card"><h2>Test the chain <span class="muted">(read-only)</span></h2>'
+      +'<p class="muted" style="margin-top:0">Runs the real provider chain in a non-mutating mode against a directory — no edits, no branch. Use it to confirm the configured agent answers.</p>'
+      +'<div class="row" style="gap:12px;margin-bottom:8px"><input type="text" id="apTestCwd" placeholder="working directory (absolute path)" style="flex:1;min-width:240px" />'
+      +'<select id="apTestMode"><option value="plan">plan</option><option value="review">review</option></select></div>'
+      +'<textarea id="apTestTask" rows="2" placeholder="e.g. Summarize what this project does">Run a quick health check and summarize this project.</textarea>'
+      +'<div class="row" style="margin-top:8px"><button class="btn" id="apTestBtn">Run test</button></div>'
+      +'<div id="apTestOut" style="margin-top:12px"></div></div>';
+
+    function paintChain(){
+      const ol=document.getElementById('apChain'); if(!ol)return; ol.innerHTML='';
+      const order=(d.order||[]);
+      if(!order.length){ ol.outerHTML='<p class="risk4" id="apChain">No provider is enabled — enable one below or Autopilot will refuse to run.</p>'; return; }
+      order.forEach(function(id){
+        ol.appendChild(el('<li style="margin-bottom:4px"><code>'+esc(lbl(id))+'</code> '+availBadge(id)+(id===st.primary?' <span class="tag">primary</span>':'')+'</li>'));
+      });
+      const runnable=order.filter(function(id){ return detail[id]&&detail[id].available; });
+      if(!runnable.length){ ol.appendChild(el('<li class="risk4">No provider in the chain has its CLI installed — Autopilot will fail until you install one.</li>')); }
+    }
+    async function refreshChain(){ try{ const nd=await api('autopilot'); d.order=nd.order; (nd.providersDetail||[]).forEach(function(p){detail[p.id]=p;}); paintChain(); paintProviders(); }catch(e){} }
+
+    function paintPrimary(){
+      const sel=document.getElementById('apPrimary'); if(!sel)return;
+      sel.innerHTML=apIds.map(function(id){return '<option value="'+esc(id)+'"'+(st.primary===id?' selected':'')+'>'+esc(lbl(id))+'</option>';}).join('');
+      sel.onchange=function(e){ st.primary=e.target.value; st.fallbacks=st.fallbacks.filter(function(x){return x!==st.primary;}); save().then(function(){ toast('Primary → '+lbl(st.primary)); paintFallbacks(); paintAdd(); refreshChain(); }).catch(err); };
+    }
+    function paintProviders(){
+      const tb=document.getElementById('apProviders'); if(!tb)return; tb.innerHTML='';
+      apIds.forEach(function(id){
+        const p=detail[id]||{};
+        const cli=p.available?'<span class="risk0">on PATH</span>':'<span class="risk4">missing</span>';
+        const tr=el('<tr><td><b>'+esc(lbl(id))+'</b></td><td>'+cli+'</td><td></td></tr>');
+        const wrap=el('<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox"'+(enabled(id)?' checked':'')+' style="width:auto"/> '+(enabled(id)?'enabled':'disabled')+'</label>');
+        wrap.querySelector('input').onchange=function(e){ st.providers[id]={enabled:e.target.checked}; save().then(function(){ toast('Saved'); refreshChain(); }).catch(err); };
+        tr.lastElementChild.appendChild(wrap);
+        tb.appendChild(tr);
+      });
+    }
+    function paintFallbacks(){
+      const ul=document.getElementById('apFallbacks'); if(!ul)return; ul.innerHTML='';
+      if(!st.fallbacks.length){ ul.innerHTML='<li class="muted">None — primary only.</li>'; return; }
+      st.fallbacks.forEach(function(id,i){
+        const li=el('<li style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1"><code>'+esc(lbl(id))+'</code> '+availBadge(id)+'</span></li>');
+        const up=el('<button class="btn ghost sm">↑</button>'); up.disabled=i===0; up.onclick=function(){ const a=st.fallbacks,t=a[i-1]; a[i-1]=a[i]; a[i]=t; save().then(function(){paintFallbacks();refreshChain();}).catch(err); };
+        const dn=el('<button class="btn ghost sm">↓</button>'); dn.disabled=i===st.fallbacks.length-1; dn.onclick=function(){ const a=st.fallbacks,t=a[i+1]; a[i+1]=a[i]; a[i]=t; save().then(function(){paintFallbacks();refreshChain();}).catch(err); };
+        const rm=el('<button class="btn ghost sm">Remove</button>'); rm.onclick=function(){ st.fallbacks=st.fallbacks.filter(function(x){return x!==id;}); save().then(function(){paintFallbacks();paintAdd();refreshChain();}).catch(err); };
+        li.appendChild(up); li.appendChild(dn); li.appendChild(rm); ul.appendChild(li);
+      });
+    }
+    function paintAdd(){
+      const sel=document.getElementById('apAddFb'); if(!sel)return;
+      const avail=apIds.filter(function(id){return st.fallbacks.indexOf(id)===-1&&id!==st.primary;});
+      sel.innerHTML=avail.map(function(id){return '<option value="'+esc(id)+'">'+esc(lbl(id))+'</option>';}).join('');
+      sel.disabled=!avail.length;
+      const btn=document.getElementById('apAddFbBtn'); if(btn)btn.disabled=!avail.length;
+    }
+    function paintPolicy(){
+      const dv=document.getElementById('apPolicy'); if(!dv)return; dv.innerHTML='';
+      POLICY.forEach(function(p){
+        const def=!(p[0]==='onSafetyBlock'||p[0]==='onApprovalRequired');
+        let val=st.fallbackPolicy[p[0]]; if(val===undefined)val=def;
+        const lab=el('<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:4px"><input type="checkbox"'+(val?' checked':'')+' style="width:auto"/> '+esc(p[1])+'</label>');
+        lab.querySelector('input').onchange=function(e){ st.fallbackPolicy[p[0]]=e.target.checked; save().then(function(){toast('Saved');}).catch(err); };
+        dv.appendChild(lab);
+      });
+    }
+
+    document.getElementById('apAddFbBtn').onclick=function(){ const sel=document.getElementById('apAddFb'); if(sel&&sel.value){ st.fallbacks.push(sel.value); save().then(function(){paintFallbacks();paintAdd();refreshChain();}).catch(err); } };
+
+    const testBtn=document.getElementById('apTestBtn');
+    testBtn.onclick=action(testBtn,async()=>{
+      const cwd=document.getElementById('apTestCwd').value.trim();
+      const task=document.getElementById('apTestTask').value.trim();
+      const mode=document.getElementById('apTestMode').value;
+      const out=document.getElementById('apTestOut');
+      if(!cwd){ toast('Working directory is required.','err'); return; }
+      if(!task){ toast('Describe a task to test.','err'); return; }
+      out.innerHTML='<p class="muted"><span class="spin"></span> Running '+esc(mode)+'…</p>';
+      const r=await api('autopilot/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cwd,task,mode})});
+      const attempts=(r.attempts||[]).map(function(a){
+        const status=a.skipped?'<span class="tag">skipped</span>':(a.ok?'<span class="tag risk0">ok</span>':'<span class="tag risk4">failed</span>');
+        const why=a.failureReason?(' <span class="muted">'+esc(a.failureReason)+'</span>'):'';
+        return '<li><code>'+esc(a.providerLabel||a.providerId)+'</code> '+status+why+(a.note?' <span class="muted">'+esc(a.note)+'</span>':'')+'</li>';
+      }).join('');
+      const head=r.ok?'<span class="risk0">✓ A provider answered.</span>':(r.exhausted?'<span class="risk4">✗ Every provider failed.</span>':'<span class="risk4">✗ Stopped: '+esc(r.stoppedReason||'')+'</span>');
+      out.innerHTML='<p>'+head+'</p>'
+        +'<p class="muted" style="margin:6px 0 4px">Attempts (in order):</p><ul style="margin:0 0 8px;padding-left:20px">'+(attempts||'<li class="muted">none</li>')+'</ul>'
+        +'<pre style="max-height:300px">'+esc((r.output||'(no output)').slice(0,4000))+'</pre>';
+    },'Testing');
+
+    paintChain(); paintPrimary(); paintProviders(); paintFallbacks(); paintAdd(); paintPolicy();
+  },
+
   async MCP(m){
     m.innerHTML='<div class="card"><h2>Bridged MCP servers</h2>'
       +'<p class="muted" style="margin-top:0">Connect downstream <b>stdio</b> MCP servers to LocalAnt. Their tools are proxied through the gateway (approval + audit pipeline). '
@@ -626,13 +762,9 @@ const VIEWS = {
       +'</div>'
       +'</div>'
 
-      +'<div class="card"><h2>Autopilot Settings</h2>'
-      +'<p class="muted" style="margin-top:0">ChatGPT delegates local work through the single <code>autopilot</code> tool — it never names a backend. These settings pick the automation provider (Claude Code, Codex, opencode, OpenClaw, Antigravity, Hermes) and the fallback chain.</p>'
-      +'<div class="field"><label>Primary provider</label><select id="apPrimary" style="width:220px"></select></div>'
-      +'<div class="field"><label>Providers (enabled)</label><div id="apProviders"></div></div>'
-      +'<div class="field"><label>Fallback chain (tried in order after the primary fails)</label><ul id="apFallbacks" style="padding-left:0;list-style:none;margin:0 0 8px"></ul>'
-        +'<div class="row" style="gap:8px"><select id="apAddFb" style="width:200px"></select><button class="btn ghost sm" id="apAddFbBtn">Add to chain</button></div></div>'
-      +'<div class="field"><label>Fallback policy (advance to the next provider when…)</label><div id="apPolicy"></div></div>'
+      +'<div class="card"><h2>Autopilot</h2>'
+      +'<p class="muted" style="margin-top:0">ChatGPT delegates local work through the single <code>autopilot</code> tool — it never names a backend. Pick which agent runs, the fallback chain, and run a safe test from the dedicated <b>Autopilot</b> tab.</p>'
+      +'<button class="btn ghost sm" id="goAutopilot">Open Autopilot settings →</button>'
       +'</div>'
 
       +'<div class="card"><h2>Auth token</h2>'
@@ -683,67 +815,7 @@ const VIEWS = {
     document.getElementById('approveRisk1').onchange=async(e)=>{ try{ await saveSec({approveRisk1:e.target.checked}); toast('Saved'); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('toolProfile').onchange=async(e)=>{ try{ await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tools:{profile:e.target.value}})}); toast('Tool profile → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
 
-    // --- Autopilot Settings ---
-    (function(){
-      var APLABELS={'claude-code':'Claude Code','codex':'Codex','opencode':'opencode','openclaw':'OpenClaw','antigravity-cli':'Antigravity (agy)','hermes-agent':'Hermes Agent'};
-      var POLICY=[['onTimeout','Timeout'],['onNonZeroExit','Non-zero exit'],['onEmptyOutput','Empty output'],['onNoChanges','No changes'],['onRateLimit','Rate / usage limit'],['onCommandNotFound','Command not found'],['onSafetyBlock','Safety block (off by default)'],['onApprovalRequired','Approval required (off by default)']];
-      var apIds=Object.keys(c.codingAgents||{});
-      if(!apIds.length) return;
-      var st=JSON.parse(JSON.stringify(c.autopilot||{}));
-      st.primary=apIds.indexOf(st.primary)!==-1?st.primary:apIds[0];
-      st.fallbacks=(st.fallbacks||[]).filter(function(x){return apIds.indexOf(x)!==-1;});
-      st.providers=st.providers||{};
-      st.fallbackPolicy=st.fallbackPolicy||{};
-      function lbl(id){return APLABELS[id]||id;}
-      function enabled(id){return !(st.providers[id]&&st.providers[id].enabled===false);}
-      function save(){return api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({autopilot:st})});}
-      function ok(){toast('Saved');}
-      function err(e){toast(e.message,'err');}
-      function paintPrimary(){
-        var sel=document.getElementById('apPrimary'); if(!sel)return;
-        sel.innerHTML=apIds.map(function(id){return '<option value="'+esc(id)+'"'+(st.primary===id?' selected':'')+'>'+esc(lbl(id))+'</option>';}).join('');
-        sel.onchange=function(e){ st.primary=e.target.value; save().then(function(){toast('Primary → '+lbl(st.primary));}).catch(err); };
-      }
-      function paintProviders(){
-        var d=document.getElementById('apProviders'); if(!d)return; d.innerHTML='';
-        apIds.forEach(function(id){
-          var lab=el('<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:4px"><input type="checkbox"'+(enabled(id)?' checked':'')+' style="width:auto"/> '+esc(lbl(id))+'</label>');
-          lab.querySelector('input').onchange=function(e){ st.providers[id]={enabled:e.target.checked}; save().then(ok).catch(err); };
-          d.appendChild(lab);
-        });
-      }
-      function paintFallbacks(){
-        var ul=document.getElementById('apFallbacks'); if(!ul)return; ul.innerHTML='';
-        if(!st.fallbacks.length){ ul.innerHTML='<li class="muted">None — primary only.</li>'; return; }
-        st.fallbacks.forEach(function(id,i){
-          var li=el('<li style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="flex:1"><code>'+esc(lbl(id))+'</code></span></li>');
-          var up=el('<button class="btn ghost sm">↑</button>'); up.disabled=i===0; up.onclick=function(){ var a=st.fallbacks,t=a[i-1]; a[i-1]=a[i]; a[i]=t; save().then(paintFallbacks).catch(err); };
-          var dn=el('<button class="btn ghost sm">↓</button>'); dn.disabled=i===st.fallbacks.length-1; dn.onclick=function(){ var a=st.fallbacks,t=a[i+1]; a[i+1]=a[i]; a[i]=t; save().then(paintFallbacks).catch(err); };
-          var rm=el('<button class="btn ghost sm">Remove</button>'); rm.onclick=function(){ st.fallbacks=st.fallbacks.filter(function(x){return x!==id;}); save().then(function(){paintFallbacks();paintAdd();}).catch(err); };
-          li.appendChild(up); li.appendChild(dn); li.appendChild(rm); ul.appendChild(li);
-        });
-      }
-      function paintAdd(){
-        var sel=document.getElementById('apAddFb'); if(!sel)return;
-        var avail=apIds.filter(function(id){return st.fallbacks.indexOf(id)===-1&&id!==st.primary;});
-        sel.innerHTML=avail.map(function(id){return '<option value="'+esc(id)+'">'+esc(lbl(id))+'</option>';}).join('');
-        sel.disabled=!avail.length;
-        var btn=document.getElementById('apAddFbBtn'); if(btn)btn.disabled=!avail.length;
-      }
-      function paintPolicy(){
-        var d=document.getElementById('apPolicy'); if(!d)return; d.innerHTML='';
-        POLICY.forEach(function(p){
-          var def=!(p[0]==='onSafetyBlock'||p[0]==='onApprovalRequired');
-          var val=st.fallbackPolicy[p[0]]; if(val===undefined)val=def;
-          var lab=el('<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-bottom:4px"><input type="checkbox"'+(val?' checked':'')+' style="width:auto"/> '+esc(p[1])+'</label>');
-          lab.querySelector('input').onchange=function(e){ st.fallbackPolicy[p[0]]=e.target.checked; save().then(ok).catch(err); };
-          d.appendChild(lab);
-        });
-      }
-      var addBtn=document.getElementById('apAddFbBtn');
-      if(addBtn)addBtn.onclick=function(){ var sel=document.getElementById('apAddFb'); if(sel&&sel.value){ st.fallbacks.push(sel.value); save().then(function(){paintFallbacks();paintAdd();}).catch(err); } };
-      paintPrimary(); paintProviders(); paintFallbacks(); paintAdd(); paintPolicy();
-    })();
+    document.getElementById('goAutopilot').onclick=function(){ current='Autopilot'; renderNav(); render(); };
 
     const authTok=document.getElementById('authTok');
     document.getElementById('authReveal').onclick=action(document.getElementById('authReveal'),async()=>{
