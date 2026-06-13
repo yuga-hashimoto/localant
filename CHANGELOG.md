@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-06-13
+
+### Added
+- Turn-based ChatGPT ⇄ coding-agent dialogue: `coding_agent_continue_task` now
+  resumes the agent's prior session (via per-agent `resumeArgs`, e.g. `claude -c`,
+  `codex exec resume --last`, `hermes --continue`) on the same work branch.
+- `localant skills new <name>` scaffolds a new local skill skeleton (disabled).
+- `localant skills search [query]` searches configured skill registries.
+- `--json` output for `localant status` and `localant doctor`.
+- Example "local hands" skills: **file-organizer** (sort a folder by type/date)
+  and **local-backup** (timestamped `.tar.gz` snapshots via a `tar`-only allowlist).
+- Dashboard: **Approve all / Deny all** for pending approvals, plus full-width
+  thumb-sized approval buttons on small screens.
+- `docs/tools.md` documents every tool family with its risk level; root
+  `server.json` manifest for the official MCP registry.
+- Demo recording embedded in the README (GIF linking the full MP4).
+
+### Fixed
+- Coding-agent adapter now uses each CLI's correct non-interactive invocation
+  (`codex exec`, `opencode run`, `hermes chat -q`, `openclaw agent --local -m`,
+  `agy --print`, `claude -p`). Adds a `{{prompt}}` placeholder for agents that
+  take the prompt mid-argv. Fixes Hermes/OpenClaw (prompt was read as a
+  subcommand) and Codex (interactive mode without a TTY).
+- Audit log now prunes entries older than `logRetentionDays` (on startup and
+  throttled thereafter).
+- Windows: external CLIs (coding agents, cloudflared, ngrok) resolve their
+  `.cmd`/`.exe` shims via PATHEXT, fixing ENOENT when spawned with `shell:false`.
+
+### Changed
+- Upgraded zod 3 → 4.4.3.
+
 ## [1.4.3] - 2026-06-13
 
 ### Fixed
