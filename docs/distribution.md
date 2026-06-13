@@ -22,41 +22,30 @@ System*):
 
 Legend used by that list: 🟫 = TypeScript, 🏠 = local service.
 
-## Official MCP registry (draft — validate before publishing)
+## Official MCP registry
 
-LocalAnt is unusual for the registry: it is a **gateway** that speaks Streamable
-HTTP `/mcp` behind a tunnel rather than a plain stdio server, and its npm `bin`
-is a CLI (`localant setup`) rather than a server entrypoint. Before submitting,
-validate the manifest below with the official
-[`mcp-publisher`](https://github.com/modelcontextprotocol/registry) tool and
-adjust the `transport`/`packages` shape to match the current schema.
+The submission manifest lives at [`server.json`](../server.json) in the repo
+root (kept in sync with the published version). Publish with the official
+[`mcp-publisher`](https://github.com/modelcontextprotocol/registry) tool:
 
-```jsonc
-{
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.json",
-  "name": "io.github.yuga-hashimoto/localant",
-  "description": "Permissioned local MCP gateway for ChatGPT: run approved commands, manage files, drive coding agents, all behind default-deny security with local approval and audit logging.",
-  "repository": {
-    "url": "https://github.com/yuga-hashimoto/localant",
-    "source": "github"
-  },
-  "version": "1.0.2",
-  "packages": [
-    {
-      "registryType": "npm",
-      "identifier": "localant",
-      "version": "1.0.2",
-      "runtimeHint": "npx",
-      "transport": { "type": "stdio" }
-    }
-  ]
-}
+```bash
+# authenticate as the io.github.yuga-hashimoto namespace owner, then:
+mcp-publisher validate   # check server.json against the current schema
+mcp-publisher publish    # submit to the registry
 ```
 
-> NOTE: the `transport` above is a placeholder. LocalAnt's real endpoint is
-> `https://<tunnel>/mcp` (Streamable HTTP) created by `localant setup`. If the
-> registry version in use supports a `remote`/`streamable-http` transport,
-> prefer documenting that flow instead of a stdio package.
+Keep `server.json`'s `version` (and the package `version`) in lockstep with the
+npm release — the release checklist in
+[CONTRIBUTING.md → Releasing](../CONTRIBUTING.md#releasing-maintainers) should
+bump both.
+
+> LocalAnt is unusual for the registry: at runtime it is a **gateway** that
+> speaks Streamable HTTP `/mcp` behind a tunnel, but it is *installed* as the npm
+> package `localant` (CLI entrypoint `localant setup`). The `server.json` above
+> describes the npm install path; the actual MCP endpoint is
+> `https://<tunnel>/mcp`, created by `localant setup`. If a future registry
+> schema gains first-class `remote`/`streamable-http` support, prefer
+> documenting that endpoint shape instead of the stdio package hint.
 
 ## Articles / posts
 

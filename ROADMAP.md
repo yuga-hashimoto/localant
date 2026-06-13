@@ -3,6 +3,11 @@
 This is a living document of where LocalAnt is headed. Priorities may shift —
 open an issue or discussion to propose changes. Items are not commitments.
 
+## Recently shipped
+
+- [x] Per-tool-family risk documentation ([docs/tools.md](docs/tools.md))
+- [x] Correct per-agent coding-agent invocations + turn-based session resume
+
 ## Now (hardening the core)
 
 - [x] Dashboard CSRF / DNS-rebinding protection (per-process token + Host check)
@@ -15,7 +20,7 @@ open an issue or discussion to propose changes. Items are not commitments.
 
 ## Next (usability & reach)
 
-- [ ] One-command setup recording / demo GIF in the README
+- [x] One-command setup recording / demo GIF in the README
 - [x] `localant skills new <name>` scaffolder for the skill SDK
 - [x] Skill registry: browse/search/install from curated sources (`localant skills search`)
 - [ ] Per-session approval UX improvements in the dashboard

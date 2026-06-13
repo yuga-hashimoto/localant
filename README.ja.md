@@ -24,6 +24,16 @@
 `LocalAnt` は、ChatGPT を頭脳として、ローカル PC を実行環境として使うための
 ツールです。
 
+## デモ
+
+<p align="center">
+  <a href="assets/demo.mp4">
+    <img src="assets/demo.gif" width="100%" alt="LocalAnt デモ — ChatGPT がリポジトリを読み、バグを直し、検証し、差分を表示する。" />
+  </a>
+</p>
+
+<p align="center"><sub>ChatGPT が LocalAnt 経由でローカル PC 上の実タスクを実行します。<a href="assets/demo.mp4">▶ 高画質 MP4</a></sub></p>
+
 <table>
   <tr>
     <td width="50%"><b>Before (作業前: タスク開始時)</b></td>
