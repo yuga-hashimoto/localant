@@ -11,7 +11,7 @@ open an issue or discussion to propose changes. Items are not commitments.
 - [x] Expanded security test coverage (vault, approvals, redaction, HTTP auth)
 - [x] Tag-driven npm release with provenance; CI on Linux/macOS/Windows × Node 20/22
 - [x] Coverage reporting wired to source (vitest resolves workspace packages to `src`)
-- [ ] Audit log rotation honoring `logRetentionDays`
+- [x] Audit log rotation honoring `logRetentionDays`
 
 ## Next (usability & reach)
 
