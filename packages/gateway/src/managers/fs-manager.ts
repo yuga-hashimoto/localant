@@ -426,7 +426,9 @@ export class FsManager {
           if (FsManager.DEFAULT_IGNORES.has(e.name)) continue;
           walk(full);
         } else {
-          const rel = path.relative(root, full);
+          // Normalize to forward slashes so path-aware globs (** and /)
+          // match on Windows, where path.relative yields backslashes.
+          const rel = path.relative(root, full).split(path.sep).join("/");
           if (rx.test(rel) || rx.test(e.name)) out.push(full);
         }
       }
