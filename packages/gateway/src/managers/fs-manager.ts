@@ -223,6 +223,38 @@ export class FsManager {
     ".turbo",
   ]);
 
+  /**
+   * Write raw bytes to a path inside the allowlist, atomically (temp file +
+   * rename) and keeping a backup if the destination already exists. Used by the
+   * Asset Bridge to persist binary images. Unlike {@link createFile} this does
+   * not enforce the text-file size limit (assets have their own ceiling) and
+   * never coerces the payload through UTF-8.
+   */
+  writeBytes(target: string, data: Buffer, overwrite: boolean): { path: string; bytes: number; backupId?: string } {
+    const resolved = this.guard.assertAccess(target, "write");
+    let backupId: string | undefined;
+    if (fs.existsSync(resolved)) {
+      if (!overwrite) {
+        throw new Error(`File exists: '${target}'. Pass overwrite=true to replace (a backup is kept).`);
+      }
+      backupId = this.backup(resolved).id;
+    }
+    fs.mkdirSync(path.dirname(resolved), { recursive: true });
+    const tmp = path.join(path.dirname(resolved), `.localant-asset-${nanoid(8)}.tmp`);
+    try {
+      fs.writeFileSync(tmp, data);
+      fs.renameSync(tmp, resolved);
+    } catch (e) {
+      try {
+        fs.rmSync(tmp, { force: true });
+      } catch {
+        /* ignore */
+      }
+      throw e;
+    }
+    return { path: resolved, bytes: data.length, ...(backupId ? { backupId } : {}) };
+  }
+
   /** Create a directory (recursive). */
   createDirectory(target: string): { path: string } {
     const resolved = this.guard.assertAccess(target, "write");

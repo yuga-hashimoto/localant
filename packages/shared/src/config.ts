@@ -183,6 +183,26 @@ export const ConfigSchema = z.object({
     })
     // prefault: an empty object parsed through the schema yields all defaults.
     .prefault({}),
+  assets: z
+    .object({
+      // Hard ceiling on the size of any single received/imported asset. Larger
+      // than security.maxFileSizeBytes because images/media legitimately exceed
+      // the text-file limit. Caps both the declared transfer size and the bytes
+      // actually downloaded over the network.
+      maxAssetBytes: z.number().int().positive().default(26_214_400), // 25 MiB
+      // How long an in-progress chunked transfer may stay open before it is
+      // evicted (also bounds the in-memory buffer lifetime).
+      transferTtlMs: z.number().int().positive().default(300_000), // 5 min
+      // MIME allowlist for imported/received assets. Enforced against the
+      // detected magic bytes, not just the declared MIME.
+      allowedMimeTypes: z
+        .array(z.string())
+        .default(["image/png", "image/jpeg", "image/webp", "image/gif", "image/svg+xml"]),
+      // Directory scanned by asset_import_latest_download. Defaults to the OS
+      // Downloads folder when unset.
+      downloadsDir: z.string().optional(),
+    })
+    .prefault({}),
   codingAgents: z
     .record(z.string(), CodingAgentConfig)
     // prefault: each agent literal omits some defaulted fields, so parse the

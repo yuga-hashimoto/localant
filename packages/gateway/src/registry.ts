@@ -13,6 +13,12 @@ export interface ToolDefinition<S extends z.ZodTypeAny = z.ZodTypeAny> {
   inputSchema: S;
   /** Short human summary of an invocation, used for audit + approval prompts. */
   summarize?: (input: z.output<S>) => string;
+  /**
+   * Sanitized view of the input recorded in the audit log. Use this to keep
+   * bulky or sensitive payloads (e.g. base64 image chunks) out of the log while
+   * still recording the metadata that matters. Defaults to the raw input.
+   */
+  auditInput?: (input: z.output<S>) => unknown;
   handler: (input: z.output<S>, ctx: ToolCallContext) => Promise<unknown> | unknown;
 }
 
