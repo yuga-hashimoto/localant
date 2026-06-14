@@ -24,7 +24,9 @@ beforeEach(() => {
   proj = path.join(base, "proj");
   fs.mkdirSync(proj, { recursive: true });
 });
-afterEach(() => fs.rmSync(base, { recursive: true, force: true }));
+// maxRetries/retryDelay absorb the Windows EBUSY race where a just-stopped
+// background shell still holds a handle to the temp dir during cleanup.
+afterEach(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
 
 describe("bash tool", () => {
   it("executes an allowed command", async () => {
