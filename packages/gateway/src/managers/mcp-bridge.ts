@@ -5,6 +5,7 @@ import type { Config } from "@localant/shared";
 import { createLogger } from "@localant/shared";
 
 const log = createLogger("mcp-bridge");
+const DEFAULT_MCP_OPERATION_TIMEOUT_MS = 15_000;
 
 interface Closable {
   close: () => Promise<void>;
@@ -58,8 +59,11 @@ export class McpBridge {
     }
 
     try {
-      await client.connect(transport as unknown as Parameters<Client["connect"]>[0]);
-      const tools = await this.listToolsFrom(client);
+      await withMcpTimeout(
+        client.connect(transport as unknown as Parameters<Client["connect"]>[0]),
+        `connect to MCP server '${name}'`,
+      );
+      const tools = await this.listToolsFrom(client, name);
 
       const server: BridgeServer = { name, client, transport, tools, connected: true };
       this.servers.set(name, server);
@@ -72,8 +76,8 @@ export class McpBridge {
     }
   }
 
-  private async listToolsFrom(client: Client): Promise<{ name: string; description?: string; inputSchema?: Record<string, unknown> }[]> {
-    const result = await client.listTools({});
+  private async listToolsFrom(client: Client, serverName: string): Promise<{ name: string; description?: string; inputSchema?: Record<string, unknown> }[]> {
+    const result = await withMcpTimeout(client.listTools({}), `list tools from MCP server '${serverName}'`);
     return (result.tools ?? []).map((t) => ({
       name: t.name,
       description: t.description,
@@ -97,7 +101,10 @@ export class McpBridge {
     }
 
     try {
-      const result = await server.client.callTool({ name: toolName, arguments: args });
+      const result = await withMcpTimeout(
+        server.client.callTool({ name: toolName, arguments: args }),
+        `call downstream tool '${name}.${toolName}'`,
+      );
       return result;
     } catch (err) {
       throw new Error(`Downstream tool '${name}.${toolName}' failed: ${(err as Error).message}`);
@@ -118,5 +125,23 @@ export class McpBridge {
     for (const name of this.servers.keys()) {
       await this.disconnect(name);
     }
+  }
+}
+
+export async function withMcpTimeout<T>(
+  promise: Promise<T>,
+  label: string,
+  timeoutMs = DEFAULT_MCP_OPERATION_TIMEOUT_MS,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

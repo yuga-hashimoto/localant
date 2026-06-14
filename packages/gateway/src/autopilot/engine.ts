@@ -7,6 +7,8 @@ import type { AutopilotFallbackReason, PriorAttemptContext } from "./types.js";
 
 const MUTATING_MODES = new Set<AutopilotMode>(["execute", "fix", "pr"]);
 const SUMMARY_CHARS = 1200;
+const DEFAULT_LOCK_TTL_MS = 30 * 60 * 1000;
+const LOCK_TTL_GRACE_MS = 60 * 1000;
 
 export interface AutopilotRunInput {
   task: string;
@@ -50,8 +52,13 @@ export interface AutopilotRunResult {
  * advances through fallbacks per the fallback policy. ChatGPT never names a
  * provider — selection happens entirely here.
  */
+interface AutopilotLock {
+  startedAt: number;
+  timeoutMs: number;
+}
+
 export class AutopilotEngine {
-  private readonly locks = new Set<string>();
+  private readonly locks = new Map<string, AutopilotLock>();
 
   constructor(
     private readonly config: () => Config,
@@ -73,15 +80,49 @@ export class AutopilotEngine {
       );
     }
 
-    if (this.locks.has(safeCwd)) {
-      throw new Error(`Autopilot is already running in this directory (${input.cwd}). Wait for it to finish.`);
+    this.pruneStaleLock(safeCwd);
+    const active = this.locks.get(safeCwd);
+    if (active) {
+      const ageMs = Date.now() - active.startedAt;
+      throw new Error(
+        `Autopilot is already running in this directory (${input.cwd}). ` +
+          `Wait for it to finish or retry after ${Math.max(1, Math.ceil((active.timeoutMs - ageMs) / 1000))}s.`,
+      );
     }
-    this.locks.add(safeCwd);
+    this.locks.set(safeCwd, {
+      startedAt: Date.now(),
+      timeoutMs: this.lockTtlMs(input),
+    });
     try {
       return await this.runChain(order, input, safeCwd);
     } finally {
-      this.locks.delete(safeCwd);
+      this.releaseLock(safeCwd);
     }
+  }
+
+  private lockTtlMs(input: AutopilotRunInput): number {
+    return (input.timeoutMs ?? DEFAULT_LOCK_TTL_MS) + LOCK_TTL_GRACE_MS;
+  }
+
+  private pruneStaleLock(safeCwd: string): void {
+    const lock = this.locks.get(safeCwd);
+    if (!lock) return;
+    if (Date.now() - lock.startedAt > lock.timeoutMs) this.locks.delete(safeCwd);
+  }
+
+  private releaseLock(safeCwd: string): void {
+    this.locks.delete(safeCwd);
+  }
+
+  activeRuns(): { cwd: string; startedAt: string; ageMs: number; timeoutMs: number }[] {
+    const now = Date.now();
+    for (const cwd of this.locks.keys()) this.pruneStaleLock(cwd);
+    return [...this.locks.entries()].map(([cwd, lock]) => ({
+      cwd,
+      startedAt: new Date(lock.startedAt).toISOString(),
+      ageMs: now - lock.startedAt,
+      timeoutMs: lock.timeoutMs,
+    }));
   }
 
   private async runChain(
