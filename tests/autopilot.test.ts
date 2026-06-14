@@ -215,6 +215,20 @@ describe("AutopilotEngine fallback chain", () => {
     expect(res.attempts).toHaveLength(2);
   });
 
+  it("releases the cwd lock after a completed run", async () => {
+    const primary = stubProvider("claude-code", { result: { ok: true, exitCode: 0, stdout: "done", failureReason: undefined } });
+    const engine = new AutopilotEngine(
+      () => configWith({ primary: "claude-code", fallbacks: [] }),
+      stubRegistry({ "claude-code": primary.provider }),
+      openPathGuard(dir),
+    );
+    const first = await engine.run({ task: "first", cwd: dir, mode: "review" });
+    const second = await engine.run({ task: "second", cwd: dir, mode: "plan" });
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    expect(engine.activeRuns()).toHaveLength(0);
+  });
+
   it("throws when no provider is enabled", async () => {
     const engine = new AutopilotEngine(
       () => configWith({ primary: "claude-code", fallbacks: [], providers: { "claude-code": { enabled: false } } }),

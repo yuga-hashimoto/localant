@@ -18,6 +18,7 @@ import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
 import { registerAdapterTools } from "./adapters.js";
 import { registerAssetTools } from "./assets.js";
+import { registerLegacyCompatibilityTools } from "./legacy.js";
 import { registerAliasTools } from "./aliases.js";
 
 /** Register every built-in tool family onto the gateway registry. */
@@ -44,6 +45,9 @@ export function registerAllTools(gw: Gateway): void {
   registerBrowserTools(gw);
   registerAdapterTools(gw);
   registerAssetTools(gw);
+  // Legacy compatibility keeps older ChatGPT tool schemas callable while the
+  // current advertised surface uses autopilot and the generic MCP bridge.
+  registerLegacyCompatibilityTools(gw);
   // Aliases must run last: they wrap already-registered tools.
   registerAliasTools(gw);
 }

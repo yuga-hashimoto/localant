@@ -6,7 +6,7 @@ export { registerAllTools } from "./tools/index.js";
 export { closeBrowserSession } from "./tools/browser.js";
 export { buildKeyComboArgs, buildTypeArgs, SPECIAL_KEYS, MODIFIERS } from "./tools/computer.js";
 export type { Modifier } from "./tools/computer.js";
-export { McpBridge } from "./managers/mcp-bridge.js";
+export { McpBridge, withMcpTimeout } from "./managers/mcp-bridge.js";
 export { assembleAgentArgs } from "./managers/coding-agent-manager.js";
 export { ProviderRegistry } from "./autopilot/provider-registry.js";
 export { AutopilotEngine } from "./autopilot/engine.js";
