@@ -10,7 +10,19 @@ import {
 } from "@localant/shared";
 import { execFileSafe } from "../util/exec.js";
 
-const RUNNER = fileURLToPath(new URL("../skill-runner.js", import.meta.url));
+const RUNNER = resolveRunnerPath();
+
+function resolveRunnerPath(): string {
+  const candidates = [
+    new URL("../skill-runner.js", import.meta.url),
+    new URL("../../dist/skill-runner.js", import.meta.url),
+  ];
+  for (const candidate of candidates) {
+    const file = fileURLToPath(candidate);
+    if (fs.existsSync(file)) return file;
+  }
+  return fileURLToPath(candidates[0]!);
+}
 
 interface SkillStateFile {
   enabled: Record<string, boolean>;
@@ -227,6 +239,7 @@ export class SkillRuntime {
 
     fs.writeFileSync(path.join(dir, "skill.json"), JSON.stringify(manifest, null, 2));
     fs.writeFileSync(path.join(dir, ".generated"), new Date().toISOString());
+    fs.writeFileSync(path.join(dir, "package.json"), skillPackageJsonTemplate(input.name));
     fs.writeFileSync(path.join(dir, "LICENSE"), "MIT\n");
     fs.writeFileSync(path.join(dir, "CHANGELOG.md"), `# Changelog\n\n## 0.1.0\n- Generated skill skeleton.\n`);
     fs.writeFileSync(
@@ -270,6 +283,21 @@ export class SkillRuntime {
   }
 }
 
+function skillPackageJsonTemplate(name: string): string {
+  return (
+    JSON.stringify(
+      {
+        name: `@localant-skill/${name}`,
+        version: "0.1.0",
+        private: true,
+        type: "module",
+      },
+      null,
+      2,
+    ) + "\n"
+  );
+}
+
 function readmeTemplate(
   name: string,
   description: string,
@@ -299,20 +327,27 @@ Call the tool \`${name.replace(/-/g, "_")}_run\` from ChatGPT once enabled.
 }
 
 function skillSrcTemplate(name: string, toolName: string, requirements: string[]): string {
-  return `import { defineSkill, z } from "@localant/skill-sdk";
-
-// Requirements:
+  return `// Requirements:
 ${requirements.map((r) => `// - ${r}`).join("\n") || "// - implement me"}
 
-export default defineSkill({
+const inputSchema = {
+  parse(value) {
+    if (value == null || typeof value !== "object") return {};
+    const input = value.input;
+    if (input !== undefined && typeof input !== "string") {
+      throw new Error("input must be a string");
+    }
+    return { input };
+  },
+};
+
+export default {
   name: "${name}",
   tools: {
     ${toolName}: {
       description: "TODO: describe what this tool does",
       riskLevel: 1,
-      inputSchema: z.object({
-        input: z.string().optional(),
-      }),
+      inputSchema,
       handler: async ({ input }, ctx) => {
         ctx.log("running ${name}");
         // TODO: implement. Use ctx.getSecret(name) for any declared secrets.
@@ -320,7 +355,7 @@ export default defineSkill({
       },
     },
   },
-});
+};
 `;
 }
 
