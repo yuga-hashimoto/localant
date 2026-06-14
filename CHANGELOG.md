@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Command Code** as a built-in coding agent / Autopilot provider
+  (id `command-code`, command `cmd`). Command Code ([commandcode.ai](https://commandcode.ai/))
+  ships Claude Code-compatible flags, so it runs non-interactively via
+  `cmd -p <prompt>` (plan/execute) and resumes the last session with
+  `cmd -p -c <prompt>`. It is selectable as primary or a fallback in the
+  dashboard's **Autopilot** tab.
+
 ## [1.4.6] - 2026-06-14
 
 ### Added

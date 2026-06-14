@@ -238,7 +238,7 @@ describe("ProviderRegistry + settings persistence", () => {
   it("builds one provider per configured coding agent", () => {
     const gw = createGateway(base);
     const ids = gw.providers.list().map((p) => p.id);
-    for (const id of ["claude-code", "codex", "opencode", "openclaw", "antigravity-cli", "hermes-agent"]) {
+    for (const id of ["claude-code", "codex", "opencode", "openclaw", "antigravity-cli", "hermes-agent", "command-code"]) {
       expect(ids, `missing ${id}`).toContain(id);
     }
     expect(gw.providers.get("does-not-exist")).toBeUndefined();

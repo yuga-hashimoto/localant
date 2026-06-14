@@ -61,6 +61,10 @@ describe("default coding-agent invocations", () => {
   it("openclaw runs `openclaw agent --local -m <prompt>`", () => {
     expect(argvFor("openclaw", "executeArgs", P)).toEqual(["agent", "--local", "-m", P]);
   });
+
+  it("command-code runs `cmd -p <prompt>`", () => {
+    expect(argvFor("command-code", "executeArgs", P)).toEqual(["-p", P]);
+  });
 });
 
 describe("resume invocations for turn-based dialogue", () => {
@@ -76,6 +80,10 @@ describe("resume invocations for turn-based dialogue", () => {
 
   it("hermes resumes with --continue", () => {
     expect(argvFor("hermes-agent", "resumeArgs", P)).toEqual(["chat", "--continue", "-q", P]);
+  });
+
+  it("command-code resumes with -c", () => {
+    expect(argvFor("command-code", "resumeArgs", P)).toEqual(["-p", "-c", P]);
   });
 
   it("every agent defines resumeArgs", () => {
