@@ -251,50 +251,50 @@ describe("project validation", () => {
 });
 
 describe("agent / compatibility surface", () => {
- it("keeps retired per-agent tool names as deprecated compatibility wrappers", async () => {
- const g = gw("full", "yolo");
- for (const name of [
- "agent_run",
- "agent_list",
- "agent_plan",
- "coding_agent_list",
- "coding_agent_start_task",
- "coding_agent_continue_task",
- "openclaw_status",
- "desktop_commander_status",
- ]) {
- const tool = g.registry.get(name);
- expect(tool).toBeDefined();
- expect(tool!.description).toMatch(/Deprecated compatibility wrapper/i);
- }
+  it("keeps retired per-agent tool names as deprecated compatibility wrappers", async () => {
+    const g = gw("full", "yolo");
+    for (const name of [
+      "agent_run",
+      "agent_list",
+      "agent_plan",
+      "coding_agent_list",
+      "coding_agent_start_task",
+      "coding_agent_continue_task",
+      "openclaw_status",
+      "desktop_commander_status",
+    ]) {
+      const tool = g.registry.get(name);
+      expect(tool).toBeDefined();
+      expect(tool!.description).toMatch(/Deprecated compatibility wrapper/i);
+    }
 
- const res = await g.executeTool("agent_list", {}, { caller: "test" });
- expect(res.ok).toBe(true);
- expect(Array.isArray(res.data)).toBe(true);
- });
+    const res = await g.executeTool("agent_list", {}, { caller: "test" });
+    expect(res.ok).toBe(true);
+    expect(Array.isArray(res.data)).toBe(true);
+  });
 
- it("registers the high-level autopilot tool with no provider/agent argument", () => {
- const g = gw();
- const tool = g.registry.get("autopilot");
- expect(tool).toBeDefined();
- const shape = (tool!.inputSchema as unknown as { shape: Record<string, unknown> }).shape;
- expect(Object.keys(shape).sort()).toEqual(["constraints", "cwd", "mode", "task", "timeoutMs"]);
- expect(tool!.description.toLowerCase()).not.toMatch(/claude|codex|opencode|openclaw|hermes|agy|antigravity/);
- });
+  it("registers the high-level autopilot tool with no provider/agent argument", () => {
+    const g = gw();
+    const tool = g.registry.get("autopilot");
+    expect(tool).toBeDefined();
+    const shape = (tool!.inputSchema as unknown as { shape: Record<string, unknown> }).shape;
+    expect(Object.keys(shape).sort()).toEqual(["constraints", "cwd", "mode", "task", "timeoutMs"]);
+    expect(tool!.description.toLowerCase()).not.toMatch(/claude|codex|opencode|openclaw|hermes|agy|antigravity/);
+  });
 
- it("does not register ChatGPT-duplicate tools (todo/question/webfetch/websearch)", async () => {
- const g = gw();
- for (const name of ["todowrite", "todo_list", "question", "ask_user", "webfetch", "websearch", "web_open"]) {
- expect(g.registry.get(name)).toBeUndefined();
- }
- });
+  it("does not register ChatGPT-duplicate tools (todo/question/webfetch/websearch)", async () => {
+    const g = gw();
+    for (const name of ["todowrite", "todo_list", "question", "ask_user", "webfetch", "websearch", "web_open"]) {
+      expect(g.registry.get(name)).toBeUndefined();
+    }
+  });
 
- it("still exposes approval_request (local security gating)", async () => {
- const g = gw();
- const res = await g.executeTool("approval_request", { action: "do risky thing", risk: 3 }, { caller: "test" });
- expect(res.ok).toBe(true);
- expect((res.data as { approvalId: string }).approvalId).toBeTruthy();
- });
+  it("still exposes approval_request (local security gating)", async () => {
+    const g = gw();
+    const res = await g.executeTool("approval_request", { action: "do risky thing", risk: 3 }, { caller: "test" });
+    expect(res.ok).toBe(true);
+    expect((res.data as { approvalId: string }).approvalId).toBeTruthy();
+  });
 });
 
 describe("lsp", () => {
