@@ -171,7 +171,7 @@ export type AutopilotFallbackPolicyT = z.infer<typeof AutopilotFallbackPolicy>;
  * reads `primary` + ordered `fallbacks` from here, skips disabled providers,
  * and advances through them per `fallbackPolicy`. Provider ids are
  * `codingAgents` keys (claude-code / codex / opencode / openclaw /
- * antigravity-cli / hermes-agent).
+ * antigravity-cli / hermes-agent / command-code).
  */
 const AutopilotConfig = z
   .object({
@@ -351,6 +351,22 @@ export const ConfigSchema = z.object({
         planArgs: ["run"],
         executeArgs: ["run"],
         resumeArgs: ["run", "--continue"],
+        defaultPermissionMode: "plan",
+        maxTurns: 10,
+        timeoutMs: 600_000,
+      },
+      "command-code": {
+        enabled: true,
+        command: "cmd",
+        args: [],
+        // Command Code (commandcode.ai) ships the `cmd` binary with Claude
+        // Code-compatible flags. `-p/--print <prompt>` runs a single prompt
+        // non-interactively and exits; the prompt is the trailing positional.
+        planArgs: ["-p"],
+        executeArgs: ["-p"],
+        // -c/--continue resumes the most recent conversation in the cwd.
+        resumeArgs: ["-p", "-c"],
+        dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,

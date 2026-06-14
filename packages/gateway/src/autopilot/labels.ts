@@ -10,6 +10,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   openclaw: "OpenClaw",
   "antigravity-cli": "Antigravity (agy)",
   "hermes-agent": "Hermes Agent",
+  "command-code": "Command Code (cmd)",
 };
 
 /** Human label for a provider id, falling back to the id itself. */

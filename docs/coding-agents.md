@@ -53,6 +53,7 @@ non-interactive entry points; LocalAnt ships defaults that call each correctly
 | `opencode` | `opencode` | `opencode run <prompt>` | `opencode run --continue <prompt>` |
 | `hermes-agent` | `hermes` | `hermes chat -q <prompt>` | `hermes chat --continue -q <prompt>` |
 | `openclaw` | `openclaw` | `openclaw agent --local -m <prompt>` | (same; one agent turn) |
+| `command-code` | `cmd` | `cmd -p <prompt>` | `cmd -p -c <prompt>` |
 
 > Provider auth (`claude /login`, `codex login`, …) is a per-backend
 > prerequisite — LocalAnt invokes the CLI but does not log you in. Authenticate
