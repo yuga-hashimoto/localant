@@ -7,6 +7,7 @@ const REASON_TO_FLAG: Record<AutopilotFallbackReason, keyof AutopilotFallbackPol
   no_changes: "onNoChanges",
   rate_limit: "onRateLimit",
   command_not_found: "onCommandNotFound",
+  auth_error: "onAuthError",
   safety_block: "onSafetyBlock",
   approval_required: "onApprovalRequired",
 };
@@ -26,4 +27,20 @@ const NOT_FOUND_RE = /(enoent|command not found|not found|no such file|is not re
 /** Heuristic: did spawning the agent fail because its CLI is missing? */
 export function looksCommandNotFound(text: string): boolean {
   return NOT_FOUND_RE.test(text);
+}
+
+// Signatures observed from real CLI runs that exit 0 while doing no work:
+//   claude   → "Not logged in · Please run /login"
+//   codex    → "Missing Authorization header", "invalid_token",
+//              "Unsupported service_tier: flex"
+//   openclaw → "OAuth token refresh failed", "invalid_grant", "re-authenticate"
+const AUTH_ERROR_RE =
+  /(not logged in|please run\s+\/login|unauthori[sz]ed|invalid[_\s-]?token|invalid[_\s-]?grant|missing authorization|auth(?:entication)?\s+required|authrequired|re-?authenticate|token refresh failed|\binvalid api key\b|\bno api key\b|api key (?:not|is) |\b401\b|unsupported service_tier)/i;
+/**
+ * Heuristic: did the agent emit an authentication / provider-config error even
+ * though it exited 0? Several CLIs print the error to stdout/stderr and still
+ * return exit 0, which would otherwise be mistaken for a successful answer.
+ */
+export function looksAuthError(text: string): boolean {
+  return AUTH_ERROR_RE.test(text);
 }

@@ -132,6 +132,11 @@ export const AUTOPILOT_FALLBACK_REASONS = [
   "no_changes",
   "rate_limit",
   "command_not_found",
+  // Several agent CLIs (claude, codex, openclaw, …) print an auth/config error
+  // and still exit 0, so a failed run is otherwise indistinguishable from a
+  // successful one. `auth_error` flags that case so the chain falls back to a
+  // working provider instead of returning the error text as the "answer".
+  "auth_error",
   "safety_block",
   "approval_required",
 ] as const;
@@ -160,6 +165,7 @@ const AutopilotFallbackPolicy = z
     onNoChanges: z.boolean().default(true),
     onRateLimit: z.boolean().default(true),
     onCommandNotFound: z.boolean().default(true),
+    onAuthError: z.boolean().default(true),
     onSafetyBlock: z.boolean().default(false),
     onApprovalRequired: z.boolean().default(false),
   })

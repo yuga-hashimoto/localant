@@ -10,6 +10,7 @@ import {
   shouldFallback,
   looksRateLimited,
   looksCommandNotFound,
+  looksAuthError,
   createGateway,
   type AutopilotProvider,
   type AutopilotProviderInput,
@@ -65,7 +66,7 @@ describe("fallbackPolicy", () => {
   const policy = ConfigSchema.parse({}).autopilot.fallbackPolicy;
 
   it("falls back on operational failures by default", () => {
-    for (const reason of ["timeout", "non_zero_exit", "empty_output", "no_changes", "rate_limit", "command_not_found"] as const) {
+    for (const reason of ["timeout", "non_zero_exit", "empty_output", "no_changes", "rate_limit", "command_not_found", "auth_error"] as const) {
       expect(shouldFallback(policy, reason), reason).toBe(true);
     }
   });
@@ -88,6 +89,15 @@ describe("fallbackPolicy", () => {
     expect(looksCommandNotFound("spawn claude ENOENT")).toBe(true);
     expect(looksCommandNotFound("command not found: codex")).toBe(true);
     expect(looksCommandNotFound("all good")).toBe(false);
+  });
+
+  it("detects auth/config errors that CLIs print while still exiting 0", () => {
+    // Real signatures captured from claude, codex and openclaw runs.
+    expect(looksAuthError("Not logged in · Please run /login")).toBe(true);
+    expect(looksAuthError('error="invalid_token", Missing Authorization header')).toBe(true);
+    expect(looksAuthError("Unsupported service_tier: flex")).toBe(true);
+    expect(looksAuthError("OAuth token refresh failed: invalid_grant")).toBe(true);
+    expect(looksAuthError("Here is the implementation plan: …")).toBe(false);
   });
 });
 
@@ -199,6 +209,23 @@ describe("AutopilotEngine fallback chain", () => {
     // The fallback continues on the prior branch rather than creating a new one.
     expect(fb.calls[0].createBranch).toBe(false);
     expect(fb.calls[0].branchName).toBe("cla/x");
+  });
+
+  it("keeps each failed attempt's stdout/stderr so the cause is inspectable", async () => {
+    const primary = stubProvider("claude-code", {
+      result: { failureReason: "non_zero_exit", stdout: "planning…", stderr: "boom: missing API key" },
+    });
+    const fb = stubProvider("codex", { result: { ok: true, exitCode: 0, stdout: "answer", failureReason: undefined } });
+    const engine = new AutopilotEngine(
+      () => configWith({ primary: "claude-code", fallbacks: ["codex"] }),
+      stubRegistry({ "claude-code": primary.provider, codex: fb.provider }),
+      openPathGuard(dir),
+    );
+    const res = await engine.run({ task: "do it", cwd: dir, mode: "plan" });
+    const failed = res.attempts.find((a) => a.providerId === "claude-code");
+    expect(failed?.ok).toBe(false);
+    expect(failed?.stdout).toBe("planning…");
+    expect(failed?.stderr).toBe("boom: missing API key");
   });
 
   it("marks the run exhausted when every provider fails", async () => {

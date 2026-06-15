@@ -96,7 +96,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Agents","Autopilot","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Autopilot","Settings"];
 let current = "Home";
 let toolSub = "tools";
 let pendingApprovals = 0;
@@ -453,104 +453,12 @@ const VIEWS = {
     });
   },
 
-  async Agents(m){
-    const a=await api('agents');
-    const tasks=await api('agents/tasks');
-    m.innerHTML='<div class="card"><h2>Coding agents</h2><table><thead><tr><th>Agent</th><th>CLI available</th><th>Command</th><th>Enabled</th></tr></thead><tbody id="ag"></tbody></table></div>';
-    const tb=document.getElementById('ag');
-    for(const x of a){
-      const avail = x.available ? '<span class="risk0">yes</span>' : '<span class="risk4">not on PATH</span>';
-      const tr=el('<tr><td><b>'+esc(x.agent)+'</b></td><td>'+avail+'</td><td class="muted"><code>'+esc(x.command)+'</code></td><td></td></tr>');
-      const toggle=el('<button class="btn '+(x.enabled?'ok':'ghost')+' sm">'+(x.enabled?'Enabled':'Disabled')+'</button>');
-      toggle.onclick=action(toggle,async()=>{ await api('agents/'+encodeURIComponent(x.agent)+'/'+(x.enabled?'disable':'enable'),{method:'POST'}); toast(x.agent+(x.enabled?' disabled':' enabled')); render(); });
-      tr.lastElementChild.appendChild(toggle);
-      if(!x.available){ tr.lastElementChild.appendChild(el('<span class="muted" style="margin-left:8px;font-size:11px">install <code>'+esc(x.command)+'</code> to run it</span>')); }
-      tb.appendChild(tr);
-    }
-
-    // Launcher: only agents that are enabled AND on PATH can actually run.
-    const runnable=a.filter(function(x){return x.enabled && x.available;});
-    const runCard=el('<div class="card"><h2>Run a task</h2></div>');
-    if(!runnable.length){
-      runCard.appendChild(el('<p class="muted">Enable an agent above whose CLI is installed to run tasks from here.</p>'));
-    } else {
-      const agentOpts=runnable.map(function(x){return '<option value="'+esc(x.agent)+'">'+esc(x.agent)+'</option>';}).join('');
-      runCard.appendChild(el('<div class="row" style="gap:12px;margin-bottom:12px">'
-        +'<select id="runAgent">'+agentOpts+'</select>'
-        +'<input type="text" id="runCwd" placeholder="working directory (absolute path)" style="flex:1;min-width:240px" />'
-        +'<select id="runMode"><option value="plan">plan (read-only)</option><option value="execute">execute (creates a branch)</option></select>'
-        +'</div>'));
-      runCard.appendChild(el('<textarea id="runTask" rows="3" placeholder="Describe the task…"></textarea>'));
-      const runBtn=el('<div class="row" style="margin-top:8px"><button class="btn" id="runBtn">Run</button></div>');
-      runCard.appendChild(runBtn);
-      runBtn.querySelector('#runBtn').onclick=action(runBtn.querySelector('#runBtn'),async()=>{
-        const agent=document.getElementById('runAgent').value;
-        const cwd=document.getElementById('runCwd').value.trim();
-        const mode=document.getElementById('runMode').value;
-        const task=document.getElementById('runTask').value.trim();
-        if(!cwd){ toast('Working directory is required.','err'); return; }
-        if(!task){ toast('Describe the task first.','err'); return; }
-        await api('agents/run',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({agent,cwd,task,mode})});
-        toast('Task '+mode+' started');
-        render();
-      },'Running');
-    }
-    m.appendChild(runCard);
-
-    const taskCard=el('<div class="card"><h2>Agent tasks</h2><table><thead><tr><th>Created</th><th>Agent</th><th>Mode</th><th>Status</th><th>Branch</th><th></th></tr></thead><tbody id="tk"></tbody></table></div>');
-    m.appendChild(taskCard);
-    const tkb=taskCard.querySelector('#tk');
-    if(!tasks.length){ tkb.appendChild(el('<tr><td colspan=6 class="muted">No agent tasks yet.</td></tr>')); }
-    for(const t of tasks){
-      const stCls = t.status==='completed'?'risk0':(t.status==='failed'?'risk4':(t.status==='running'?'risk2':''));
-      const tr=el('<tr><td class="muted">'+esc(String(t.createdAt).replace("T"," ").slice(0,19))+'</td><td>'+esc(t.agent)+'</td><td>'+esc(t.mode)+'</td><td class="'+stCls+'">'+esc(t.status)+'</td><td class="muted">'+esc(t.branch||'')+'</td><td></td></tr>');
-      const cell=tr.lastElementChild;
-      const logs=el('<button class="btn ghost sm">Logs</button>');
-      logs.onclick=action(logs,async()=>{
-        const ex=tr.nextElementSibling;
-        if(ex&&ex.classList.contains('logrow')){ ex.remove(); return; }
-        const pre=el('<pre></pre>');
-        const fetchLogs=async()=>{ try{ const r=await api('agents/tasks/'+encodeURIComponent(t.id)+'/logs'); pre.textContent=r.logs||'(no output)'; pre.scrollTop=pre.scrollHeight; }catch(e){} };
-        await fetchLogs();
-        const lr=el('<tr class="logrow"><td colspan=6></td></tr>');
-        lr.firstElementChild.appendChild(pre);
-        tr.after(lr);
-        // Live-tail a running task's output until it finishes or the row closes.
-        if(t.status==='running'){ const tm=setInterval(()=>{ if(!document.body.contains(pre)){ clearInterval(tm); return; } fetchLogs(); }, 2000); logTimers.push(tm); }
-      });
-      cell.appendChild(logs);
-      if(t.status==='running'){
-        const stop=el('<button class="btn danger sm" style="margin-left:6px">Stop</button>');
-        stop.onclick=action(stop,async()=>{ await api('agents/tasks/'+encodeURIComponent(t.id)+'/stop',{method:'POST'}); toast('Stopped'); render(); });
-        cell.appendChild(stop);
-      }
-      tkb.appendChild(tr);
-    }
-
-    // If a task is running, refresh the view when its status changes (e.g.
-    // running → completed) — but never while the launcher textarea has focus,
-    // so we don't interrupt typing.
-    if(tasks.some(function(t){return t.status==='running';})){
-      const sig=tasks.map(function(t){return t.id+':'+t.status;}).join(',');
-      const tm=setInterval(async()=>{
-        const ta=document.getElementById('runTask');
-        if(ta && document.activeElement===ta) return;
-        if(document.getElementById('modalOverlay').classList.contains('show')) return;
-        try{
-          const now=await api('agents/tasks');
-          if(now.map(function(t){return t.id+':'+t.status;}).join(',')!==sig && current==='Agents'){ render(); }
-        }catch(e){}
-      }, 3000);
-      logTimers.push(tm);
-    }
-  },
-
   // Dedicated Autopilot page: shows which provider actually runs (the resolved
   // chain with live availability), lets you configure the primary / fallback
   // chain / fallback policy, and runs a safe read-only test against a directory.
   async Autopilot(m){
     const d=await api('autopilot');
-    const POLICY=[['onTimeout','Timeout'],['onNonZeroExit','Non-zero exit'],['onEmptyOutput','Empty output'],['onNoChanges','No changes'],['onRateLimit','Rate / usage limit'],['onCommandNotFound','Command not found'],['onSafetyBlock','Safety block (off by default)'],['onApprovalRequired','Approval required (off by default)']];
+    const POLICY=[['onTimeout','Timeout'],['onNonZeroExit','Non-zero exit'],['onEmptyOutput','Empty output'],['onNoChanges','No changes'],['onRateLimit','Rate / usage limit'],['onCommandNotFound','Command not found'],['onAuthError','Auth / provider error'],['onSafetyBlock','Safety block (off by default)'],['onApprovalRequired','Approval required (off by default)']];
     const detail={}; (d.providersDetail||[]).forEach(function(p){ detail[p.id]=p; });
     const apIds=(d.providersDetail||[]).map(function(p){return p.id;});
     function lbl(id){ return (detail[id]&&detail[id].label)||id; }
@@ -667,15 +575,33 @@ const VIEWS = {
       if(!task){ toast('Describe a task to test.','err'); return; }
       out.innerHTML='<p class="muted"><span class="spin"></span> Running '+esc(mode)+'…</p>';
       const r=await api('autopilot/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({cwd,task,mode})});
-      const attempts=(r.attempts||[]).map(function(a){
-        const status=a.skipped?'<span class="tag">skipped</span>':(a.ok?'<span class="tag risk0">ok</span>':'<span class="tag risk4">failed</span>');
-        const why=a.failureReason?(' <span class="muted">'+esc(a.failureReason)+'</span>'):'';
-        return '<li><code>'+esc(a.providerLabel||a.providerId)+'</code> '+status+why+(a.note?' <span class="muted">'+esc(a.note)+'</span>':'')+'</li>';
-      }).join('');
       const head=r.ok?'<span class="risk0">✓ A provider answered.</span>':(r.exhausted?'<span class="risk4">✗ Every provider failed.</span>':'<span class="risk4">✗ Stopped: '+esc(r.stoppedReason||'')+'</span>');
       out.innerHTML='<p>'+head+'</p>'
-        +'<p class="muted" style="margin:6px 0 4px">Attempts (in order):</p><ul style="margin:0 0 8px;padding-left:20px">'+(attempts||'<li class="muted">none</li>')+'</ul>'
+        +'<p class="muted" style="margin:6px 0 4px">Attempts (in order):</p><ul id="apAttempts" style="margin:0 0 8px;padding-left:20px"></ul>'
         +'<pre style="max-height:300px">'+esc((r.output||'(no output)').slice(0,4000))+'</pre>';
+      const ul=document.getElementById('apAttempts');
+      const list=(r.attempts||[]);
+      if(!list.length){ ul.appendChild(el('<li class="muted">none</li>')); }
+      list.forEach(function(a){
+        const status=a.skipped?'<span class="tag">skipped</span>':(a.ok?'<span class="tag risk0">ok</span>':'<span class="tag risk4">failed</span>');
+        const why=a.failureReason?(' <span class="muted">'+esc(a.failureReason)+(a.exitCode!=null?' (exit '+esc(String(a.exitCode))+')':'')+'</span>'):'';
+        const li=el('<li><code>'+esc(a.providerLabel||a.providerId)+'</code> '+status+why+(a.note?' <span class="muted">'+esc(a.note)+'</span>':'')+'</li>');
+        // Surface the failing provider's own output so the cause is visible —
+        // previously only the winning provider's output survived.
+        const log=((a.stderr||'')+((a.stderr&&a.stdout)?'\n':'')+(a.stdout||'')).trim();
+        if(!a.ok && !a.skipped && log){
+          const logsBtn=el(' <button class="btn ghost sm" style="margin-left:6px">Logs</button>');
+          logsBtn.onclick=function(){
+            const nx=li.querySelector('pre');
+            if(nx){ nx.remove(); return; }
+            const pre=el('<pre style="max-height:240px;margin-top:6px"></pre>');
+            pre.textContent=log;
+            li.appendChild(pre);
+          };
+          li.appendChild(logsBtn);
+        }
+        ul.appendChild(li);
+      });
     },'Testing');
 
     paintChain(); paintPrimary(); paintProviders(); paintFallbacks(); paintAdd(); paintPolicy();
