@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-06-15
+
 ### Added
 - **Command Code** as a built-in coding agent / Autopilot provider
   (id `command-code`, command `cmd`). Command Code ([commandcode.ai](https://commandcode.ai/))
@@ -13,6 +15,22 @@ All notable changes to this project are documented here. The format is based on
   `cmd -p <prompt>` (plan/execute) and resumes the last session with
   `cmd -p -c <prompt>`. It is selectable as primary or a fallback in the
   dashboard's **Autopilot** tab.
+- Deprecated compatibility wrappers for retired tool names (per-agent
+  `coding_agent_*` / `agent_*`, `localant_autopilot_*`, `openclaw_*`,
+  `desktop_commander_*`) so stale ChatGPT tool schemas keep working instead of
+  failing with "Unknown tool". New flows should still prefer the high-level
+  `autopilot` tool and the generic MCP bridge.
+
+### Changed
+- Hardened Autopilot per-directory locking with a TTL, stale-lock pruning, and
+  an `activeRuns()` diagnostic so a hung run can no longer block a directory
+  indefinitely.
+- Bounded the downstream MCP `connect` / `listTools` / `callTool` operations
+  with timeouts so an unresponsive server surfaces a clear timeout error instead
+  of hanging.
+
+### Fixed
+- Generated skills are now runnable out of the box.
 
 ## [1.4.6] - 2026-06-14
 
