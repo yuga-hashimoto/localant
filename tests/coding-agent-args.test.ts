@@ -91,6 +91,12 @@ describe("resume invocations for turn-based dialogue", () => {
     expect(argvFor("hermes-agent", "resumeArgs", P)).toEqual(["chat", "--continue", "-q", P]);
   });
 
+  it("antigravity-cli resumes with -c BEFORE --print", () => {
+    // agy's --print consumes the next token as the prompt, so -c must precede it
+    // or it would be read as the prompt value (and the prompt dropped).
+    expect(argvFor("antigravity-cli", "resumeArgs", P)).toEqual(["-c", "--print", P]);
+  });
+
   it("command-code resumes with -c", () => {
     expect(argvFor("command-code", "resumeArgs", P)).toEqual(["-p", "-c", P]);
   });
@@ -100,5 +106,48 @@ describe("resume invocations for turn-based dialogue", () => {
     for (const [agent, cfg] of Object.entries(cfgs)) {
       expect(cfg.resumeArgs.length, `${agent} should define resumeArgs`).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * In yolo mode the manager appends dangerArgs AFTER the stage args:
+ * `[...args, ...stageArgs, ...dangerArgs]` then prompt assembly. For agents
+ * whose prompt flag consumes the next token (agy's --print, hermes' -q), a
+ * trailing danger flag would otherwise be swallowed as the prompt value (or
+ * trigger an argparse error). The {{prompt}} placeholder must pin the prompt
+ * immediately after that flag, leaving the danger flag to trail harmlessly.
+ */
+describe("yolo-mode assembly keeps the prompt anchored to its flag", () => {
+  const P = "PROMPT";
+
+  function yoloArgv(agent: string, stage: "planArgs" | "executeArgs" | "resumeArgs"): string[] {
+    const cfg = ConfigSchema.parse({}).codingAgents[agent];
+    if (!cfg) throw new Error(`no such agent ${agent}`);
+    return assembleAgentArgs([...cfg.args, ...cfg[stage], ...cfg.dangerArgs], P);
+  }
+
+  it("antigravity-cli keeps the prompt right after --print, danger flag trailing", () => {
+    expect(yoloArgv("antigravity-cli", "executeArgs")).toEqual([
+      "--print",
+      P,
+      "--dangerously-skip-permissions",
+    ]);
+    expect(yoloArgv("antigravity-cli", "resumeArgs")).toEqual([
+      "-c",
+      "--print",
+      P,
+      "--dangerously-skip-permissions",
+    ]);
+  });
+
+  it("hermes keeps the prompt right after -q, --yolo trailing", () => {
+    expect(yoloArgv("hermes-agent", "executeArgs")).toEqual(["chat", "-q", P, "--yolo"]);
+    expect(yoloArgv("hermes-agent", "resumeArgs")).toEqual([
+      "chat",
+      "--continue",
+      "-q",
+      P,
+      "--yolo",
+    ]);
   });
 });
