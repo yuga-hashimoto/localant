@@ -329,11 +329,17 @@ export const ConfigSchema = z.object({
         command: "agy",
         args: [],
         // agy launches an interactive TUI by default, which hangs when spawned
-        // without a TTY. --print runs a single prompt non-interactively.
-        planArgs: ["--print"],
-        executeArgs: ["--print"],
-        // -c/--continue resumes the most recent agy conversation.
-        resumeArgs: ["--print", "-c"],
+        // without a TTY. --print runs a single prompt non-interactively, but it
+        // CONSUMES THE NEXT TOKEN as the prompt value (it is `--print <prompt>`,
+        // an alias of --prompt — not a boolean). So the prompt must sit
+        // immediately after --print, and every other flag (-c, danger) must come
+        // before --print or trail after the prompt. The {{prompt}} placeholder
+        // pins it in the right slot regardless of appended dangerArgs.
+        planArgs: ["--print", "{{prompt}}"],
+        executeArgs: ["--print", "{{prompt}}"],
+        // -c/--continue resumes the most recent agy conversation; it must precede
+        // --print so it is not swallowed as the prompt value.
+        resumeArgs: ["-c", "--print", "{{prompt}}"],
         dangerArgs: ["--dangerously-skip-permissions"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
@@ -345,10 +351,14 @@ export const ConfigSchema = z.object({
         args: [],
         // `hermes chat -q <prompt>` is the single-query non-interactive mode.
         // The bare prompt was previously passed as a subcommand and rejected.
-        planArgs: ["chat", "-q"],
-        executeArgs: ["chat", "-q"],
+        // `-q/--query` REQUIRES its value as the next token (argparse errors if
+        // the next token is another option, e.g. --yolo). So the prompt must sit
+        // immediately after -q; the {{prompt}} placeholder keeps it there even
+        // when dangerArgs (--yolo) are appended in yolo mode.
+        planArgs: ["chat", "-q", "{{prompt}}"],
+        executeArgs: ["chat", "-q", "{{prompt}}"],
         // --continue resumes the most recent hermes session.
-        resumeArgs: ["chat", "--continue", "-q"],
+        resumeArgs: ["chat", "--continue", "-q", "{{prompt}}"],
         dangerArgs: ["--yolo"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
