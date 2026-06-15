@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.8] - 2026-06-15
+
+### Changed
+- Autopilot now falls back to the next provider on silent auth/config failures:
+  coding-agent CLIs that print an auth error but still exit `0` are detected and
+  surfaced as an `auth_error` instead of being treated as success. Failed-attempt
+  logs are shown in the dashboard, and the redundant **Agents** tab was dropped.
+
+### Fixed
+- Anchored the Autopilot prompt to value-consuming flags for the `agy` and
+  `hermes` providers, whose prompt flags consume the following token, so the
+  prompt is no longer mis-parsed.
+- `openclaw` agent invocation now requires `--session-id`.
+
 ## [1.4.7] - 2026-06-15
 
 ### Added
