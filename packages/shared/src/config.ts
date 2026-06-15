@@ -304,11 +304,16 @@ export const ConfigSchema = z.object({
         command: "openclaw",
         args: [],
         // `openclaw agent --local -m <prompt>` runs one embedded agent turn
-        // non-interactively (requires provider API keys in the shell). The bare
-        // command otherwise treats the prompt as an unknown subcommand.
-        planArgs: ["agent", "--local", "-m"],
-        executeArgs: ["agent", "--local", "-m"],
-        resumeArgs: ["agent", "--local", "-m"],
+        // non-interactively (requires provider API keys in the shell). The
+        // `agent` subcommand refuses to run without a session selector
+        // (--to / --session-id / --agent), so an explicit --session-id is
+        // required — the bare form errors with "Pass --to/--session-id/--agent".
+        // Plan gets its own session id so its read-only "do not modify"
+        // instructions never bleed into execution; execute and resume share one
+        // session so resume continues the execute turn.
+        planArgs: ["agent", "--local", "--session-id", "localant-plan", "-m"],
+        executeArgs: ["agent", "--local", "--session-id", "localant-exec", "-m"],
+        resumeArgs: ["agent", "--local", "--session-id", "localant-exec", "-m"],
         defaultPermissionMode: "plan",
         maxTurns: 10,
         timeoutMs: 600_000,

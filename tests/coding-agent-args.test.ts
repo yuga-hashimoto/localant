@@ -58,8 +58,17 @@ describe("default coding-agent invocations", () => {
     expect(argvFor("hermes-agent", "executeArgs", P)).toEqual(["chat", "-q", P]);
   });
 
-  it("openclaw runs `openclaw agent --local -m <prompt>`", () => {
-    expect(argvFor("openclaw", "executeArgs", P)).toEqual(["agent", "--local", "-m", P]);
+  it("openclaw runs `openclaw agent --local --session-id <id> -m <prompt>`", () => {
+    // The `agent` subcommand refuses to run without a session selector, so an
+    // explicit --session-id is required for the non-interactive turn.
+    expect(argvFor("openclaw", "executeArgs", P)).toEqual([
+      "agent",
+      "--local",
+      "--session-id",
+      "localant-exec",
+      "-m",
+      P,
+    ]);
   });
 
   it("command-code runs `cmd -p <prompt>`", () => {
