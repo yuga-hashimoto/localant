@@ -12,7 +12,7 @@ export { ProviderRegistry } from "./autopilot/provider-registry.js";
 export { AutopilotEngine } from "./autopilot/engine.js";
 export type { AutopilotRunInput, AutopilotRunResult, AutopilotAttempt } from "./autopilot/engine.js";
 export { resolveProviderOrder, isProviderEnabled } from "./autopilot/settings.js";
-export { shouldFallback, looksRateLimited, looksCommandNotFound } from "./autopilot/fallback-policy.js";
+export { shouldFallback, looksRateLimited, looksCommandNotFound, looksAuthError } from "./autopilot/fallback-policy.js";
 export { providerLabel } from "./autopilot/labels.js";
 export { CodingAgentProvider } from "./autopilot/coding-agent-provider.js";
 export type {

@@ -7,6 +7,10 @@ import type { AutopilotFallbackReason, PriorAttemptContext } from "./types.js";
 
 const MUTATING_MODES = new Set<AutopilotMode>(["execute", "fix", "pr"]);
 const SUMMARY_CHARS = 1200;
+/** Per-attempt stdout/stderr kept on each attempt so the dashboard can show
+ * *why* a provider failed (otherwise only the winning provider's output
+ * survives, and a failed attempt shows just its reason code). */
+const ATTEMPT_LOG_CHARS = 4000;
 const DEFAULT_LOCK_TTL_MS = 30 * 60 * 1000;
 const LOCK_TTL_GRACE_MS = 60 * 1000;
 
@@ -30,6 +34,11 @@ export interface AutopilotAttempt {
   exitCode?: number | null;
   durationMs?: number;
   note?: string;
+  /** Tail of the provider's stdout for this attempt (truncated). Present for
+   * non-skipped attempts so a failure's logs are inspectable in the UI. */
+  stdout?: string;
+  /** Tail of the provider's stderr for this attempt (truncated). */
+  stderr?: string;
 }
 
 export interface AutopilotRunResult {
@@ -171,6 +180,8 @@ export class AutopilotEngine {
         failureReason: res.failureReason,
         exitCode: res.exitCode,
         durationMs: res.durationMs,
+        stdout: res.stdout.slice(-ATTEMPT_LOG_CHARS),
+        stderr: res.stderr.slice(-ATTEMPT_LOG_CHARS),
       });
 
       if (res.ok) {

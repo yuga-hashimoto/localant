@@ -4,7 +4,7 @@ import type { CodingAgentManager } from "../managers/coding-agent-manager.js";
 import type { GitManager } from "../managers/git-manager.js";
 import { providerLabel } from "./labels.js";
 import { isProviderEnabled } from "./settings.js";
-import { looksCommandNotFound, looksRateLimited } from "./fallback-policy.js";
+import { looksAuthError, looksCommandNotFound, looksRateLimited } from "./fallback-policy.js";
 import type {
   AutopilotProvider,
   AutopilotProviderInput,
@@ -86,6 +86,9 @@ export class CodingAgentProvider implements AutopilotProvider {
     else if (raw.timedOut) failureReason = "timeout";
     else if (raw.code !== 0) failureReason = looksRateLimited(combined) ? "rate_limit" : "non_zero_exit";
     else if (combined.trim().length === 0) failureReason = "empty_output";
+    // Exit 0 but the output is just an auth/config error → not a real answer.
+    // Without this the broken provider "wins" and the chain never falls back.
+    else if (looksAuthError(combined)) failureReason = "auth_error";
     else if (mutating && !changed) failureReason = "no_changes";
 
     return {
