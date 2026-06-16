@@ -588,7 +588,7 @@ const VIEWS = {
         const li=el('<li><code>'+esc(a.providerLabel||a.providerId)+'</code> '+status+why+(a.note?' <span class="muted">'+esc(a.note)+'</span>':'')+'</li>');
         // Surface the failing provider's own output so the cause is visible —
         // previously only the winning provider's output survived.
-        const log=((a.stderr||'')+((a.stderr&&a.stdout)?'\n':'')+(a.stdout||'')).trim();
+        const log=((a.stderr||'')+((a.stderr&&a.stdout)?'\\n':'')+(a.stdout||'')).trim();
         if(!a.ok && !a.skipped && log){
           const logsBtn=el(' <button class="btn ghost sm" style="margin-left:6px">Logs</button>');
           logsBtn.onclick=function(){
