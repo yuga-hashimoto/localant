@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.9] - 2026-06-16
+
+### Fixed
+- Dashboard no longer gets stuck on "connecting…": a raw newline was emitted
+  into the inline client `<script>` (the failed-attempt log builder used `'\n'`
+  inside the outer HTML template literal, which evaluated to a literal newline
+  and broke the single-quoted string with `SyntaxError: Invalid or unexpected
+  token`, halting the whole script before it could poll `/api/status`). The
+  escape is now `'\\n'` so the served script parses. Regression from 1.4.8.
+
 ## [1.4.8] - 2026-06-15
 
 ### Changed
