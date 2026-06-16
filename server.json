@@ -6,12 +6,12 @@
     "url": "https://github.com/yuga-hashimoto/localant",
     "source": "github"
   },
-  "version": "1.4.8",
+  "version": "1.4.9",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "localant",
-      "version": "1.4.8",
+      "version": "1.4.9",
       "runtimeHint": "npx",
       "transport": { "type": "stdio" }
     }
