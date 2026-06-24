@@ -13,6 +13,7 @@ import { registerControlTools } from "./control.js";
 import { registerSkillTools } from "./skill.js";
 import { registerAutopilotTools } from "./autopilot.js";
 import { registerDoctorTools } from "./doctor.js";
+import { registerUiTools } from "./ui.js";
 import { registerAdbTools } from "./adb.js";
 import { registerComputerTools } from "./computer.js";
 import { registerBrowserTools } from "./browser.js";
@@ -40,6 +41,7 @@ export function registerAllTools(gw: Gateway): void {
   // the high-level `autopilot` tool, which selects an internal provider.
   registerAutopilotTools(gw);
   registerDoctorTools(gw);
+  registerUiTools(gw);
   registerAdbTools(gw);
   registerComputerTools(gw);
   registerBrowserTools(gw);

@@ -13,6 +13,7 @@ function scriptBlocks(html: string): string[] {
 describe("widget documents", () => {
   it("registers at least the approval and git widgets", () => {
     const ids = WIDGETS.map((w) => w.id);
+    expect(ids).toContain("localant-home");
     expect(ids).toContain("approval-center");
     expect(ids).toContain("git-panel");
     expect(ids).toContain("image-viewer");
@@ -67,7 +68,13 @@ describe("widgetMetaForTool", () => {
     expect((meta.ui as { resourceUri: string }).resourceUri).toBe("ui://localant/image-viewer-v1.html");
   });
 
-  it("points the approval list/get tools at the approval center template", () => {
+  it("points localant_ui at the LocalAnt home template", () => {
+ const meta = widgetMetaForTool("localant_ui")!;
+ expect(meta["openai/outputTemplate"]).toBe("ui://localant/home-v1.html");
+ expect((meta.ui as { resourceUri: string }).resourceUri).toBe("ui://localant/home-v1.html");
+ });
+
+ it("points the approval list/get tools at the approval center template", () => {
     for (const tool of ["approval_list_pending", "approval_get"]) {
       expect(widgetMetaForTool(tool)!["openai/outputTemplate"]).toBe("ui://localant/approval-center-v1.html");
     }

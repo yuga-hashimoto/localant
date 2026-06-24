@@ -1,5 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { WidgetDef } from "./runtime.js";
+import { localantHome } from "./localant-home.js";
 import { imageViewer } from "./image-viewer.js";
 import { approvalCenter } from "./approval-center.js";
 import { gitPanel } from "./git-panel.js";
@@ -16,6 +17,7 @@ const APPS_RESOURCE_MIME_TYPE = "text/html;profile=mcp-app";
 
 /** Every widget LocalAnt exposes as an Apps SDK component. */
 export const WIDGETS: readonly WidgetDef[] = [
+ localantHome,
   imageViewer,
   approvalCenter,
   gitPanel,
