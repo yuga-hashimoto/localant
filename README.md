@@ -99,6 +99,7 @@ and audit.
   pick in the dashboard — Claude Code / Codex / opencode / OpenClaw / Antigravity
   / Hermes — with an ordered fallback chain. ChatGPT never names a backend.
 - 🩺 **Diagnostics**: `localant_doctor` — a read-only, structured health report.
+- 🧭 **ChatGPT UI widgets**: `localant_ui` opens a LocalAnt Home panel inside ChatGPT; focused panels render approvals, git, shell processes, browser state, MCP servers, skills, and images. See [docs/chatgpt-ui.md](docs/chatgpt-ui.md).
 - 🖥️ **Local dashboard**: status, approvals, audit, skills, secrets, Autopilot.
 - 🌐 **3-minute setup** with Tailscale Funnel by default, plus Cloudflare Tunnel / ngrok fallbacks and clipboard copy.
 - 🖱️ **Computer Use**: screenshot + mouse + keyboard control of the macOS

@@ -31,6 +31,7 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "get_mcp_endpoint",
   "get_tunnel_status",
   "localant_doctor",
+ "localant_ui",
 
   // --- Approvals + audit (read-only; the human approves in the dashboard) ---
   "approval_list_pending",
