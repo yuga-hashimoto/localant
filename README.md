@@ -56,9 +56,9 @@ ChatGPT
 LocalAnt  ── Gateway · Risk engine · Approval queue · Audit log · Dashboard
   ↓ Local PC
   ├─ Shell · Filesystem · Git (deny-list by default · allow-list in strict mode)
-  ├─ Claude Code / Codex (plan → approve → execute → validate → diff)
+  ├─ Autopilot providers selected in the dashboard
   ├─ Browser (Playwright, isolated profile) · Android (ADB) · Computer Use (macOS desktop)
-  ├─ Articles (Zenn / Qiita / note, via skill) · Custom Skills
+  ├─ Articles (Zenn / Qiita publishing, note drafts) · Custom Skills
   └─ Adapters: any downstream MCP server (Desktop Commander, etc.)
 ```
 
@@ -74,8 +74,8 @@ ChatGPT's Developer-Mode connectors can call.
 The design is inspired by OpenClaw (local gateway + skills + registry),
 Desktop Commander (local PC control + audit + hardening), supergateway
 (stdio→Streamable-HTTP `/mcp`), and mcp-proxy (bundling MCP servers) — but the
-brain is **ChatGPT**, and every capability is wrapped in permissions, approval,
-and audit.
+brain is **ChatGPT**, and every capability is wrapped in permissions,
+mode-aware approval gates, and audit.
 
 ## Why ChatGPT as brain, local PC as hands?
 
@@ -89,8 +89,8 @@ and audit.
 - 🔒 **Layered security**: deny-list by default (sensitive-path blocklist +
   always-blocked commands), optional `strict` allow-list mode, path & symlink
   traversal prevention, secret vault + redaction.
-- ✅ **Local approval queue**: risk-2+ tools require explicit approval in the
-  dashboard or CLI — ChatGPT's confirmation is never trusted alone.
+- ✅ **Local approval queue**: approval is enforced locally according to the
+  selected security mode, not by ChatGPT confirmation alone.
 - 🧾 **Full audit log**: every tool call recorded (with secrets redacted).
 - 🧩 **Skill system**: create, validate, enable, run, install-from-git,
   publish, and **generate skills from ChatGPT** (always saved disabled).
@@ -336,20 +336,19 @@ plain language — it never names a backend:
 
 ```text
 autopilot(task:"Plan SEO improvements",      cwd:"/Users/me/Documents/my-app", mode:"plan")
-# review the plan, approve, then:
+# review the plan, then:
 autopilot(task:"Implement the SEO plan",     cwd:"/Users/me/Documents/my-app", mode:"execute")
 # or: mode:"review" (read-only), mode:"fix" (diagnose + repair + validate), mode:"pr"
 ```
 
-Execution is risk-3 (approval required), runs on a fresh branch, and falls back
-through the chain on failure per your fallback policy. Push / PR / publish stay
-behind explicit approval. The low-level bash/git/file/browser/adb tools remain
-available. See [docs/coding-agents.md](docs/coding-agents.md).
+Execution is risk-3. Whether approval is required depends on the active security
+mode. Autopilot runs on a fresh branch and falls back through the chain on
+failure per your fallback policy. See [docs/coding-agents.md](docs/coding-agents.md).
 
-## Codex example
+## Backend selection
 
-Same flow with `agent:"codex"` once `codingAgents.codex.enabled = true` and the
-`codex` CLI is on PATH.
+Select Codex or another configured provider in the dashboard. ChatGPT uses the
+single `autopilot` tool and LocalAnt applies your local provider order.
 
 ## Article publishing
 
@@ -361,8 +360,7 @@ article-publisher` first):
   `published:false`, can open a PR branch. (`zenn_*`)
 - **Qiita**: official API with `QIITA_TOKEN` from the vault; private-first.
   (`qiita_*`)
-- **note**: local drafts only (note has no official public write API).
-  (`note_*`)
+- **note**: local drafts; optional note-mcp adapter for publishing. (`note_*`)
 
 Publish actions are **risk 4 (double approval)**. See [docs/articles.md](docs/articles.md).
 
