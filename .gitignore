@@ -6,4 +6,5 @@ examples/skills/*/dist/
 coverage/
 *.log
 .tmp-tests/
+.tmp-video-studio-e2e/
 .commandcode/

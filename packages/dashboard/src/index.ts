@@ -96,7 +96,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Autopilot","Settings"];
+const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Autopilot","Video Studio","Settings"];
 let current = "Home";
 let toolSub = "tools";
 let pendingApprovals = 0;
@@ -647,6 +647,50 @@ const VIEWS = {
       await api('mcp-servers',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({name,command,args,enabled:true})});
       toast('MCP server added');
       render();
+    });
+  },
+
+  async "Video Studio"(m){
+    const [status, projectsData]=await Promise.all([api('video-studio/status'), api('video-studio/projects').catch(()=>({projects:[]}))]);
+    const projects=projectsData.projects||[];
+    m.innerHTML='<div class="card"><h2>Video Studio</h2>'
+      +'<p class="muted" style="margin-top:0">Renderer: <code>builtin-ffmpeg</code> · video generation: <code>'+esc(status.policy&&status.policy.videoGeneration||'free local generation only')+'</code></p>'
+      +'<div class="row" style="gap:8px;margin-bottom:12px"><span class="tag '+(status.renderer&&status.renderer.builtinFfmpeg?'risk0':'risk4')+'">ffmpeg '+(status.renderer&&status.renderer.builtinFfmpeg?'ready':'missing')+'</span><span class="tag '+(status.renderer&&status.renderer.ffprobe?'risk0':'risk2')+'">ffprobe '+(status.renderer&&status.renderer.ffprobe?'ready':'missing')+'</span><span class="tag '+(status.audio&&status.audio.macosSay?'risk0':'risk2')+'">macOS say '+(status.audio&&status.audio.macosSay?'ready':'fallback')+'</span></div>'
+      +'<div class="row" style="gap:12px;align-items:flex-end">'
+        +'<div class="field" style="flex:1;margin:0"><label>Topic</label><input id="vsTopic" value="LocalAntで動画制作を自動化する" /></div>'
+        +'<div class="field" style="width:150px;margin:0"><label>Duration</label><input id="vsDuration" type="number" value="18" min="6" max="180" /></div>'
+        +'<div class="field" style="width:150px;margin:0"><label>Language</label><select id="vsLang"><option value="ja">ja</option><option value="en">en</option></select></div>'
+        +'<button class="btn" id="vsCreate">Create project</button>'
+      +'</div>'
+      +'<pre id="vsOut" style="display:none"></pre></div>'
+      +'<div class="card"><h2>Projects</h2><table><thead><tr><th>Project</th><th>Targets</th><th>Updated</th><th></th></tr></thead><tbody id="vsProjects"></tbody></table></div>';
+
+    const out=document.getElementById('vsOut');
+    function show(o){ out.style.display='block'; out.textContent=JSON.stringify(o,null,2); }
+    document.getElementById('vsCreate').onclick=action(document.getElementById('vsCreate'),async()=>{
+      const topic=document.getElementById('vsTopic').value.trim();
+      const durationSeconds=parseInt(document.getElementById('vsDuration').value,10)||18;
+      const language=document.getElementById('vsLang').value;
+      const script=await api('video-studio/script',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({topic,durationSeconds,language,targetPlatform:'youtube'})});
+      const project=await api('video-studio/projects',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:script.title,description:script.description,script:script.script,scenes:script.scenes,hashtags:script.hashtags,durationSeconds,language,targetPlatforms:['youtube','tiktok','instagram']})});
+      show(project); toast('Project created'); render();
+    },'Creating');
+
+    const tb=document.getElementById('vsProjects');
+    if(!projects.length) tb.appendChild(el('<tr><td colspan=4 class="muted">No Video Studio projects yet.</td></tr>'));
+    projects.forEach(function(p){
+      const tr=el('<tr><td><b>'+esc(p.title)+'</b><br><code>'+esc(p.id)+'</code></td><td class="muted">'+esc((p.targetPlatforms||[]).join(', '))+'</td><td class="muted">'+esc((p.updatedAt||'').replace('T',' ').slice(0,19))+'</td><td></td></tr>');
+      const cell=tr.lastElementChild;
+      const gen=el('<button class="btn sm">Generate Video</button>');
+      gen.onclick=action(gen,async()=>{ const r=await api('video-studio/projects/'+encodeURIComponent(p.id)+'/generate',{method:'POST'}); show(r); toast('Video generated'); render(); },'Generating');
+      cell.appendChild(gen);
+      const review=el('<button class="btn ghost sm" style="margin-left:6px">Review</button>');
+      review.onclick=action(review,async()=>{ show(await api('video-studio/projects/'+encodeURIComponent(p.id)+'/review',{method:'POST'})); },'Reviewing');
+      cell.appendChild(review);
+      const prep=el('<button class="btn ghost sm" style="margin-left:6px">Prepare Publish</button>');
+      prep.onclick=action(prep,async()=>{ show(await api('video-studio/publish/prepare',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platforms:['youtube','tiktok','instagram']})})); toast('Metadata written'); },'Preparing');
+      cell.appendChild(prep);
+      tb.appendChild(tr);
     });
   },
 
