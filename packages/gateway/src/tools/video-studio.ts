@@ -54,32 +54,266 @@ function createProject(gw: Gateway, input: ProjectInput) {
   return { id, projectDir: dir, manifestPath: path.join(dir, "manifest.json"), scriptPath: path.join(dir, "script.md") };
 }
 
+
 async function generateVideo(gw: Gateway, input: { projectId: string; engine?: string; commandTemplate?: string; outputFilename: string }) {
   const projectRoot = path.join(workspaceRoot(gw), "projects");
   const dir = path.join(projectRoot, safeName(input.projectId));
   gw.pathGuard.assertAccess(dir, "write");
   const manifestPath = path.join(dir, "manifest.json");
   if (!fs.existsSync(manifestPath)) throw new Error("Project manifest not found: " + input.projectId);
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { title: string; durationSeconds?: number };
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as Record<string, any>;
   const outName = safeOutputName(input.outputFilename);
   const output = path.join(dir, "output", outName);
   fs.mkdirSync(path.dirname(output), { recursive: true });
   const engine = input.engine || "builtin-ffmpeg";
+
   if (engine !== "builtin-ffmpeg") {
-    const template = input.commandTemplate;
-    if (!template) return { ok: false, setupRequired: true, engine, error: "commandTemplate is required for this engine." };
-    return { ok: false, setupRequired: true, engine, error: "Custom engine execution is intentionally not enabled until commandTemplate execution is reviewed." };
+    return runExternalVideoEngine(gw, dir, manifest, engine, input.commandTemplate, output);
   }
+
   const has = await gw.shell.runBash("command -v ffmpeg", { cwd: dir, timeoutMs: 10_000, maxOutputBytes: 2_000 });
   if (has.code !== 0) return { ok: false, setupRequired: true, engine, error: "ffmpeg is not installed or not on PATH." };
-  const duration = Math.max(1, Math.min(3600, manifest.durationSeconds || 60));
-  const title = String(manifest.title || "Video").replace(/[\\:'\[\]\n\r]/g, " ").slice(0, 120);
-  const command = "ffmpeg -y -f lavfi -i " + q("color=c=0x111827:s=1080x1920:d=" + duration) + " -vf " + q("drawtext=text='" + title + "':fontcolor=white:fontsize=64:x=(w-text_w)/2:y=220:box=1:boxcolor=black@0.35:boxborderw=24") + " -pix_fmt yuv420p " + q(output);
-  const res = await gw.shell.runBash(command, { cwd: dir, timeoutMs: Math.max(120_000, duration * 3_000), maxOutputBytes: 30_000 });
-  const result = { ok: res.code === 0 && fs.existsSync(output), engine, output, code: res.code, timedOut: res.timedOut, stderr: res.stderr.slice(-8_000) };
+
+  const renderId = "render-" + Date.now().toString(36);
+  const renderDir = path.join(dir, "render", renderId);
+  fs.mkdirSync(renderDir, { recursive: true });
+  const dimensions = dimensionsForAspect(String(manifest.aspectRatio ?? "9:16"));
+  const scenes = buildScenePlan(renderDir, manifest, dimensions);
+  const renderPlanPath = path.join(renderDir, "render-plan.json");
+  const captionsPath = path.join(dir, "output", outName.replace(/\.mp4$/i, ".srt"));
+  const storyboardPath = path.join(dir, "output", outName.replace(/\.mp4$/i, ".storyboard.json"));
+  const thumbnailPath = path.join(dir, "output", outName.replace(/\.mp4$/i, ".jpg"));
+  fs.writeFileSync(renderPlanPath, JSON.stringify({ engine, dimensions, scenes }, null, 2), { mode: 0o600 });
+  fs.writeFileSync(captionsPath, toSrt(scenes), { mode: 0o600 });
+  fs.writeFileSync(storyboardPath, JSON.stringify(scenes.map(({ textPath, titlePath, segmentPath, ...scene }) => scene), null, 2), { mode: 0o600 });
+
+  for (const scene of scenes) {
+    fs.writeFileSync(scene.titlePath, scene.title, { mode: 0o600 });
+    fs.writeFileSync(scene.textPath, scene.body, { mode: 0o600 });
+    const filter = sceneFilter(scene, dimensions);
+    const cmd =
+      "ffmpeg -y -f lavfi -i " +
+      q(`color=c=${scene.color}:s=${dimensions.width}x${dimensions.height}:d=${scene.duration}`) +
+      " -vf " +
+      q(filter) +
+      " -an -r 30 -pix_fmt yuv420p " +
+      q(scene.segmentPath);
+    const res = await gw.shell.runBash(cmd, { cwd: dir, timeoutMs: Math.max(120_000, scene.duration * 20_000), maxOutputBytes: 30_000 });
+    if (res.code !== 0 || !fs.existsSync(scene.segmentPath)) {
+      const result = { ok: false, engine, stage: "segment", scene: scene.index, code: res.code, stderr: res.stderr.slice(-8_000), renderPlanPath };
+      fs.appendFileSync(path.join(dir, "runs.jsonl"), JSON.stringify({ type: "generate", result, at: new Date().toISOString() }) + "\n", { mode: 0o600 });
+      return result;
+    }
+  }
+
+  const concatPath = path.join(renderDir, "concat.txt");
+  fs.writeFileSync(concatPath, scenes.map((s) => "file " + JSON.stringify(s.segmentPath) + "\n").join(""), { mode: 0o600 });
+  const concat = await gw.shell.runBash("ffmpeg -y -f concat -safe 0 -i " + q(concatPath) + " -c copy " + q(output), {
+    cwd: dir,
+    timeoutMs: Math.max(120_000, scenes.reduce((sum, s) => sum + s.duration, 0) * 10_000),
+    maxOutputBytes: 30_000,
+  });
+  if (concat.code === 0 && fs.existsSync(output)) {
+    await gw.shell.runBash("ffmpeg -y -ss 00:00:01 -i " + q(output) + " -frames:v 1 " + q(thumbnailPath), {
+      cwd: dir,
+      timeoutMs: 60_000,
+      maxOutputBytes: 10_000,
+    });
+  }
+  const result = {
+    ok: concat.code === 0 && fs.existsSync(output),
+    engine,
+    output,
+    thumbnailPath: fs.existsSync(thumbnailPath) ? thumbnailPath : undefined,
+    captionsPath,
+    storyboardPath,
+    renderPlanPath,
+    sceneCount: scenes.length,
+    durationSeconds: scenes.reduce((sum, s) => sum + s.duration, 0),
+    aspectRatio: manifest.aspectRatio ?? "9:16",
+    code: concat.code,
+    timedOut: concat.timedOut,
+    stderr: concat.stderr.slice(-8_000),
+  };
   fs.appendFileSync(path.join(dir, "runs.jsonl"), JSON.stringify({ type: "generate", result, at: new Date().toISOString() }) + "\n", { mode: 0o600 });
   return result;
 }
+
+
+type VideoDimensions = { width: number; height: number };
+type PlannedScene = {
+  index: number;
+  title: string;
+  body: string;
+  narration: string;
+  color: string;
+  duration: number;
+  start: number;
+  end: number;
+  titlePath: string;
+  textPath: string;
+  segmentPath: string;
+};
+
+async function runExternalVideoEngine(
+  gw: Gateway,
+  dir: string,
+  manifest: Record<string, any>,
+  engine: string,
+  commandTemplate: string | undefined,
+  output: string,
+) {
+  if (!commandTemplate) {
+    return {
+      ok: false,
+      setupRequired: true,
+      engine,
+      error: `${engine} requires commandTemplate. Use placeholders: {{projectDir}}, {{manifestPath}}, {{outputPath}}.`,
+    };
+  }
+  const manifestPath = path.join(dir, "manifest.json");
+  const command = commandTemplate
+    .replaceAll("{{projectDir}}", q(dir))
+    .replaceAll("{{manifestPath}}", q(manifestPath))
+    .replaceAll("{{outputPath}}", q(output))
+    .replaceAll("{{title}}", q(String(manifest.title ?? "")))
+    .replaceAll("{{script}}", q(String(manifest.script ?? "")));
+  const res = await gw.shell.runBash(command, { cwd: dir, timeoutMs: 30 * 60_000, maxOutputBytes: 80_000 });
+  const result = { ok: res.code === 0 && fs.existsSync(output), engine, output, code: res.code, timedOut: res.timedOut, stderr: res.stderr.slice(-12_000) };
+  fs.appendFileSync(path.join(dir, "runs.jsonl"), JSON.stringify({ type: "generate", result, at: new Date().toISOString() }) + "\n", { mode: 0o600 });
+  return result;
+}
+
+function dimensionsForAspect(aspectRatio: string): VideoDimensions {
+  if (aspectRatio === "16:9") return { width: 1920, height: 1080 };
+  if (aspectRatio === "1:1") return { width: 1080, height: 1080 };
+  return { width: 1080, height: 1920 };
+}
+
+function buildScenePlan(renderDir: string, manifest: Record<string, any>, dimensions: VideoDimensions): PlannedScene[] {
+  const totalDuration = Math.max(3, Math.min(3600, Number(manifest.durationSeconds ?? 45)));
+  const rawScenes = normalizeRawScenes(manifest);
+  const baseDuration = Math.max(2, Math.floor(totalDuration / Math.max(1, rawScenes.length)));
+  let cursor = 0;
+  return rawScenes.map((scene, index) => {
+    const remaining = Math.max(2, totalDuration - cursor);
+    const duration = index === rawScenes.length - 1 ? remaining : Math.max(2, Math.min(remaining, Number(scene.durationSeconds ?? baseDuration)));
+    const title = wrapText(String(scene.title || (index === 0 ? manifest.title : `Scene ${index + 1}`)), dimensions.width >= dimensions.height ? 24 : 14).slice(0, 240);
+    const body = wrapText(String(scene.body || scene.text || scene.narration || ""), dimensions.width >= dimensions.height ? 42 : 22).slice(0, 900);
+    const planned: PlannedScene = {
+      index: index + 1,
+      title,
+      body,
+      narration: String(scene.narration || scene.body || scene.text || ""),
+      color: sceneColor(index),
+      duration,
+      start: cursor,
+      end: cursor + duration,
+      titlePath: path.join(renderDir, `scene-${index + 1}-title.txt`),
+      textPath: path.join(renderDir, `scene-${index + 1}-body.txt`),
+      segmentPath: path.join(renderDir, `scene-${index + 1}.mp4`),
+    };
+    cursor += duration;
+    return planned;
+  });
+}
+
+function normalizeRawScenes(manifest: Record<string, any>): Array<Record<string, any>> {
+  if (Array.isArray(manifest.scenes) && manifest.scenes.length) {
+    return manifest.scenes.map((scene: unknown, index: number) => {
+      if (typeof scene === "string") return { title: index === 0 ? manifest.title : `Scene ${index + 1}`, body: scene };
+      if (scene && typeof scene === "object") return scene as Record<string, any>;
+      return { title: `Scene ${index + 1}`, body: String(scene ?? "") };
+    });
+  }
+  const script = String(manifest.script || manifest.description || manifest.title || "LocalAnt Video Studio");
+  const chunks = splitScript(script);
+  return chunks.map((body, index) => ({ title: index === 0 ? manifest.title : `Point ${index + 1}`, body }));
+}
+
+function splitScript(script: string): string[] {
+  const normalized = script.replace(/\r/g, "\n").split(/\n{2,}|(?<=[。.!?！？])\s+/).map((s) => s.trim()).filter(Boolean);
+  if (normalized.length >= 2) return normalized.slice(0, 12);
+  const words = script.trim().split(/\s+/).filter(Boolean);
+  if (words.length <= 18) return [script.trim() || "Generated with LocalAnt Video Studio"];
+  const chunks: string[] = [];
+  for (let i = 0; i < words.length; i += 18) chunks.push(words.slice(i, i + 18).join(" "));
+  return chunks.slice(0, 12);
+}
+
+function wrapText(value: string, maxChars: number): string {
+  const compact = value.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  const lines: string[] = [];
+  let line = "";
+  for (const token of compact.split(" ")) {
+    if (!line) line = token;
+    else if ((line + " " + token).length <= maxChars) line += " " + token;
+    else {
+      lines.push(line);
+      line = token;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.join("\n");
+}
+
+function sceneColor(index: number): string {
+  const palette = ["0x111827", "0x172554", "0x312e81", "0x4c1d95", "0x701a75", "0x7f1d1d", "0x064e3b", "0x134e4a"];
+  return palette[index % palette.length]!;
+}
+
+function sceneFilter(scene: PlannedScene, dimensions: VideoDimensions): string {
+  const font = detectFontFile();
+  const fontArg = font ? `fontfile='${filterPath(font)}':` : "";
+  const titleSize = Math.round(dimensions.height * 0.045);
+  const bodySize = Math.round(dimensions.height * 0.027);
+  const marginX = Math.round(dimensions.width * 0.075);
+  const titleY = Math.round(dimensions.height * 0.13);
+  const bodyY = Math.round(dimensions.height * 0.33);
+  const progressWidth = Math.round(dimensions.width * 0.78 * (scene.index / Math.max(1, scene.index + 1)));
+  return [
+    "drawbox=x=0:y=0:w=iw:h=ih:color=black@0.10:t=fill",
+    `drawbox=x=${marginX}:y=${Math.round(dimensions.height * 0.08)}:w=${dimensions.width - marginX * 2}:h=${Math.round(dimensions.height * 0.18)}:color=black@0.28:t=fill`,
+    `drawtext=${fontArg}textfile='${filterPath(scene.titlePath)}':fontcolor=white:fontsize=${titleSize}:line_spacing=12:x=${marginX + 32}:y=${titleY}`,
+    `drawtext=${fontArg}textfile='${filterPath(scene.textPath)}':fontcolor=white:fontsize=${bodySize}:line_spacing=18:x=${marginX}:y=${bodyY}:box=1:boxcolor=black@0.32:boxborderw=28`,
+    `drawbox=x=${marginX}:y=${dimensions.height - 150}:w=${dimensions.width - marginX * 2}:h=10:color=white@0.25:t=fill`,
+    `drawbox=x=${marginX}:y=${dimensions.height - 150}:w=${progressWidth}:h=10:color=white@0.85:t=fill`,
+    `drawtext=${fontArg}text='LocalAnt Video Studio':fontcolor=white@0.72:fontsize=${Math.round(dimensions.height * 0.018)}:x=${marginX}:y=${dimensions.height - 110}`,
+  ].join(",");
+}
+
+function detectFontFile(): string | undefined {
+  const candidates = [
+    "/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    "/Library/Fonts/Arial Unicode.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  ];
+  return candidates.find((candidate) => fs.existsSync(candidate));
+}
+
+function filterPath(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/:/g, "\\:").replace(/'/g, "\\'");
+}
+
+function toSrt(scenes: PlannedScene[]): string {
+  return scenes.map((scene, index) => [
+    String(index + 1),
+    `${srtTime(scene.start)} --> ${srtTime(scene.end)}`,
+    scene.narration || scene.body.replace(/\n/g, " "),
+    "",
+  ].join("\n")).join("\n");
+}
+
+function srtTime(seconds: number): string {
+  const whole = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const s = whole % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")},000`;
+}
+
 
 function workspaceRoot(gw: Gateway): string {
   const dir = path.join(gw.paths.workspaceDir, "video-studio");
