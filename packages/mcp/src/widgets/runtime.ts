@@ -136,6 +136,21 @@ const WIDGET_RUNTIME = `
     return Promise.resolve(fn(name, args || {})).then(unwrap);
   };
   ctx.callTool = function (name, args) { return ctx.callToolRaw(name, args).then(function (u) { return u.data; }); };
+  ctx.sendFollowUpMessage = function (prompt) {
+    var fn = openai().sendFollowUpMessage;
+    if (!fn) return Promise.reject(new Error("sendFollowUpMessage requires the ChatGPT app runtime."));
+    return Promise.resolve(fn({ prompt: prompt }));
+  };
+  ctx.requestDisplayMode = function (mode) {
+    var fn = openai().requestDisplayMode;
+    if (!fn) return Promise.reject(new Error("requestDisplayMode requires the ChatGPT app runtime."));
+    return Promise.resolve(fn({ mode: mode }));
+  };
+  ctx.openExternal = function (href) {
+    var fn = openai().openExternal;
+    if (!fn) return Promise.reject(new Error("openExternal requires the ChatGPT app runtime."));
+    return Promise.resolve(fn({ href: href }));
+  };
   function apply(result, metaOverride) {
     ctx.result = result || {};
     ctx.data = ctx.result && typeof ctx.result === "object" && "data" in ctx.result ? ctx.result.data : ctx.result;
