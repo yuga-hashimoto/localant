@@ -34,6 +34,8 @@ describe("Video Studio", () => {
       expect(text).toContain(required);
     }
     expect(text).toMatch(/free local/i);
+    expect(text).toContain("## Implementation mapping");
+    expect(text).toContain("No source code copied");
   });
 
   it("registers the requested tools with risk annotations and coding profile exposure", () => {
