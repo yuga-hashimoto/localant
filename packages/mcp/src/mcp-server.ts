@@ -81,15 +81,30 @@ export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => D
       async (args: unknown) => {
         const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: getSessionId() });
         const { image, rest } = extractImage(result.data);
-        const response = { ...result, data: imageStructuredData(rest, image) };
-        const text = JSON.stringify({ ...result, data: rest }, null, 2);
+
+        // Strip __closeWidget from result data and use it to auto-close the
+        // widget on the final batch (e.g. no pending approvals remain).
+        let cleanRest = rest;
+        let closeWidget = false;
+        if (typeof rest === "object" && rest !== null && "__closeWidget" in (rest as Record<string, unknown>)) {
+          const { __closeWidget: _, ...cleaned } = rest as Record<string, unknown> & { __closeWidget: boolean };
+          cleanRest = cleaned;
+          closeWidget = true;
+        }
+
+        const response = { ...result, data: imageStructuredData(cleanRest, image) };
+        const text = JSON.stringify({ ...result, data: cleanRest }, null, 2);
+        let resultMeta: Record<string, unknown> | undefined = image ? { [IMAGE_META_KEY]: image, ...imageWidgetMeta() } : undefined;
+        if (closeWidget) {
+          resultMeta = { ...resultMeta, "openai/closeWidget": true };
+        }
         return {
           structuredContent: response,
           content: [
             { type: "text" as const, text },
             ...(image ? [{ type: "image" as const, data: image.base64, mimeType: image.mimeType }] : []),
           ],
-          _meta: image ? { [IMAGE_META_KEY]: image, ...imageWidgetMeta() } : undefined,
+          _meta: resultMeta,
           isError: !result.ok && !result.approvalRequired,
         };
       },

@@ -112,6 +112,22 @@ const WIDGET_RUNTIME = `
     if (s < 86400) return Math.floor(s / 3600) + "h ago";
     return new Date(t).toLocaleString();
   }
+  // JSON-RPC 2.0 bridge over postMessage (MCP Apps standard).
+  // Preferred over window.openai for tools/call and ui/message.
+  var rpcId = 0;
+  var rpcPending = {};
+  function rpcRequest(method, params) {
+    return new Promise(function (resolve, reject) {
+      var id = ++rpcId;
+      rpcPending[id] = { resolve: resolve, reject: reject };
+      window.parent.postMessage({ jsonrpc: "2.0", id: id, method: method, params: params }, "*");
+      setTimeout(function () {
+        var p = rpcPending[id];
+        if (p) { delete rpcPending[id]; reject(new Error("RPC " + method + " timed out")); }
+      }, 30000);
+    });
+  }
+  function canRpc() { return window.parent && window.parent.postMessage; }
   function unwrap(r) {
     if (!r) return { result: null, data: null };
     var result = r.structuredContent || r.toolOutput || r.result || r;
@@ -130,17 +146,27 @@ const WIDGET_RUNTIME = `
     statusEl.textContent = msg || "";
     statusEl.className = "status" + (kind ? " " + kind : "");
   };
+  // Prefer JSON-RPC tools/call, fall back to window.openai.callTool.
   ctx.callToolRaw = function (name, args) {
+    if (canRpc()) return rpcRequest("tools/call", { name: name, arguments: args || {} });
     var fn = openai().callTool;
     if (!fn) return Promise.reject(new Error("Interactive actions require the ChatGPT app runtime."));
     return Promise.resolve(fn(name, args || {})).then(unwrap);
   };
   ctx.callTool = function (name, args) { return ctx.callToolRaw(name, args).then(function (u) { return u.data; }); };
+  // Prefer JSON-RPC ui/message, fall back to window.openai.sendFollowUpMessage.
   ctx.sendFollowUpMessage = function (prompt) {
+    if (canRpc()) return rpcRequest("ui/message", { role: "user", content: [{ type: "text", text: prompt }] });
     var fn = openai().sendFollowUpMessage;
     if (!fn) return Promise.reject(new Error("sendFollowUpMessage requires the ChatGPT app runtime."));
     return Promise.resolve(fn({ prompt: prompt }));
   };
+  // JSON-RPC ui/update-model-context: tell the model about widget-side state.
+  ctx.updateModelContext = function (text) {
+    if (canRpc()) return rpcRequest("ui/update-model-context", { content: [{ type: "text", text: text }] });
+    return Promise.reject(new Error("updateModelContext requires the MCP Apps bridge."));
+  };
+  // ChatGPT-only extensions (no JSON-RPC equivalent).
   ctx.requestDisplayMode = function (mode) {
     var fn = openai().requestDisplayMode;
     if (!fn) return Promise.reject(new Error("requestDisplayMode requires the ChatGPT app runtime."));
@@ -171,10 +197,24 @@ const WIDGET_RUNTIME = `
     var g = e.detail && e.detail.globals;
     if (g && "toolOutput" in g) apply(g.toolOutput);
   }, { passive: true });
+  // Listen for JSON-RPC responses (tools/call result) and notifications
+  // (ui/notifications/tool-result). Dispatches pending RPC promises and
+  // applies tool-result updates.
   window.addEventListener("message", function (e) {
     if (e.source !== window.parent) return;
     var m = e.data;
     if (!m || m.jsonrpc !== "2.0") return;
+    // Response to a pending rpcRequest
+    if (typeof m.id === "number") {
+      var p = rpcPending[m.id];
+      if (p) {
+        delete rpcPending[m.id];
+        if (m.error) p.reject(new Error(m.error.message || "RPC error"));
+        else p.resolve(m.result);
+      }
+      return;
+    }
+    // Notification (no id) — tool result update
     if (m.method === "ui/notifications/tool-result") {
       var p = m.params || {};
       apply(p.structuredContent || p, p._meta);
