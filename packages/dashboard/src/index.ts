@@ -96,7 +96,7 @@ export function dashboardHtml(token = ""): string {
   <main id="main"></main>
 </div>
 <script>
-const TABS = ["Home","Tools","Security","Approvals","Audit","Secrets","Autopilot","Settings"];
+const TABS = ["Home","Tools","Video Studio","Security","Approvals","Audit","Secrets","Autopilot","Settings"];
 let current = "Home";
 let toolSub = "tools";
 let pendingApprovals = 0;
@@ -650,7 +650,14 @@ const VIEWS = {
     });
   },
 
-  async Settings(m){
+  "Video Studio": async function(m){
+ m.innerHTML='<div class=card><h2>Video Studio</h2><p class=muted>Create local short-video projects and prepare uploads.</p><input id=vsTitle placeholder=Title><textarea id=vsScript placeholder=Script></textarea><button class=btn id=vsCreate>Create project</button><div id=vsStatus class=muted>Loading…</div></div><div class=card><h2>Projects</h2><div id=vsProjects class=muted>Loading…</div></div>';
+ const load=async()=>{ const st=await api('video-studio/status'); document.getElementById('vsStatus').textContent='Workspace: '+(st.workspaceDir||''); const pr=await api('video-studio/projects'); document.getElementById('vsProjects').innerHTML='<pre>'+esc(JSON.stringify(pr.projects||[],null,2))+'</pre>'; };
+ document.getElementById('vsCreate').onclick=action(document.getElementById('vsCreate'),async()=>{ await api('video-studio/new',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({title:document.getElementById('vsTitle').value||'Untitled',script:document.getElementById('vsScript').value||'Hello'})}); await load(); },'Creating');
+ await load();
+ },
+
+ async Settings(m){
     const [c, s]=await Promise.all([api('config'), api('status').catch(()=>({}))]);
     const sec=c.security||{};
     const mode=sec.mode||'open';

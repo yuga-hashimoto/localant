@@ -385,7 +385,25 @@ function mountDashboardApi(
     );
   });
 
-  // --- Tool profile ---
+  // --- Video Studio ---
+ r.get("/video-studio/status", async (_q, s) => {
+ const out = await gw.executeTool("video_studio_status", {}, { caller: "dashboard" });
+ s.status(out.ok ? 200 : 500).json(out.data ?? { error: out.error });
+ });
+
+ r.get("/video-studio/projects", async (_q, s) => {
+ const out = await gw.executeTool("video_studio_list_projects", { limit: 100 }, { caller: "dashboard" });
+ s.status(out.ok ? 200 : 500).json(out.data ?? { error: out.error });
+ });
+ r.post("/video-studio/new", async (req, res) => {
+ const out = await gw.executeTool("video_studio_create_project", req.body || {}, { caller: "dashboard" });
+ res.status(out.ok ? 200 : 400).json(out.data || { error: out.error });
+ });
+ r.post("/video-studio/prep", async (req, res) => {
+ const out = await gw.executeTool("video_studio_publish_prepare", req.body || {}, { caller: "dashboard" });
+ res.status(out.ok ? 200 : 400).json(out.data || { error: out.error });
+ });
+ // --- Tool profile ---
   r.get("/tools/profile", (_q, s) => s.json({ profile: gw.config().tools.profile }));
   r.post("/tools/profile/:name", (q, s) => {
     const name = q.params.name;

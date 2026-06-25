@@ -176,6 +176,7 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "browser_extract_text",
   "browser_get_url",
   "browser_wait",
+ "browser_upload_file",
 
   // --- MCP import ---
   "mcp_import_claude_config",
