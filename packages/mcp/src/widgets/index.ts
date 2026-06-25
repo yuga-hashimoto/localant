@@ -76,6 +76,7 @@ function widgetMeta(widget: WidgetDef): Record<string, unknown> {
     "openai/outputTemplate": widget.uri,
     "openai/toolInvocation/invoking": widget.invoking,
     "openai/toolInvocation/invoked": widget.invoked,
+    "openai/widgetAccessible": true,
   };
 }
 
