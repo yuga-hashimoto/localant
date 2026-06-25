@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { z } from "zod";
 import type { Gateway } from "../gateway.js";
+import { resolveOptionalDep } from "../util/optional-deps-path.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,6 +32,34 @@ const secretNames = [
 
 type Platform = (typeof platforms)[number];
 type Provider = (typeof providers)[number];
+type BrowserPublishInput = {
+  projectId: string;
+  platform: Platform;
+  provider: Provider;
+  dryRun: boolean;
+  confirmBrowserPublish: boolean;
+  endpoint?: string;
+  executeBrowser: boolean;
+  uploadUrl?: string;
+  fileInputSelector?: string;
+  titleSelector?: string;
+  descriptionSelector?: string;
+  submitSelector?: string;
+  headless: boolean;
+  timeoutMs: number;
+};
+type BrowserPlan = {
+  uploadUrl: string;
+  fileInputSelector: string;
+  titleSelector: string | null;
+  descriptionSelector: string | null;
+  submitSelector: string | null;
+  outputPath: string;
+  metadataPath: string;
+  profileDir: string;
+  stoppedBeforeSubmit: boolean;
+  actions: string[];
+};
 
 interface VideoScene {
   id: string;
@@ -167,6 +197,14 @@ export function registerVideoStudioTools(gw: Gateway): void {
       dryRun: z.boolean().default(true),
       confirmBrowserPublish: z.boolean().default(false),
       endpoint: z.string().url().optional(),
+      executeBrowser: z.boolean().default(true),
+      uploadUrl: z.string().url().optional(),
+      fileInputSelector: z.string().optional(),
+      titleSelector: z.string().optional(),
+      descriptionSelector: z.string().optional(),
+      submitSelector: z.string().optional(),
+      headless: z.boolean().default(false),
+      timeoutMs: z.number().int().min(1000).max(120000).default(60000),
     }).strip(),
     summarize: (i) => `${i.dryRun ? "dry-run" : "prepare"} ${i.platform} publish`,
     auditInput: (i) => ({ ...i, secretValues: "not accepted" }),
@@ -508,13 +546,40 @@ async function publishPrepare(gw: Gateway, projectId: string, targetPlatforms: P
   return { ok: true, metadata };
 }
 
-async function publishVideo(gw: Gateway, input: { projectId: string; platform: Platform; provider: Provider; dryRun: boolean; confirmBrowserPublish: boolean; endpoint?: string }) {
+async function publishVideo(gw: Gateway, input: BrowserPublishInput) {
   const { dir } = loadProject(gw, input.projectId);
   const prepared = await publishPrepare(gw, input.projectId, [input.platform]);
   const outputPath = path.join(dir, "output", "output.mp4");
   if (input.dryRun) return { ok: true, dryRun: true, networkCalled: false, outputPath, prepared };
   if (input.provider === "browser") {
-    return { ok: true, dryRun: false, provider: "browser", networkCalled: false, outputPath, uploadUrl: setupUrl(input.platform), stoppedBeforeSubmit: !input.confirmBrowserPublish, note: "Open the upload URL, select the file, fill metadata, and stop before submit unless confirmBrowserPublish=true." };
+    const metadataPath = path.join(dir, "output", `metadata-${input.platform}.json`);
+    const metadata = JSON.parse(fs.readFileSync(metadataPath, "utf8")) as { title?: string; description?: string };
+    const browserPlan = buildBrowserPlan(gw, input, outputPath, metadataPath);
+    if (!input.executeBrowser) {
+      appendRun(dir, "publish.browser.planned", { platform: input.platform, browserPlan });
+      return {
+        ok: true,
+        dryRun: false,
+        provider: "browser",
+        networkCalled: false,
+        outputPath,
+        stoppedBeforeSubmit: browserPlan.stoppedBeforeSubmit,
+        browserPlan,
+        uploadAttempted: false,
+        readyToExecute: true,
+      };
+    }
+    const result = await runBrowserUpload(browserPlan, metadata, input);
+    appendRun(dir, "publish.browser.upload", { platform: input.platform, ...result });
+    return {
+      ...result,
+      dryRun: false,
+      provider: "browser",
+      networkCalled: true,
+      outputPath,
+      stoppedBeforeSubmit: browserPlan.stoppedBeforeSubmit,
+      browserPlan,
+    };
   }
   if (input.provider === "upload-post") {
     const key = gw.vault.get("UPLOAD_POST_API_KEY");
@@ -547,6 +612,131 @@ function browserUploadFile(gw: Gateway, input: { selector: string; path: string;
   if (!isWithin(root, resolved)) throw new Error("Path traversal rejected: upload files must stay inside the LocalAnt Video Studio workspace.");
   if (!fs.existsSync(resolved)) throw new Error(`Upload file does not exist: ${resolved}`);
   return { ok: true, dryRun: input.dryRun, selector: input.selector, path: resolved, note: "Use Playwright setInputFiles in the browser publisher; this tool does not click submit." };
+}
+
+function buildBrowserPlan(gw: Gateway, input: BrowserPublishInput, outputPath: string, metadataPath: string): BrowserPlan {
+  const defaults = platformSelectors(input.platform);
+  const submitSelector = input.submitSelector ?? defaults.submitSelector;
+  return {
+    uploadUrl: input.uploadUrl ?? setupUrl(input.platform),
+    fileInputSelector: input.fileInputSelector ?? defaults.fileInputSelector,
+    titleSelector: input.titleSelector ?? defaults.titleSelector,
+    descriptionSelector: input.descriptionSelector ?? defaults.descriptionSelector,
+    submitSelector,
+    outputPath,
+    metadataPath,
+    profileDir: path.join(videoRoot(gw), "browser-profiles", input.platform),
+    stoppedBeforeSubmit: !input.confirmBrowserPublish,
+    actions: [
+      "goto",
+      "setInputFiles",
+      "fillMetadata",
+      input.confirmBrowserPublish && submitSelector ? "clickSubmit" : "stopBeforeSubmit",
+    ],
+  };
+}
+
+function platformSelectors(platform: Platform): { fileInputSelector: string; titleSelector: string | null; descriptionSelector: string | null; submitSelector: string | null } {
+  if (platform === "youtube") {
+    return {
+      fileInputSelector: "input[type=file]",
+      titleSelector: "input#textbox, textarea[aria-label*='Title'], [contenteditable='true']",
+      descriptionSelector: "textarea#description, textarea[aria-label*='Description'], [contenteditable='true']",
+      submitSelector: "ytcp-button#done-button, button[aria-label*='Publish'], button:has-text('Publish')",
+    };
+  }
+  if (platform === "tiktok") {
+    return {
+      fileInputSelector: "input[type=file], input[accept*='video']",
+      titleSelector: "[contenteditable='true'], textarea, input[name='title']",
+      descriptionSelector: "textarea, [contenteditable='true']",
+      submitSelector: "button[type='submit'], button:has-text('Post'), button:has-text('Publish')",
+    };
+  }
+  return {
+    fileInputSelector: "input[type=file], input[accept*='video']",
+    titleSelector: "textarea, input[name='caption'], [contenteditable='true']",
+    descriptionSelector: "textarea, input[name='caption'], [contenteditable='true']",
+    submitSelector: "button[type='submit'], button:has-text('Share'), button:has-text('Post')",
+  };
+}
+
+type PlaywrightLike = {
+  chromium?: {
+    launchPersistentContext?: (profileDir: string, options: unknown) => Promise<{
+      newPage: () => Promise<any>;
+      close: () => Promise<unknown>;
+    }>;
+  };
+  default?: PlaywrightLike;
+};
+
+async function loadPlaywrightRuntime(): Promise<Required<Pick<PlaywrightLike, "chromium">>> {
+  try {
+    // @ts-ignore optional dependency resolved at runtime
+    const mod = await import("playwright") as PlaywrightLike;
+    const runtime = mod.chromium ? mod : mod.default;
+    if (runtime?.chromium?.launchPersistentContext) return runtime as Required<Pick<PlaywrightLike, "chromium">>;
+  } catch {
+    /* fall through */
+  }
+  const entry = resolveOptionalDep("playwright");
+  if (entry) {
+    const mod = await import(pathToFileURL(entry).href) as PlaywrightLike;
+    const runtime = mod.chromium ? mod : mod.default;
+    if (runtime?.chromium?.launchPersistentContext) return runtime as Required<Pick<PlaywrightLike, "chromium">>;
+  }
+  throw new Error("Playwright is not installed. Run `localant deps install browser`.");
+}
+
+async function runBrowserUpload(plan: BrowserPlan, metadata: { title?: string; description?: string }, input: BrowserPublishInput) {
+  let context: Awaited<ReturnType<NonNullable<NonNullable<PlaywrightLike["chromium"]>["launchPersistentContext"]>>> | undefined;
+  try {
+    const { chromium } = await loadPlaywrightRuntime();
+    fs.mkdirSync(plan.profileDir, { recursive: true });
+    context = await chromium.launchPersistentContext!(plan.profileDir, { headless: input.headless, acceptDownloads: true });
+    const page = await context.newPage();
+    await page.goto(plan.uploadUrl, { waitUntil: "domcontentloaded", timeout: input.timeoutMs });
+    await page.waitForSelector(plan.fileInputSelector, { timeout: input.timeoutMs });
+    await page.setInputFiles(plan.fileInputSelector, plan.outputPath);
+    if (plan.titleSelector && metadata.title) await fillFirstAvailable(page, plan.titleSelector, metadata.title, input.timeoutMs);
+    if (plan.descriptionSelector && metadata.description) await fillFirstAvailable(page, plan.descriptionSelector, metadata.description, input.timeoutMs);
+    if (input.confirmBrowserPublish && plan.submitSelector) {
+      await page.click(plan.submitSelector, { timeout: input.timeoutMs });
+      return { ok: true, uploadAttempted: true, submitted: true, finalUrl: page.url() };
+    }
+    return { ok: true, uploadAttempted: true, submitted: false, finalUrl: page.url(), note: "Stopped before submit. Call again with confirmBrowserPublish=true to click the configured submit selector." };
+  } catch (e) {
+    return {
+      ok: false,
+      setupRequired: true,
+      uploadAttempted: false,
+      reason: (e as Error).message,
+      note: "Log in manually in the opened persistent browser profile if required. LocalAnt does not bypass login, CAPTCHA, 2FA, or bot protection.",
+    };
+  } finally {
+    await context?.close().catch(() => undefined);
+  }
+}
+
+async function fillFirstAvailable(page: any, selectorList: string, value: string, timeoutMs: number): Promise<void> {
+  const selectors = selectorList.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const selector of selectors) {
+    try {
+      await page.waitForSelector(selector, { timeout: Math.min(timeoutMs, 5000) });
+      await page.fill(selector, value, { timeout: Math.min(timeoutMs, 5000) });
+      return;
+    } catch {
+      try {
+        await page.locator(selector).first().click({ timeout: 1000 });
+        await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+        await page.keyboard.type(value);
+        return;
+      } catch {
+        /* try next selector */
+      }
+    }
+  }
 }
 
 function dimensions(aspect: VideoProject["aspectRatio"]) {

@@ -136,8 +136,49 @@ describe("Video Studio", () => {
       provider: "browser",
       dryRun: false,
       confirmBrowserPublish: false,
+      executeBrowser: false,
     });
     expect(browser.stoppedBeforeSubmit).toBe(true);
+    expect(browser.browserPlan.actions).toContain("setInputFiles");
+    expect(browser.browserPlan.profileDir).toContain("video-studio");
+    expect(browser.readyToExecute || browser.uploadAttempted || browser.setupRequired).toBe(true);
+  }, 20_000);
+
+  it("returns a concrete browser upload plan for operational publishing", async () => {
+    const gw = gateway();
+    const script = await call(gw, "video_studio_create_script", { topic: "Browser upload", durationSeconds: 6 });
+    const project = await call(gw, "video_studio_create_project", {
+      title: script.title,
+      description: script.description,
+      script: script.script,
+      scenes: script.scenes,
+      durationSeconds: 6,
+    });
+    await call(gw, "video_studio_generate_video", { projectId: project.project.id });
+
+    const publish = await call(gw, "video_studio_publish_video", {
+      projectId: project.project.id,
+      platform: "youtube",
+      provider: "browser",
+      dryRun: false,
+      confirmBrowserPublish: false,
+      executeBrowser: false,
+      uploadUrl: "https://studio.youtube.com/",
+      fileInputSelector: "input[type=file]",
+      titleSelector: "input[name=title]",
+      descriptionSelector: "textarea[name=description]",
+      submitSelector: "button[type=submit]",
+    });
+
+    expect(publish.browserPlan).toMatchObject({
+      uploadUrl: "https://studio.youtube.com/",
+      fileInputSelector: "input[type=file]",
+      titleSelector: "input[name=title]",
+      descriptionSelector: "textarea[name=description]",
+      submitSelector: "button[type=submit]",
+      stoppedBeforeSubmit: true,
+    });
+    expect(publish.browserPlan.actions).toEqual(["goto", "setInputFiles", "fillMetadata", "stopBeforeSubmit"]);
   }, 20_000);
 
   it("rejects path traversal in browser upload assist", async () => {

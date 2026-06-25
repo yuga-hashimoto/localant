@@ -690,6 +690,12 @@ const VIEWS = {
       const prep=el('<button class="btn ghost sm" style="margin-left:6px">Prepare Publish</button>');
       prep.onclick=action(prep,async()=>{ show(await api('video-studio/publish/prepare',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platforms:['youtube','tiktok','instagram']})})); toast('Metadata written'); },'Preparing');
       cell.appendChild(prep);
+      const upload=el('<button class="btn ghost sm" style="margin-left:6px">Browser Upload Assist</button>');
+      upload.onclick=action(upload,async()=>{ show(await api('video-studio/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platform:'youtube',provider:'browser',dryRun:false,confirmBrowserPublish:false})})); toast('Upload assist opened or returned setup instructions'); },'Opening');
+      cell.appendChild(upload);
+      const publish=el('<button class="btn danger sm" style="margin-left:6px">Publish</button>');
+      publish.onclick=action(publish,async()=>{ if(!confirm('Click the configured submit/publish button in the browser? Login, CAPTCHA and 2FA are never bypassed.')) return; show(await api('video-studio/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platform:'youtube',provider:'browser',dryRun:false,confirmBrowserPublish:true})})); },'Publishing');
+      cell.appendChild(publish);
       tb.appendChild(tr);
     });
   },
