@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import http from "node:http";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -65,6 +66,26 @@ async function routerHealthy(port: number): Promise<boolean> {
   }
 }
 
+async function portAvailable(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once("error", () => resolve(false));
+    server.listen(port, "127.0.0.1", () => {
+      server.close(() => resolve(true));
+    });
+  });
+}
+
+export async function selectAvailableRouterPort(preferredPort: number): Promise<number> {
+  if (await routerHealthy(preferredPort)) return preferredPort;
+  if (await portAvailable(preferredPort)) return preferredPort;
+  for (let port = DEFAULT_PORT + 1; port < DEFAULT_PORT + 100; port++) {
+    if (await routerHealthy(port)) return port;
+    if (await portAvailable(port)) return port;
+  }
+  throw new Error(`No available shared MCP router port found near ${DEFAULT_PORT}.`);
+}
+
 async function waitForRouter(port: number): Promise<void> {
   for (let i = 0; i < 30; i++) {
     if (await routerHealthy(port)) return;
@@ -113,6 +134,7 @@ export async function ensureSharedRouterRoute(options: EnsureSharedRouterOptions
     prefix,
     target: options.target.replace(/\/$/, ""),
   };
+  config.port = await selectAvailableRouterPort(config.port);
   saveRouterConfig(config);
   await ensureRouterProcess(config.port);
   await ensureTailscaleFunnel(config.port);

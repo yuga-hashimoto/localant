@@ -3,7 +3,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildRoutedMcpEndpoint, createSharedRouterServer, normalizeRoutePrefix } from "../packages/cli/src/shared-router.js";
+import {
+  buildRoutedMcpEndpoint,
+  createSharedRouterServer,
+  normalizeRoutePrefix,
+  selectAvailableRouterPort,
+} from "../packages/cli/src/shared-router.js";
 
 const servers: http.Server[] = [];
 
@@ -61,5 +66,15 @@ describe("shared Tailscale MCP router", () => {
 
     const res = await fetch(`http://127.0.0.1:${routerPort}/localant/mcp?key=abc`, { method: "POST" });
     await expect(res.json()).resolves.toEqual({ method: "POST", url: "/mcp?key=abc" });
+  });
+
+  it("moves to another router port when the preferred port belongs to another service", async () => {
+    const otherService = http.createServer((_req, res) => {
+      res.writeHead(404);
+      res.end("not the shared router");
+    });
+    const occupiedPort = await listen(otherService);
+
+    await expect(selectAvailableRouterPort(occupiedPort)).resolves.not.toBe(occupiedPort);
   });
 });
