@@ -26,7 +26,10 @@ beforeEach(() => {
 });
 // maxRetries/retryDelay absorb the Windows EBUSY race where a just-stopped
 // background shell still holds a handle to the temp dir during cleanup.
-afterEach(() => fs.rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+afterEach(async () => {
+  if (process.platform === "win32") await new Promise((resolve) => setTimeout(resolve, 500));
+  fs.rmSync(base, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+});
 
 describe("bash tool", () => {
   it("executes an allowed command", async () => {
