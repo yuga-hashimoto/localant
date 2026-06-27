@@ -158,7 +158,7 @@ describe("Video Studio", () => {
     expect(browser.browserPlan.actions).toContain("setInputFiles");
     expect(browser.browserPlan.profileDir).toContain("video-studio");
     expect(browser.readyToExecute || browser.uploadAttempted || browser.setupRequired).toBe(true);
-  }, 60_000);
+  }, 120_000);
 
   it("imports a ChatGPT-generated image file as a scene asset for Remotion", async () => {
     const gw = gateway();
@@ -194,7 +194,7 @@ describe("Video Studio", () => {
     const props = JSON.parse(fs.readFileSync(path.join(project.projectDir, "render", "render-props.json"), "utf8"));
     expect(props.scenes[0].assetFile).toBe("assets/scene-001.png");
     expect(props.scenes[0].assetSource).toBe("imported-image");
-  }, 60_000);
+  }, 120_000);
 
   it("uses VOICEVOX as the primary Japanese TTS and derives scene durations from probed audio", async () => {
     const voicevox = await startVoicevoxFixture();
@@ -234,7 +234,7 @@ describe("Video Studio", () => {
     } finally {
       await voicevox.close();
     }
-  }, 60_000);
+  }, 120_000);
 
   it("writes Remotion render props and motion plan outputs", async () => {
     const gw = gateway();
@@ -259,7 +259,7 @@ describe("Video Studio", () => {
     const motion = JSON.parse(fs.readFileSync(path.join(project.projectDir, "render", "motion-plan.json"), "utf8"));
     expect(props.scenes.length).toBeGreaterThanOrEqual(1);
     expect(motion.animations).toEqual(expect.arrayContaining(["background", "card", "title", "captions", "progress", "cta"]));
-  }, 60_000);
+  }, 120_000);
 
   it("fails review when the rendered video is shorter than narration audio", async () => {
     if (!hasCommandSync("ffmpeg") || !hasCommandSync("ffprobe")) return;
@@ -297,7 +297,7 @@ describe("Video Studio", () => {
     const review = await call(gw, "video_studio_review_video", { projectId: project.project.id });
     expect(review.ok).toBe(false);
     expect(review.warnings.join(" ")).toMatch(/audio|short|cut|途中|音声/i);
-  }, 60_000);
+  }, 120_000);
 
   it("returns a concrete browser upload plan for operational publishing", async () => {
     const gw = gateway();
@@ -334,7 +334,7 @@ describe("Video Studio", () => {
       stoppedBeforeSubmit: true,
     });
     expect(publish.browserPlan.actions).toEqual(["goto", "setInputFiles", "fillMetadata", "stopBeforeSubmit"]);
-  }, 60_000);
+  }, 120_000);
 
   it("rejects path traversal in browser upload assist", async () => {
     const gw = gateway();

@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-## [1.4.14] - 2026-06-27
+## [1.4.15] - 2026-06-27
 
 ### Added
 - LocalAnt Video Studio now generates presentation-style short videos with
