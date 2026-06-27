@@ -1,4 +1,6 @@
 import { z } from "zod";
+import fs from "node:fs";
+import path from "node:path";
 import type { Gateway } from "../gateway.js";
 
 /**
@@ -65,4 +67,58 @@ export function registerAssetTools(gw: Gateway): void {
     },
     handler: (i) => gw.assetBridge.saveImage(i.source, i.destination, i.overwrite),
   });
+
+  gw.registry.register({
+    name: "asset_upload_chunk",
+    description:
+      "Upload one base64 chunk for a large ChatGPT-generated image. Use this when a single asset_save_image base64 payload would be too large; finish with asset_commit_upload.",
+    risk: 2,
+    inputSchema: z.object({
+      uploadId: z.string().min(1).max(120).regex(/^[a-zA-Z0-9._-]+$/),
+      index: z.number().int().min(0).max(10_000),
+      data: z.string().min(1).describe("One base64 text chunk. It is not written to the audit log."),
+    }).strip(),
+    auditInput: (i) => ({ uploadId: i.uploadId, index: i.index, base64Len: i.data.length }),
+    summarize: (i) => `upload image chunk ${i.index} for ${i.uploadId}`,
+    handler: (i) => {
+      const dir = uploadDir(gw, i.uploadId);
+      fs.mkdirSync(dir, { recursive: true });
+      const file = path.join(dir, `${String(i.index).padStart(6, "0")}.b64`);
+      fs.writeFileSync(file, i.data, "utf8");
+      return { ok: true, uploadId: i.uploadId, index: i.index, bytesReceived: i.data.length };
+    },
+  });
+
+  gw.registry.register({
+    name: "asset_commit_upload",
+    description:
+      "Assemble previously uploaded base64 chunks, validate the image, and save it to a local path using the normal Asset Bridge validation path.",
+    risk: 2,
+    inputSchema: z.object({
+      uploadId: z.string().min(1).max(120).regex(/^[a-zA-Z0-9._-]+$/),
+      chunks: z.number().int().min(1).max(10_001),
+      destination: z.string().describe("Absolute or repo-relative path to write the assembled image to."),
+      overwrite: z.boolean().default(false),
+      sha256: z.string().optional().describe("Optional hex sha256 of the decoded image bytes."),
+      cleanup: z.boolean().default(true),
+    }).strip(),
+    auditInput: (i) => ({ ...i, chunkData: "not recorded" }),
+    summarize: (i) => `commit chunked image ${i.uploadId} -> ${i.destination}`,
+    handler: async (i) => {
+      const dir = uploadDir(gw, i.uploadId);
+      const parts: string[] = [];
+      for (let idx = 0; idx < i.chunks; idx += 1) {
+        const file = path.join(dir, `${String(idx).padStart(6, "0")}.b64`);
+        if (!fs.existsSync(file)) throw new Error(`Missing image chunk ${idx} for uploadId '${i.uploadId}'.`);
+        parts.push(fs.readFileSync(file, "utf8"));
+      }
+      const result = await gw.assetBridge.saveImage({ kind: "base64", data: parts.join(""), sha256: i.sha256 }, i.destination, i.overwrite);
+      if (i.cleanup) fs.rmSync(dir, { recursive: true, force: true });
+      return { ...result, source: `chunked:${i.uploadId}` };
+    },
+  });
+}
+
+function uploadDir(gw: Gateway, uploadId: string): string {
+  return path.join(gw.paths.root, "asset-uploads", uploadId);
 }

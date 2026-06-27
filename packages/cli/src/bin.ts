@@ -563,8 +563,9 @@ toolsCmd
   .description("List tools exposed under the active profile")
   .action(() => {
     const gw = createGateway();
-    const profile = gw.config().tools.profile;
-    const tools = gw.registry.list().filter((t) => isToolInProfile(t.name, profile));
+    const toolsConfig = gw.config().tools;
+    const profile = toolsConfig.profile;
+    const tools = gw.registry.list().filter((t) => isToolInProfile(t.name, profile, toolsConfig.features));
     console.log(c.bold(`Profile: ${profile} (${tools.length} tools)`));
     for (const t of tools) console.log(`  ${t.name} ${c.gray(`[risk ${t.risk}]`)}`);
   });
@@ -580,7 +581,7 @@ toolsCmd
     if (!["minimal", "coding", "full"].includes(name)) {
       return console.log(fail("Profile must be one of: minimal, coding, full"));
     }
-    gw.saveConfig({ ...gw.config(), tools: { profile: name as "minimal" | "coding" | "full" } });
+    gw.saveConfig({ ...gw.config(), tools: { ...gw.config().tools, profile: name as "minimal" | "coding" | "full" } });
     console.log(ok(`Tool profile set to '${name}'. Restart the gateway for it to take effect.`));
   });
 

@@ -63,10 +63,11 @@ export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => D
   const server = new McpServer({ name: "LocalAnt", version: APP_VERSION });
   registerWidgets(server);
 
-  const profile = gw.config().tools.profile;
+  const toolsConfig = gw.config().tools;
+  const profile = toolsConfig.profile;
   const mode = gw.config().security.mode;
   for (const tool of gw.registry.list()) {
-    if (!isToolInProfile(tool.name, profile)) continue;
+    if (!isToolInProfile(tool.name, profile, toolsConfig.features)) continue;
     const shape = (tool.inputSchema as unknown as { shape?: Record<string, z.ZodTypeAny> }).shape ?? {};
     server.registerTool(
       tool.name,

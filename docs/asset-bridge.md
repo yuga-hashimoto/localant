@@ -43,6 +43,46 @@ asset_save_image {
 
 Returns `{ path, bytes, mimeType, sha256, source, backupId? }`.
 
+### Large generated images
+
+When ChatGPT can read the image bytes but a single `asset_save_image` base64
+payload would be too large, stream it in chunks:
+
+```jsonc
+asset_upload_chunk {
+  "uploadId": "generated-scene-001",
+  "index": 0,
+  "data": "base64 text chunk"
+}
+
+asset_commit_upload {
+  "uploadId": "generated-scene-001",
+  "chunks": 12,
+  "destination": "/absolute/path/to/scene-001.png"
+}
+```
+
+`asset_commit_upload` assembles the chunks, then runs the exact same image
+validation and atomic write path as `asset_save_image`. Chunk payloads are not
+recorded in the audit log.
+
+## Video Studio handoff
+
+Use `asset_save_image` first, then import the saved file into a Video Studio
+scene:
+
+```jsonc
+video_studio_add_asset {
+  "projectId": "mqu-example",
+  "sceneId": "scene-001",
+  "path": "/absolute/path/to/chatgpt-generated.png"
+}
+```
+
+`video_studio_add_asset` copies PNG/JPEG/WebP files into the project's
+`assets/` directory, records the scene `assetPath`, and passes the image through
+`render-props.json` so Remotion renders it as the scene visual.
+
 ## Validation (every route)
 
 Before anything is written, the resolved bytes must pass:
@@ -87,7 +127,8 @@ never leaves a corrupt asset in place.
 ## Profiles
 
 `asset_save_image` is exposed in the `coding` and `full` profiles (not
-`minimal`).
+`minimal`) only after the Asset bridge feature is enabled from Dashboard →
+Settings → Optional ChatGPT tools.
 
 ```bash
 localant tools profile coding

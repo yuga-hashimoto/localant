@@ -27,7 +27,7 @@ export function registerUiTools(gw: Gateway): void {
       const runtime = gw.runtimeInfo();
       const profile = cfg.tools.profile;
       const registeredTools = gw.registry.list();
-      const exposedTools = registeredTools.filter((tool) => isToolInProfile(tool.name, profile));
+      const exposedTools = registeredTools.filter((tool) => isToolInProfile(tool.name, profile, cfg.tools.features));
       const skills = gw.skills.list().map((skill) => ({
         name: skill.manifest.name,
         version: skill.manifest.version,

@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.13] - 2026-06-27
+
+### Added
+- LocalAnt Video Studio now generates presentation-style short videos with
+  Remotion as the primary renderer and VOICEVOX as the primary Japanese TTS.
+- Video Studio outputs Remotion render props, motion plan, MP4, thumbnail, SRT,
+  ASS, and word timing files, and reviews rendered videos for narration cutoff.
+- ChatGPT-generated images can be imported into Video Studio scenes through the
+  Asset bridge, including chunked base64 upload for large images.
+- Dashboard settings now expose optional ChatGPT tool toggles for Video Studio
+  and the generated-image Asset bridge.
+
+### Changed
+- Video Studio and Asset bridge tools are hidden from ChatGPT by default and are
+  advertised over MCP only after the matching Dashboard feature is enabled.
+
 ## [1.4.9] - 2026-06-16
 
 ### Fixed

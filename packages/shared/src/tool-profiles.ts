@@ -15,6 +15,36 @@
  *    mutation, secret management, destructive git, …).
  */
 export type ToolProfile = "minimal" | "coding" | "full";
+export type ToolFeatureFlags = {
+  videoStudio?: boolean;
+  assetBridge?: boolean;
+};
+
+const VIDEO_STUDIO_TOOLS: ReadonlySet<string> = new Set<string>([
+  "video_studio_status",
+  "video_studio_configure",
+  "video_studio_create_script",
+  "video_studio_create_project",
+  "video_studio_list_projects",
+  "video_studio_add_asset",
+  "video_studio_generate_assets",
+  "video_studio_generate_audio",
+  "video_studio_generate_captions",
+  "video_studio_render_video",
+  "video_studio_generate_video",
+  "video_studio_review_video",
+  "video_studio_publish_prepare",
+  "video_studio_publish_video",
+  "video_studio_open_setup",
+  "video_studio_connect_account",
+  "video_studio_test_publisher",
+]);
+
+const ASSET_BRIDGE_TOOLS: ReadonlySet<string> = new Set<string>([
+  "asset_save_image",
+  "asset_upload_chunk",
+  "asset_commit_upload",
+]);
 
 /**
  * The set of tool names exposed in the `minimal` profile. Everything else is
@@ -75,6 +105,11 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "mcp_server_list",
   "mcp_server_status",
   "mcp_server_list_tools",
+
+  // --- Video Studio read/status ---
+  "video_studio_status",
+  "video_studio_list_projects",
+  "video_studio_review_video",
 ]);
 
 /**
@@ -106,6 +141,8 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
 
   // --- Asset bridge (get conversation images onto the local repo) ---
   "asset_save_image",
+  "asset_upload_chunk",
+  "asset_commit_upload",
   // dropped duplicates (reachable via the kept name in the comment above):
   //   read_file, read_file_range→fs_read_file_range, write_file, edit_file,
   //   list_files→fs_list_files, search_content, search_files→fs_search_files,
@@ -177,6 +214,22 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "browser_extract_text",
   "browser_get_url",
   "browser_wait",
+  "browser_upload_file",
+
+  // --- Video Studio creation/rendering (publish_video remains full-only) ---
+  "video_studio_configure",
+  "video_studio_create_script",
+  "video_studio_create_project",
+  "video_studio_add_asset",
+  "video_studio_generate_assets",
+  "video_studio_generate_audio",
+  "video_studio_generate_captions",
+  "video_studio_render_video",
+  "video_studio_generate_video",
+  "video_studio_publish_prepare",
+  "video_studio_open_setup",
+  "video_studio_connect_account",
+  "video_studio_test_publisher",
 
   // --- MCP import ---
   "mcp_import_claude_config",
@@ -190,8 +243,12 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "tunnel_restart",
 ]);
 
-/** Whether a tool is exposed under the given profile. `full` exposes everything. */
-export function isToolInProfile(name: string, profile: ToolProfile): boolean {
+/** Whether a tool is exposed under the given profile. `full` exposes everything except disabled feature tools. */
+export function isToolInProfile(name: string, profile: ToolProfile, features?: ToolFeatureFlags): boolean {
+  if (features) {
+    if (!features.videoStudio && VIDEO_STUDIO_TOOLS.has(name)) return false;
+    if (!features.assetBridge && ASSET_BRIDGE_TOOLS.has(name)) return false;
+  }
   if (profile === "full") return true;
   if (profile === "coding") return CODING_PROFILE_TOOLS.has(name);
   return MINIMAL_PROFILE_TOOLS.has(name);

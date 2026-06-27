@@ -361,7 +361,8 @@ function mountDashboardApi(
   });
 
   r.get("/tools", (_q, s) => {
-    const profile = gw.config().tools.profile;
+    const toolsConfig = gw.config().tools;
+    const profile = toolsConfig.profile;
     s.json(
       gw.registry.list().map((t) => {
         const shape = (t.inputSchema as any).shape ?? {};
@@ -379,7 +380,7 @@ function mountDashboardApi(
           risk: t.risk,
           inputSchema,
           // Whether this tool is advertised to ChatGPT under the active profile.
-          active: isToolInProfile(t.name, profile),
+          active: isToolInProfile(t.name, profile, toolsConfig.features),
         };
       })
     );
@@ -392,7 +393,7 @@ function mountDashboardApi(
     if (!["minimal", "coding", "full"].includes(name)) {
       return s.status(400).json({ error: "profile must be minimal|coding|full" });
     }
-    gw.saveConfig({ ...gw.config(), tools: { profile: name as "minimal" | "coding" | "full" } });
+    gw.saveConfig({ ...gw.config(), tools: { ...gw.config().tools, profile: name as "minimal" | "coding" | "full" } });
     s.json({ profile: name, note: "Restart the gateway for the MCP surface to refresh." });
   });
 
@@ -429,17 +430,7 @@ function mountDashboardApi(
   r.get("/config", (_q, s) => s.json(gw.config()));
   r.get("/mcp-endpoint", (_q, s) => {
     const t = gw.tunnel.current();
-    let runtimeEndpoint: string | null = null;
-    try {
-      const rt = JSON.parse(fs.readFileSync(gw.paths.runtimeFile, "utf8")) as { mcpEndpoint?: string | null };
-      runtimeEndpoint = rt.mcpEndpoint ?? null;
-    } catch {
-      runtimeEndpoint = null;
-    }
-    s.json({
-      endpoint: runtimeEndpoint ?? (t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null),
-      tunnel: t,
-    });
+    s.json({ endpoint: t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null, tunnel: t });
   });
   r.get("/token", (_q, s) => s.json({ token: gw.configStore.getToken() }));
   r.post("/token/rotate", (_q, s) => {
@@ -675,6 +666,32 @@ function mountDashboardApi(
       s.status(400).json({ error: (e as Error).message });
     }
   });
+
+  const runTool = async (s: Response, name: string, input: unknown) => {
+    const result = await gw.executeTool(name, input, { caller: "dashboard" });
+    if (!result.ok) {
+      s.status(result.approvalRequired ? 409 : 400).json(result.approvalRequired ?? { error: result.error });
+      return;
+    }
+    s.json(result.data ?? { ok: true });
+  };
+
+  // --- Video Studio ---
+  r.get("/video-studio/status", (_q, s) => void runTool(s, "video_studio_status", {}));
+  r.post("/video-studio/script", (q, s) => void runTool(s, "video_studio_create_script", q.body ?? {}));
+  r.get("/video-studio/projects", (q, s) => void runTool(s, "video_studio_list_projects", { limit: Number(q.query.limit ?? 100) }));
+  r.post("/video-studio/projects", (q, s) => void runTool(s, "video_studio_create_project", q.body ?? {}));
+  r.post("/video-studio/projects/:id/assets", (q, s) => void runTool(s, "video_studio_generate_assets", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/audio", (q, s) => void runTool(s, "video_studio_generate_audio", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/captions", (q, s) => void runTool(s, "video_studio_generate_captions", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/render", (q, s) => void runTool(s, "video_studio_render_video", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/generate", (q, s) => void runTool(s, "video_studio_generate_video", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/review", (q, s) => void runTool(s, "video_studio_review_video", { projectId: q.params.id }));
+  r.post("/video-studio/publish/prepare", (q, s) => void runTool(s, "video_studio_publish_prepare", q.body ?? {}));
+  r.post("/video-studio/publish", (q, s) => void runTool(s, "video_studio_publish_video", q.body ?? {}));
+  r.post("/video-studio/setup/open", (q, s) => void runTool(s, "video_studio_open_setup", q.body ?? {}));
+  r.post("/video-studio/connect/:platform", (q, s) => void runTool(s, "video_studio_connect_account", { ...(q.body ?? {}), platform: q.params.platform }));
+  r.post("/video-studio/publishers/:platform/test", (q, s) => void runTool(s, "video_studio_test_publisher", { ...(q.body ?? {}), platform: q.params.platform }));
 
   r.get("/mcp-servers", (_q, s) => {
     // Zod 4 infers the refined record's value as `unknown`; the runtime shape is

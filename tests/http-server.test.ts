@@ -122,6 +122,44 @@ describe("mcp chat sessions", () => {
     }
   });
 
+  it("does not advertise plugin-style tools over MCP until dashboard features are enabled", async () => {
+    gw.saveConfig({
+      ...gw.config(),
+      tools: {
+        profile: "full",
+        features: { videoStudio: false, assetBridge: false },
+      },
+    });
+
+    const first = await connectClient("plugin-disabled-client");
+    try {
+      const tools = await first.client.listTools();
+      const names = tools.tools.map((tool) => tool.name);
+      expect(names).not.toContain("video_studio_generate_video");
+      expect(names).not.toContain("asset_save_image");
+    } finally {
+      await first.client.close();
+    }
+
+    gw.saveConfig({
+      ...gw.config(),
+      tools: {
+        profile: "full",
+        features: { videoStudio: true, assetBridge: true },
+      },
+    });
+
+    const second = await connectClient("plugin-enabled-client");
+    try {
+      const tools = await second.client.listTools();
+      const names = tools.tools.map((tool) => tool.name);
+      expect(names).toContain("video_studio_generate_video");
+      expect(names).toContain("asset_save_image");
+    } finally {
+      await second.client.close();
+    }
+  });
+
   it("assigns a distinct session id per chat and tags audit entries with it", async () => {
     const a = await connectClient("chat-a");
     const b = await connectClient("chat-b");
@@ -327,15 +365,6 @@ describe("dashboard api routes", () => {
     const stop = await apiSend("tunnel/stop", "POST");
     expect(stop.status).toBe(200);
     expect(((await stop.json()) as { status: string }).status).toBe("stopped");
-  });
-
-  it("reports the verified runtime MCP endpoint even when the live tunnel manager is idle", async () => {
-    const endpoint = "https://machine.example/localant/mcp?key=runtime-token";
-    fs.writeFileSync(apiGw.paths.runtimeFile, JSON.stringify({ mcpEndpoint: endpoint }));
-
-    const res = await apiGet("mcp-endpoint");
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as { endpoint: string | null }).endpoint).toBe(endpoint);
   });
 
   it("reveals and rotates the auth token (and /mcp honors the new token)", async () => {

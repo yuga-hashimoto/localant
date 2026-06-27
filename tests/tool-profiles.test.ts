@@ -50,6 +50,8 @@ const LOW_LEVEL_TOOLS = [
 describe("tool profiles", () => {
   it("defaults the config to the minimal profile", () => {
     expect(defaultConfig().tools.profile).toBe("minimal");
+    expect(defaultConfig().tools.features.videoStudio).toBe(false);
+    expect(defaultConfig().tools.features.assetBridge).toBe(false);
   });
 
   it("exposes the high-level autopilot + doctor surface in the minimal profile", () => {
@@ -108,6 +110,26 @@ describe("tool profiles", () => {
   it("full profile admits every tool", () => {
     expect(isToolInProfile("git_commit", "full")).toBe(true);
     expect(isToolInProfile("anything_at_all", "full")).toBe(true);
+  });
+
+  it("hides plugin-style tools unless their dashboard feature is enabled", () => {
+    const disabled = { videoStudio: false, assetBridge: false };
+    const enabled = { videoStudio: true, assetBridge: true };
+
+    for (const profile of ["minimal", "coding", "full"] as const) {
+      expect(isToolInProfile("video_studio_status", profile, disabled), `${profile} video status`).toBe(false);
+      expect(isToolInProfile("video_studio_generate_video", profile, disabled), `${profile} video render`).toBe(false);
+      expect(isToolInProfile("asset_save_image", profile, disabled), `${profile} asset save`).toBe(false);
+      expect(isToolInProfile("asset_upload_chunk", profile, disabled), `${profile} asset chunk`).toBe(false);
+    }
+
+    expect(isToolInProfile("video_studio_status", "minimal", enabled)).toBe(true);
+    expect(isToolInProfile("video_studio_generate_video", "minimal", enabled)).toBe(false);
+    expect(isToolInProfile("asset_save_image", "minimal", enabled)).toBe(false);
+    expect(isToolInProfile("video_studio_generate_video", "coding", enabled)).toBe(true);
+    expect(isToolInProfile("asset_save_image", "coding", enabled)).toBe(true);
+    expect(isToolInProfile("video_studio_generate_video", "full", enabled)).toBe(true);
+    expect(isToolInProfile("asset_save_image", "full", enabled)).toBe(true);
   });
 
   it("coding profile exposes the coding tools", () => {
