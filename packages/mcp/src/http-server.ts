@@ -676,6 +676,32 @@ function mountDashboardApi(
     }
   });
 
+  const runTool = async (s: Response, name: string, input: unknown) => {
+    const result = await gw.executeTool(name, input, { caller: "dashboard" });
+    if (!result.ok) {
+      s.status(result.approvalRequired ? 409 : 400).json(result.approvalRequired ?? { error: result.error });
+      return;
+    }
+    s.json(result.data ?? { ok: true });
+  };
+
+  // --- Video Studio ---
+  r.get("/video-studio/status", (_q, s) => void runTool(s, "video_studio_status", {}));
+  r.post("/video-studio/script", (q, s) => void runTool(s, "video_studio_create_script", q.body ?? {}));
+  r.get("/video-studio/projects", (q, s) => void runTool(s, "video_studio_list_projects", { limit: Number(q.query.limit ?? 100) }));
+  r.post("/video-studio/projects", (q, s) => void runTool(s, "video_studio_create_project", q.body ?? {}));
+  r.post("/video-studio/projects/:id/assets", (q, s) => void runTool(s, "video_studio_generate_assets", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/audio", (q, s) => void runTool(s, "video_studio_generate_audio", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/captions", (q, s) => void runTool(s, "video_studio_generate_captions", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/render", (q, s) => void runTool(s, "video_studio_render_video", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/generate", (q, s) => void runTool(s, "video_studio_generate_video", { projectId: q.params.id }));
+  r.post("/video-studio/projects/:id/review", (q, s) => void runTool(s, "video_studio_review_video", { projectId: q.params.id }));
+  r.post("/video-studio/publish/prepare", (q, s) => void runTool(s, "video_studio_publish_prepare", q.body ?? {}));
+  r.post("/video-studio/publish", (q, s) => void runTool(s, "video_studio_publish_video", q.body ?? {}));
+  r.post("/video-studio/setup/open", (q, s) => void runTool(s, "video_studio_open_setup", q.body ?? {}));
+  r.post("/video-studio/connect/:platform", (q, s) => void runTool(s, "video_studio_connect_account", { ...(q.body ?? {}), platform: q.params.platform }));
+  r.post("/video-studio/publishers/:platform/test", (q, s) => void runTool(s, "video_studio_test_publisher", { ...(q.body ?? {}), platform: q.params.platform }));
+
   r.get("/mcp-servers", (_q, s) => {
     // Zod 4 infers the refined record's value as `unknown`; the runtime shape is
     // McpServerConfigT, so narrow it explicitly for the response mapping.

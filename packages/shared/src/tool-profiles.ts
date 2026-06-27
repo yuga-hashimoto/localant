@@ -75,6 +75,11 @@ export const MINIMAL_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "mcp_server_list",
   "mcp_server_status",
   "mcp_server_list_tools",
+
+  // --- Video Studio read/status ---
+  "video_studio_status",
+  "video_studio_list_projects",
+  "video_studio_review_video",
 ]);
 
 /**
@@ -177,6 +182,21 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "browser_extract_text",
   "browser_get_url",
   "browser_wait",
+  "browser_upload_file",
+
+  // --- Video Studio creation/rendering (publish_video remains full-only) ---
+  "video_studio_configure",
+  "video_studio_create_script",
+  "video_studio_create_project",
+  "video_studio_generate_assets",
+  "video_studio_generate_audio",
+  "video_studio_generate_captions",
+  "video_studio_render_video",
+  "video_studio_generate_video",
+  "video_studio_publish_prepare",
+  "video_studio_open_setup",
+  "video_studio_connect_account",
+  "video_studio_test_publisher",
 
   // --- MCP import ---
   "mcp_import_claude_config",
