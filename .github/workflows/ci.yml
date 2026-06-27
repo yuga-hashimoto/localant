@@ -27,6 +27,25 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
 
+      - name: Install ffmpeg / ffprobe
+        shell: bash
+        run: |
+          if command -v ffprobe >/dev/null 2>&1; then
+            exit 0
+          fi
+          case "$RUNNER_OS" in
+            Linux)
+              sudo apt-get update
+              sudo apt-get install -y ffmpeg
+              ;;
+            macOS)
+              brew install ffmpeg
+              ;;
+            Windows)
+              choco install ffmpeg -y
+              ;;
+          esac
+
       - name: Install
         run: pnpm install --frozen-lockfile
 
