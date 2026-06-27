@@ -3,6 +3,7 @@ import { createGateway, type Gateway } from "@localant/gateway";
 import { startHttpServers } from "@localant/mcp";
 import { c, ok, warn, copyToClipboard, openBrowser, urlBox } from "./util.js";
 import { resolveAppVersion, APP_VERSION } from "@localant/shared";
+import { buildRoutedMcpEndpoint, ensureSharedRouterRoute } from "./shared-router.js";
 
 export interface StartOptions {
   noTunnel?: boolean;
@@ -50,12 +51,35 @@ export async function runGateway(gw: Gateway, opts: StartOptions): Promise<void>
 
   if (!opts.noTunnel && cfg.tunnel.provider !== "none") {
     if (!opts.quiet) process.stdout.write(c.gray("Starting tunnel… "));
-    const tunnel = await gw.tunnel.start(servers.gatewayPort);
+    const tunnel =
+      cfg.tunnel.provider === "tailscale" && (cfg.tunnel.domain || cfg.tunnel.publicUrl)
+        ? await (async () => {
+            const publicBaseUrl = cfg.tunnel.publicUrl || `https://${cfg.tunnel.domain}`;
+            const route = await ensureSharedRouterRoute({
+              name: "localant",
+              prefix: "/localant",
+              target: `http://127.0.0.1:${servers.gatewayPort}`,
+              publicBaseUrl,
+            });
+            return {
+              provider: "tailscale-shared-router",
+              url: route.publicBaseUrl,
+              status: "running" as const,
+              error: undefined,
+            };
+          })()
+        : await gw.tunnel.start(servers.gatewayPort);
 
     if (tunnel.status === "running" && tunnel.url) {
-      const isReachable = await verifyTunnelReachable(tunnel.url);
+      const isReachable =
+        tunnel.provider === "tailscale-shared-router"
+          ? await verifyTunnelReachable(`${tunnel.url.replace(/\/$/, "")}/localant`)
+          : await verifyTunnelReachable(tunnel.url);
       if (isReachable) {
-        mcpEndpoint = `${tunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
+        mcpEndpoint =
+          tunnel.provider === "tailscale-shared-router"
+            ? buildRoutedMcpEndpoint(tunnel.url, "/localant", gw.configStore.getToken())
+            : `${tunnel.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}`;
         if (!opts.quiet) process.stdout.write(c.green("ok\n"));
       } else {
         if (!opts.quiet) process.stdout.write(c.red("failed (unreachable)\n"));
