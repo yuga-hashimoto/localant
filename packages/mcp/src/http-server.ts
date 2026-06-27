@@ -429,7 +429,17 @@ function mountDashboardApi(
   r.get("/config", (_q, s) => s.json(gw.config()));
   r.get("/mcp-endpoint", (_q, s) => {
     const t = gw.tunnel.current();
-    s.json({ endpoint: t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null, tunnel: t });
+    let runtimeEndpoint: string | null = null;
+    try {
+      const rt = JSON.parse(fs.readFileSync(gw.paths.runtimeFile, "utf8")) as { mcpEndpoint?: string | null };
+      runtimeEndpoint = rt.mcpEndpoint ?? null;
+    } catch {
+      runtimeEndpoint = null;
+    }
+    s.json({
+      endpoint: runtimeEndpoint ?? (t.url ? `${t.url.replace(/\/$/, "")}/mcp?key=${gw.configStore.getToken()}` : null),
+      tunnel: t,
+    });
   });
   r.get("/token", (_q, s) => s.json({ token: gw.configStore.getToken() }));
   r.post("/token/rotate", (_q, s) => {

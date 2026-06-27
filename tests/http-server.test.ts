@@ -329,6 +329,15 @@ describe("dashboard api routes", () => {
     expect(((await stop.json()) as { status: string }).status).toBe("stopped");
   });
 
+  it("reports the verified runtime MCP endpoint even when the live tunnel manager is idle", async () => {
+    const endpoint = "https://machine.example/localant/mcp?key=runtime-token";
+    fs.writeFileSync(apiGw.paths.runtimeFile, JSON.stringify({ mcpEndpoint: endpoint }));
+
+    const res = await apiGet("mcp-endpoint");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { endpoint: string | null }).endpoint).toBe(endpoint);
+  });
+
   it("reveals and rotates the auth token (and /mcp honors the new token)", async () => {
     const before = ((await (await apiGet("token")).json()) as { token: string }).token;
     expect(before).toBeTruthy();
