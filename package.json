@@ -1,6 +1,6 @@
 {
   "name": "localant",
-  "version": "1.4.15",
+  "version": "1.4.16",
   "private": false,
   "description": "LocalAnt — Use ChatGPT as the brain and your local computer as the hands. A safe, permissioned local MCP Gateway for ChatGPT.",
   "license": "MIT",
