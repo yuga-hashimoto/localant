@@ -77,7 +77,7 @@ export function buildMcpServer(gw: Gateway, getSessionId: () => string = () => D
         // Advertise per-tool MCP hints based on the tool's actual behavior.
         // Gateway approval policy is enforced separately from these hints.
         annotations: tool.annotations ?? toolAnnotationsForRisk(tool.risk, mode),
-        _meta: widgetMetaForTool(tool.name),
+        _meta: { ...widgetMetaForTool(tool.name), ...(tool.meta ?? {}) },
       },
       async (args: unknown) => {
         const result = await gw.executeTool(tool.name, args, { caller: "chatgpt", sessionId: getSessionId() });

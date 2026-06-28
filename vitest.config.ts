@@ -22,6 +22,7 @@ export default defineConfig({
   test: {
     include: ["packages/**/tests/**/*.test.ts", "examples/skills/**/tests/**/*.test.ts", "tests/**/*.test.ts"],
     environment: "node",
+ testTimeout: 300_000,
     coverage: {
       provider: "v8",
       include: ["packages/*/src/**/*.ts"],

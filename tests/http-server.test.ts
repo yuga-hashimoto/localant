@@ -136,7 +136,7 @@ describe("mcp chat sessions", () => {
       const tools = await first.client.listTools();
       const names = tools.tools.map((tool) => tool.name);
       expect(names).not.toContain("video_studio_generate_video");
-      expect(names).not.toContain("asset_save_image");
+      expect(names).not.toContain("asset_save_image_file");
     } finally {
       await first.client.close();
     }
@@ -154,7 +154,7 @@ describe("mcp chat sessions", () => {
       const tools = await second.client.listTools();
       const names = tools.tools.map((tool) => tool.name);
       expect(names).toContain("video_studio_generate_video");
-      expect(names).toContain("asset_save_image");
+      expect(names).toContain("asset_save_image_file");
     } finally {
       await second.client.close();
     }
