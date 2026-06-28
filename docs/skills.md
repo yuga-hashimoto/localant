@@ -106,6 +106,7 @@ Ready-to-read references live in [`examples/skills/`](../examples/skills):
 | `file-organizer` | Filesystem writes — sort a folder by type/date. A "local hands" chore ChatGPT can't do itself. |
 | `local-backup` | Shell allowlist (`tar` only) — timestamped `.tar.gz` snapshots. |
 | `article-publisher` | Network + secrets + git — publish to Zenn/Qiita/note. |
+| `flowkit` | Local REST API — control a running FlowKit video-generation server. |
 
 ## Generating a skill from ChatGPT
 

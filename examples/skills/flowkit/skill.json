@@ -1,0 +1,124 @@
+{
+  "name": "flowkit",
+  "displayName": "FlowKit",
+  "version": "0.1.0",
+  "description": "Control a local FlowKit video-generation server through LocalAnt tools.",
+  "author": "LocalAnt",
+  "license": "MIT",
+  "entry": "src/index.ts",
+  "riskLevel": 3,
+  "permissions": {
+    "filesystem": { "mode": "none", "allowedDirectories": [] },
+    "shell": { "mode": "none", "allowedCommands": [] },
+    "network": { "mode": "allowlist", "allowedHosts": ["127.0.0.1", "localhost"] },
+    "secrets": [],
+    "browser": "none",
+    "adb": "none",
+    "git": "none",
+    "agent": "none"
+  },
+  "tools": [
+    {
+      "name": "flowkit_health",
+      "description": "Check FlowKit API health and Chrome extension connection status.",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "flowkit_status",
+      "description": "Summarize FlowKit health, projects, and request status.",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "projectId": { "type": "string" },
+          "limit": { "type": "number" }
+        }
+      }
+    },
+    {
+      "name": "flowkit_create_workflow",
+      "description": "Create a FlowKit project, video, and scenes from a structured workflow spec.",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "project": { "type": "object" },
+          "video": { "type": "object" },
+          "scenes": { "type": "array", "items": { "type": "object" } }
+        },
+        "required": ["project", "video", "scenes"]
+      }
+    },
+    {
+      "name": "flowkit_generate_references",
+      "description": "Submit batch requests to generate reference images for project entities.",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "projectId": { "type": "string" },
+          "characterIds": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["projectId"]
+      }
+    },
+    {
+      "name": "flowkit_generate_images",
+      "description": "Submit batch requests to generate FlowKit scene images.",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "projectId": { "type": "string" },
+          "videoId": { "type": "string" },
+          "sceneIds": { "type": "array", "items": { "type": "string" } },
+          "orientation": { "type": "string", "enum": ["VERTICAL", "HORIZONTAL"] }
+        },
+        "required": ["projectId", "videoId"]
+      }
+    },
+    {
+      "name": "flowkit_generate_videos",
+      "description": "Submit batch requests to generate FlowKit scene video clips.",
+      "riskLevel": 3,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "projectId": { "type": "string" },
+          "videoId": { "type": "string" },
+          "sceneIds": { "type": "array", "items": { "type": "string" } },
+          "orientation": { "type": "string", "enum": ["VERTICAL", "HORIZONTAL"] }
+        },
+        "required": ["projectId", "videoId"]
+      }
+    },
+    {
+      "name": "flowkit_poll",
+      "description": "Poll FlowKit batch status for project/video request completion.",
+      "riskLevel": 0,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "baseUrl": { "type": "string" },
+          "projectId": { "type": "string" },
+          "videoId": { "type": "string" },
+          "type": { "type": "string" },
+          "orientation": { "type": "string" },
+          "timeoutSeconds": { "type": "number" },
+          "intervalSeconds": { "type": "number" }
+        }
+      }
+    }
+  ]
+}
