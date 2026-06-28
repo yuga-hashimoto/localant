@@ -9,11 +9,20 @@ import type { FsManager } from "./fs-manager.js";
 import { detectImageMime, svgHasActiveContent, type ImageMime } from "../util/image-bytes.js";
 import { assertSafeUrl, isPrivateAddress, SsrfError } from "../util/ssrf.js";
 
+/** Apps SDK file-reference shape (download_url + file_id). */
+export interface OpenAIFileParam {
+  download_url: string;
+  file_id: string;
+  mime_type?: string;
+  file_name?: string;
+}
+
 /** Where the image bytes come from. */
 export type AssetSource =
   | { kind: "base64"; data: string; sha256?: string }
   | { kind: "url"; url: string }
-  | { kind: "latest_download"; sinceSeconds?: number; allowedExtensions?: string[] };
+  | { kind: "latest_download"; sinceSeconds?: number; allowedExtensions?: string[] }
+  | { kind: "openai_file"; file: OpenAIFileParam };
 
 export interface AssetResult {
   path: string;
@@ -69,6 +78,10 @@ export class AssetManager {
       case "latest_download": {
         const { data, from } = this.readLatestDownload(source.sinceSeconds, source.allowedExtensions);
         return this.finalize(data, destination, overwrite, from);
+      }
+      case "openai_file": {
+        const { data, fileId } = await this.readOpenAIFileParam(source.file);
+        return this.finalize(data, destination, overwrite, `openai_file:${fileId}`);
       }
     }
   }
@@ -134,7 +147,12 @@ export class AssetManager {
    * redirects followed manually (re-validated, capped), Content-Length and
    * streamed-byte ceilings enforced.
    */
-  private async fetchSafely(rawUrl: string, depth = 0): Promise<Buffer> {
+  private async fetchSafely(
+    rawUrl: string,
+    depth = 0,
+    opts?: { redactUrl?: boolean },
+  ): Promise<Buffer> {
+    const redact = opts?.redactUrl ?? false;
     if (depth > REDIRECT_LIMIT) throw new SsrfError("Too many redirects.");
     const url = assertSafeUrl(rawUrl);
     await this.assertHostResolvesPublic(url.hostname.replace(/^\[|\]$/g, ""));
@@ -144,9 +162,9 @@ export class AssetManager {
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location");
       if (!location) throw new SsrfError(`Redirect with no Location header (status ${res.status}).`);
-      return this.fetchSafely(new URL(location, url).toString(), depth + 1);
+      return this.fetchSafely(new URL(location, url).toString(), depth + 1, opts);
     }
-    if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status} for ${rawUrl}.`);
+    if (!res.ok) throw new Error(`Fetch failed: HTTP ${res.status} for ${redact ? "file parameter URL" : rawUrl}.`);
 
     const declared = Number(res.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > this.maxBytes()) {
@@ -214,5 +232,39 @@ export class AssetManager {
       throw new Error(`Downloaded asset too large (> ${this.maxBytes()} bytes).`);
     }
     return { data: fs.readFileSync(newest.full), from: newest.full };
+  }
+
+  // --- Source: Apps SDK file reference (download_url + file_id) -----------
+
+  /**
+   * Resolve an Apps SDK file-reference object: a signed `download_url` plus a
+   * stable `file_id`. Both are required. The bytes are fetched server-side
+   * through the same SSRF-guarded path as the `url` source, then handed to
+   * {@link finalize} for the normal max-size + magic-byte validation.
+   *
+   * The signed `download_url` is never echoed back: errors carry only the
+   * non-sensitive `file_id` and a redacted reason (the URL is replaced with the
+   * literal "file parameter URL" in fetch failures).
+   */
+  private async readOpenAIFileParam(file: OpenAIFileParam): Promise<{ data: Buffer; fileId: string }> {
+    if (!file || typeof file !== "object") {
+      throw new Error("image_file must be a file reference object with download_url and file_id.");
+    }
+    const { download_url, file_id } = file;
+    if (typeof file_id !== "string" || file_id.trim() === "") {
+      throw new Error("image_file.file_id is required.");
+    }
+    if (typeof download_url !== "string" || download_url.trim() === "") {
+      // Never mention the URL here — only that it is missing.
+      throw new Error("image_file.download_url is required.");
+    }
+    try {
+      const data = await this.fetchSafely(download_url, 0, { redactUrl: true });
+      return { data, fileId: file_id };
+    } catch (e) {
+      // Re-wrap so neither the signed download_url nor a resolved host leaks
+      // into audit/error details — only the stable file_id + a redacted reason.
+      throw new Error(`Could not download image_file '${file_id}': ${(e as Error).message}`);
+    }
   }
 }

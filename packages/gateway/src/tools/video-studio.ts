@@ -234,6 +234,39 @@ export function registerVideoStudioTools(gw: Gateway): void {
     summarize: (i) => `import Video Studio scene image: ${i.sceneId}`,
     handler: (i) => addSceneAsset(gw, i),
   });
+  gw.registry.register({
+    name: "video_studio_add_asset_image_file",
+    description:
+      "Primary route to import a ChatGPT-generated/uploaded image into a Video Studio scene asset. " +
+      "Pass the Apps SDK `image_file` object (download_url + file_id); the bytes are fetched server-side and " +
+      "run through the same Asset Bridge validation (magic-byte sniff, MIME allowlist, SVG-safety, size limit) " +
+      "before being written into the scene asset. Prefer this over video_studio_add_asset when a file reference " +
+      "is available; the signed download_url is never stored in the audit log or errors (only file_id).",
+    risk: 3,
+    meta: { "openai/fileParams": ["image_file"] },
+    inputSchema: projectIdInput.extend({
+      sceneId: z.string().min(1),
+      image_file: z.object({
+        download_url: z.string().url(),
+        file_id: z.string().min(1),
+        mime_type: z.string().optional(),
+        file_name: z.string().optional(),
+      }).strip(),
+      mode: z.enum(["copy"]).default("copy"),
+    }).strip(),
+    summarize: (i) => `import Video Studio scene image file: ${i.sceneId}`,
+    auditInput: (i) => ({
+      projectId: i.projectId,
+      sceneId: i.sceneId,
+      mode: i.mode,
+      image_file: {
+        file_id: i.image_file.file_id,
+        ...(i.image_file.mime_type ? { mime_type: i.image_file.mime_type } : {}),
+        ...(i.image_file.file_name ? { file_name: i.image_file.file_name } : {}),
+      },
+    }),
+    handler: (i) => addSceneAssetImageFile(gw, i),
+  });
   gw.registry.register({ name: "video_studio_generate_assets", description: "Generate free local scene PNG assets.", risk: 3, inputSchema: projectIdInput, summarize: (i) => `generate Video Studio assets: ${i.projectId}`, handler: (i) => generateAssets(gw, i.projectId) });
   gw.registry.register({ name: "video_studio_generate_audio", description: "Generate free local narration audio with VOICEVOX first, macOS say preview fallback, or FFmpeg silence fallback.", risk: 3, inputSchema: projectIdInput, summarize: (i) => `generate Video Studio audio: ${i.projectId}`, handler: (i) => generateAudio(gw, i.projectId) });
   gw.registry.register({ name: "video_studio_generate_captions", description: "Generate SRT, ASS, and word timing JSON captions.", risk: 3, inputSchema: projectIdInput, summarize: (i) => `generate Video Studio captions: ${i.projectId}`, handler: (i) => generateCaptions(gw, i.projectId) });
@@ -546,6 +579,67 @@ function addSceneAsset(gw: Gateway, input: { projectId: string; sceneId: string;
   saveProject(dir, project);
   appendRun(dir, "asset.imported", { sceneId: scene.id, sourcePath: source, assetPath: dest });
   return { ok: true, projectId: project.id, sceneId: scene.id, assetPath: dest, assetSource: scene.assetSource };
+}
+
+/**
+ * Import an Apps SDK `image_file` reference (download_url + file_id) directly
+ * into a scene asset. The bytes are fetched and validated through the Asset
+ * Bridge — the same magic-byte / MIME / SVG-safety / size checks as
+ * {@link addSceneAsset} — so a non-image or oversized payload is rejected
+ * before anything is written. The signed download_url never enters the result,
+ * audit, or error path (only file_id is recorded).
+ */
+async function addSceneAssetImageFile(
+  gw: Gateway,
+  input: {
+    projectId: string;
+    sceneId: string;
+    image_file: { download_url: string; file_id: string; mime_type?: string; file_name?: string };
+    mode: "copy";
+  },
+) {
+  const { project, dir } = loadProject(gw, input.projectId);
+  const scene = project.scenes.find((s) => s.id === input.sceneId);
+  if (!scene) throw new Error(`Video Studio scene not found: ${input.sceneId}`);
+  const assetsDir = path.join(dir, "assets");
+  fs.mkdirSync(assetsDir, { recursive: true });
+  const dest = path.join(assetsDir, `${scene.id}${imageFileExtension(input.image_file)}`);
+  if (!isWithin(videoRoot(gw), dest)) {
+    throw new Error("Path traversal rejected: imported assets must stay inside the LocalAnt Video Studio workspace.");
+  }
+  // Validate + write through the Asset Bridge. overwrite=true so re-importing a
+  // scene asset replaces the previous copy (a backup is kept by PathGuard).
+  const result = await gw.assetBridge.saveImage(
+    { kind: "openai_file", file: input.image_file },
+    dest,
+    true,
+  );
+  scene.assetPath = dest;
+  scene.assetSource = "imported-image";
+  saveProject(dir, project);
+  appendRun(dir, "asset.imported", { sceneId: scene.id, sourceType: "openai_file", fileId: input.image_file.file_id, assetPath: dest });
+  return {
+    ok: true,
+    projectId: project.id,
+    sceneId: scene.id,
+    assetPath: dest,
+    assetSource: scene.assetSource,
+    mimeType: result.mimeType,
+    bytes: result.bytes,
+  };
+}
+
+/** Conventional extension for an image_file, from its declared MIME or name. */
+function imageFileExtension(file: { mime_type?: string; file_name?: string }): string {
+  if (file.mime_type === "image/png") return ".png";
+  if (file.mime_type === "image/jpeg") return ".jpg";
+  if (file.mime_type === "image/webp") return ".webp";
+  if (file.mime_type === "image/gif") return ".gif";
+  if (file.file_name) {
+    const ext = imageExtension(file.file_name);
+    if (ext) return ext;
+  }
+  return ".png";
 }
 
 function imageExtension(file: string): ".png" | ".jpg" | ".jpeg" | ".webp" | null {

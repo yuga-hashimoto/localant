@@ -27,6 +27,7 @@ const VIDEO_STUDIO_TOOLS: ReadonlySet<string> = new Set<string>([
   "video_studio_create_project",
   "video_studio_list_projects",
   "video_studio_add_asset",
+  "video_studio_add_asset_image_file",
   "video_studio_generate_assets",
   "video_studio_generate_audio",
   "video_studio_generate_captions",
@@ -41,10 +42,8 @@ const VIDEO_STUDIO_TOOLS: ReadonlySet<string> = new Set<string>([
 ]);
 
 const ASSET_BRIDGE_TOOLS: ReadonlySet<string> = new Set<string>([
-  "asset_save_image",
-  "asset_upload_chunk",
-  "asset_commit_upload",
-]);
+   "asset_save_image_file",
+  ]);
 
 /**
  * The set of tool names exposed in the `minimal` profile. Everything else is
@@ -140,10 +139,8 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "delete_file",
 
   // --- Asset bridge (get conversation images onto the local repo) ---
-  "asset_save_image",
-  "asset_upload_chunk",
-  "asset_commit_upload",
-  // dropped duplicates (reachable via the kept name in the comment above):
+   "asset_save_image_file",
+    // dropped duplicates (reachable via the kept name in the comment above):
   //   read_file, read_file_range→fs_read_file_range, write_file, edit_file,
   //   list_files→fs_list_files, search_content, search_files→fs_search_files,
   //   get_file_info→fs_get_file_info, diff_file→git_diff_file
@@ -221,6 +218,7 @@ export const CODING_PROFILE_TOOLS: ReadonlySet<string> = new Set<string>([
   "video_studio_create_script",
   "video_studio_create_project",
   "video_studio_add_asset",
+  "video_studio_add_asset_image_file",
   "video_studio_generate_assets",
   "video_studio_generate_audio",
   "video_studio_generate_captions",
