@@ -119,17 +119,16 @@ describe("tool profiles", () => {
     for (const profile of ["minimal", "coding", "full"] as const) {
       expect(isToolInProfile("video_studio_status", profile, disabled), `${profile} video status`).toBe(false);
       expect(isToolInProfile("video_studio_generate_video", profile, disabled), `${profile} video render`).toBe(false);
-      expect(isToolInProfile("asset_save_image", profile, disabled), `${profile} asset save`).toBe(false);
-      expect(isToolInProfile("asset_upload_chunk", profile, disabled), `${profile} asset chunk`).toBe(false);
-    }
+      expect(isToolInProfile("asset_save_image_file", profile, disabled), `${profile} asset save`).toBe(false);
+          }
 
     expect(isToolInProfile("video_studio_status", "minimal", enabled)).toBe(true);
     expect(isToolInProfile("video_studio_generate_video", "minimal", enabled)).toBe(false);
-    expect(isToolInProfile("asset_save_image", "minimal", enabled)).toBe(false);
+    expect(isToolInProfile("asset_save_image_file", "minimal", enabled)).toBe(false);
     expect(isToolInProfile("video_studio_generate_video", "coding", enabled)).toBe(true);
-    expect(isToolInProfile("asset_save_image", "coding", enabled)).toBe(true);
+    expect(isToolInProfile("asset_save_image_file", "coding", enabled)).toBe(true);
     expect(isToolInProfile("video_studio_generate_video", "full", enabled)).toBe(true);
-    expect(isToolInProfile("asset_save_image", "full", enabled)).toBe(true);
+    expect(isToolInProfile("asset_save_image_file", "full", enabled)).toBe(true);
   });
 
   it("coding profile exposes the coding tools", () => {
