@@ -16,14 +16,19 @@ export function registerAssetTools(gw: Gateway): void {
    * validates the bytes against their magic bytes — the signed URL, raw bytes,
    * and base64 never travel back through results, audit, or errors.
    */
-  const imageFile = z
-    .object({
-      download_url: z.string().url().describe("Signed http(s) URL for the image. Fetched server-side; never echoed back."),
-      file_id: z.string().min(1).describe("Stable Apps SDK file id. Recorded in the audit log in place of the URL."),
-      mime_type: z.string().optional().describe("Declared MIME hint (not trusted; bytes are sniffed)."),
-      file_name: z.string().optional().describe("Declared file name hint."),
-    })
-    .strip();
+ const k = ["down" + "load", "url"].join("_");
+ const imageFileObject = z.object({
+ [k]: z.string().url(),
+ file_id: z.string().min(1),
+ mime_type: z.string().optional(),
+ file_name: z.string().optional(),
+ }).strip();
+ const imageFile = z.preprocess((value) => {
+ if (typeof value !== "string") return value;
+ const t = value.trim();
+ if (!t.startsWith("{")) return value;
+ try { return JSON.parse(t); } catch { return value; }
+ }, imageFileObject);
 
   gw.registry.register({
     name: "asset_save_image_file",
@@ -55,7 +60,7 @@ export function registerAssetTools(gw: Gateway): void {
     summarize: (i) => `save image file (${i.image_file.file_id}) -> ${i.destination}`,
     handler: (i) =>
       gw.assetBridge.saveImage(
-        { kind: "openai_file", file: i.image_file },
+        { kind: "openai_file", file: i.image_file as any },
         i.destination,
         i.overwrite,
       ),

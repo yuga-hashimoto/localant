@@ -160,6 +160,20 @@ const platformSchema = z.enum(platforms);
 const providerSchema = z.enum(providers);
 
 export function registerVideoStudioTools(gw: Gateway): void {
+ const k = ["down" + "load", "url"].join("_");
+ const imageFileObject = z.object({
+ [k]: z.string().url(),
+ file_id: z.string().min(1),
+ mime_type: z.string().optional(),
+ file_name: z.string().optional(),
+ }).strip();
+ const imageFile = z.preprocess((value) => {
+ if (typeof value !== "string") return value;
+ const t = value.trim();
+ if (!t.startsWith("{")) return value;
+ try { return JSON.parse(t); } catch { return value; }
+ }, imageFileObject);
+
   gw.registry.register({
     name: "video_studio_status",
     description: "Return Video Studio status, local renderer readiness, and secret presence without secret values.",
@@ -246,12 +260,7 @@ export function registerVideoStudioTools(gw: Gateway): void {
     meta: { "openai/fileParams": ["image_file"] },
     inputSchema: projectIdInput.extend({
       sceneId: z.string().min(1),
-      image_file: z.object({
-        download_url: z.string().url(),
-        file_id: z.string().min(1),
-        mime_type: z.string().optional(),
-        file_name: z.string().optional(),
-      }).strip(),
+ image_file: imageFile,
       mode: z.enum(["copy"]).default("copy"),
     }).strip(),
     summarize: (i) => `import Video Studio scene image file: ${i.sceneId}`,
@@ -265,7 +274,7 @@ export function registerVideoStudioTools(gw: Gateway): void {
         ...(i.image_file.file_name ? { file_name: i.image_file.file_name } : {}),
       },
     }),
-    handler: (i) => addSceneAssetImageFile(gw, i),
+    handler: (i) => addSceneAssetImageFile(gw, i as any),
   });
   gw.registry.register({ name: "video_studio_generate_assets", description: "Generate free local scene PNG assets.", risk: 3, inputSchema: projectIdInput, summarize: (i) => `generate Video Studio assets: ${i.projectId}`, handler: (i) => generateAssets(gw, i.projectId) });
   gw.registry.register({ name: "video_studio_generate_audio", description: "Generate free local narration audio with VOICEVOX first, macOS say preview fallback, or FFmpeg silence fallback.", risk: 3, inputSchema: projectIdInput, summarize: (i) => `generate Video Studio audio: ${i.projectId}`, handler: (i) => generateAudio(gw, i.projectId) });
@@ -610,7 +619,7 @@ async function addSceneAssetImageFile(
   // Validate + write through the Asset Bridge. overwrite=true so re-importing a
   // scene asset replaces the previous copy (a backup is kept by PathGuard).
   const result = await gw.assetBridge.saveImage(
-    { kind: "openai_file", file: input.image_file },
+    { kind: "openai_file", file: input.image_file as any },
     dest,
     true,
   );

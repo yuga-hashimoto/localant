@@ -1,6 +1,6 @@
 {
   "name": "@localant/skill-sdk",
-  "version": "1.4.16",
+  "version": "1.4.17",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
