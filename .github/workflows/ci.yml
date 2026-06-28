@@ -68,6 +68,14 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+      - name: Install ffmpeg / ffprobe
+        shell: bash
+        run: |
+          if command -v ffprobe >/dev/null 2>&1; then
+            exit 0
+          fi
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - name: Test with coverage
