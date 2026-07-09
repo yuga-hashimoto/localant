@@ -8,8 +8,8 @@
 - last activity if available: latest release v4.0.482 on 2026-06-22 when checked
 - license: custom Remotion license, with company-license requirements in some cases
 - stack: TypeScript, React, browser rendering, programmatic composition
-- useful ideas: composition objects, props-driven rendering, preview/render separation, reusable templates
-- risks: too heavy for the first LocalAnt implementation and license constraints make direct dependency undesirable
+- useful ideas: composition objects, props-driven rendering, preview/render separation, reusable animated templates
+- risks: heavier than a pure FFmpeg fallback and Remotion's custom license should stay visible to operators
 
 - name: MoviePy
 - url: https://github.com/Zulko/moviepy and https://zulko.github.io/moviepy/
@@ -65,10 +65,19 @@
 - useful ideas: text to TTS to captions to Remotion render pipeline, MCP-compatible public surface
 - risks: Pexels/API-backed media search and ML dependencies are not acceptable as mandatory defaults here
 
+- name: VOICEVOX Engine
+- url: https://github.com/VOICEVOX/voicevox_engine and https://voicevox.github.io/voicevox_engine/api/
+- stars if available: public GitHub project
+- last activity if available: active public repository when checked
+- license: LGPL-3.0 for the engine; voice library terms are separate
+- stack: local HTTP TTS engine, `/speakers`, `/audio_query`, `/synthesis`
+- useful ideas: free local Japanese narration, explicit speaker/style selection, scene-level WAV generation
+- risks: the engine must be running locally; character/voice terms must be respected by users
+
 ## Design decisions for LocalAnt
 
-- what to adopt: Remotion's scene/composition/props model, MoviePy's separation of clips/audio/overlays, WhisperX's word-timing JSON shape, FFmpeg as the required first renderer, ASS subtitles for readable Shorts/Reels captions, and a browser-upload-assist provider that stops before submit.
-- what not to adopt: paid external video generation APIs, cloud text-to-video APIs, mandatory Remotion dependency, mandatory Python/ML stack, API-only publishers as the default path, or any copied OSS source.
+- what to adopt: Remotion's scene/composition/props model as the primary renderer, VOICEVOX Engine as the primary Japanese TTS, MoviePy's separation of clips/audio/overlays, WhisperX's word-timing JSON shape, FFmpeg/ffprobe for fallback and validation, ASS subtitles for readable Shorts/Reels captions, and a browser-upload-assist provider that stops before submit.
+- what not to adopt: paid external video generation APIs, cloud text-to-video APIs, mandatory Python/ML stack, API-only publishers as the default path, or any copied OSS source.
 - why: the product requirement is a free local fallback that can generate a real uploadable MP4 from ChatGPT/MCP. Optional paid or reviewed APIs can exist later, but they cannot be required for video generation.
 
 ## Implementation mapping
@@ -77,8 +86,13 @@ No source code copied. The implementation only adopts architecture patterns and 
 
 - Remotion mapping:
   - OSS idea: represent videos as parameterized compositions, separate preview/editing from final render, and reuse templates.
-  - LocalAnt implementation: `VideoProject`, `VideoScene`, and render-plan JSON are props-driven scene/composition equivalents. Dashboard preview/review is separated from `video_studio_render_video`. The `generate_video` tool orchestrates reusable steps instead of hiding everything in a single opaque command.
-  - Not adopted: Remotion runtime dependency, React rendering bundle, Lambda/Cloud Run rendering, or custom Remotion licensing exposure in the first implementation.
+  - LocalAnt implementation: `VideoProject`, `VideoScene`, `render/render-props.json`, and `render/motion-plan.json` drive a Remotion composition with animated background, card, title, captions, progress bar, and CTA. Dashboard preview/review is separated from `video_studio_render_video`. The `generate_video` tool orchestrates reusable steps instead of hiding everything in a single opaque command.
+  - Not adopted: Lambda/Cloud Run rendering or remote render services.
+
+- VOICEVOX mapping:
+  - OSS idea: run Japanese TTS locally through a documented HTTP engine.
+  - LocalAnt implementation: status checks `http://127.0.0.1:50021/speakers` by default, selects a speaker/style, then calls `/audio_query` and `/synthesis` per scene. Scene WAV durations are measured with `ffprobe`, and video timings are derived from those durations.
+  - Not adopted: bundled VOICEVOX engine binaries, remote TTS, or paid voice APIs.
 
 - MoviePy mapping:
   - OSS idea: think in clips and layers: image/video clip, audio clip, text overlay, final composition.
@@ -92,7 +106,7 @@ No source code copied. The implementation only adopts architecture patterns and 
 
 - FFmpeg mapping:
   - OSS idea: use CLI primitives for final rendering, audio muxing, thumbnail extraction, ffprobe validation, progress overlays, and optional subtitle filters.
-  - LocalAnt implementation: built-in FFmpeg is the primary renderer; it concatenates scene clips, pads/muxes narration, draws a progress bar, extracts `thumbnail.jpg`, records `ffmpeg-command.txt`, and validates streams with ffprobe.
+  - LocalAnt implementation: FFmpeg static-slide rendering is fallback. `ffprobe` remains mandatory for audio length measurement and review validation, including failing when rendered video is shorter than narration.
   - Compatibility decision: FFmpeg subtitle rendering requires libass-enabled builds. Since this Mac's FFmpeg build did not expose `ass/subtitles` filters, LocalAnt still writes `.ass` and `.srt`, but burns readable caption text into generated scene visuals so output remains uploadable on common free FFmpeg installs.
 
 - Aegisub / ASS mapping:
@@ -107,10 +121,10 @@ No source code copied. The implementation only adopts architecture patterns and 
 
 ## Final architecture
 
-- renderer: `builtin-ffmpeg` first. It creates scene images, burns ASS captions, muxes local narration when available, extracts a thumbnail, and validates with ffprobe.
+- renderer: Remotion first. It renders animated presentation-style shorts from `render-props.json`; `builtin-ffmpeg` static slides are fallback only.
 - script generator: deterministic template generator that works without an LLM API.
 - asset generator: free local generated visuals. It writes per-scene PNGs using FFmpeg color/image generation when available, with SVG placeholders retained for inspection.
-- audio generator: free local narration. On macOS it uses `say`; otherwise FFmpeg silence is used when possible, with setup guidance only if neither local option works.
+- audio generator: VOICEVOX first for Japanese narration. macOS `say` is preview fallback, and FFmpeg silence is only the last local fallback for tests or setup-limited environments.
 - caption system: SRT, ASS, and `words.json` are generated from scene timings, with the JSON shaped for future WhisperX word alignment.
 - publisher system: browser upload assist and dry-run metadata first. Official APIs are readiness-checked but not required.
 - dashboard integration: dashboard routes call the same MCP tools so ChatGPT and the local UI share one implementation.

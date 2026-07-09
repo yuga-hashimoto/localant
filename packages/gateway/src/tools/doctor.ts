@@ -48,7 +48,7 @@ export function registerDoctorTools(gw: Gateway): void {
       const info = gw.runtimeInfo();
       const profile = cfg.tools.profile;
       const allTools = gw.registry.list();
-      const exposed = allTools.filter((t) => isToolInProfile(t.name, profile));
+      const exposed = allTools.filter((t) => isToolInProfile(t.name, profile, cfg.tools.features));
 
       const [git, gh, pnpm, npm, npx, python, adb, screencapture, tailscale] = await Promise.all([
         commandExists("git"),

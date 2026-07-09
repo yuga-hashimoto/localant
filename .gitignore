@@ -8,3 +8,27 @@ coverage/
 .tmp-tests/
 .tmp-video-studio-e2e/
 .commandcode/
+
+# LocalAnt runtime state accidentally created at the repo root (gateway home = cwd)
+/approvals.json
+/config.json
+/secrets.json
+/token
+/vault.key
+/audit/
+/output/
+/backups/
+/logs/
+
+# Local render / e2e scratch
+.tmp-e2e-render/
+.tmp-video-studio-variants/
+.tmp-localant-five-visual-styles/
+
+# One-off dev scratch files
+/x1
+/x2
+/xrun.cjs
+/serve-output.cjs
+/patch_remotion_template.py
+/scripts/x5.ts

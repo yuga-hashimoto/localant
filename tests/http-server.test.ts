@@ -122,6 +122,44 @@ describe("mcp chat sessions", () => {
     }
   });
 
+  it("does not advertise plugin-style tools over MCP until dashboard features are enabled", async () => {
+    gw.saveConfig({
+      ...gw.config(),
+      tools: {
+        profile: "full",
+        features: { videoStudio: false, assetBridge: false },
+      },
+    });
+
+    const first = await connectClient("plugin-disabled-client");
+    try {
+      const tools = await first.client.listTools();
+      const names = tools.tools.map((tool) => tool.name);
+      expect(names).not.toContain("video_studio_generate_video");
+      expect(names).not.toContain("asset_save_image");
+    } finally {
+      await first.client.close();
+    }
+
+    gw.saveConfig({
+      ...gw.config(),
+      tools: {
+        profile: "full",
+        features: { videoStudio: true, assetBridge: true },
+      },
+    });
+
+    const second = await connectClient("plugin-enabled-client");
+    try {
+      const tools = await second.client.listTools();
+      const names = tools.tools.map((tool) => tool.name);
+      expect(names).toContain("video_studio_generate_video");
+      expect(names).toContain("asset_save_image");
+    } finally {
+      await second.client.close();
+    }
+  });
+
   it("assigns a distinct session id per chat and tags audit entries with it", async () => {
     const a = await connectClient("chat-a");
     const b = await connectClient("chat-b");

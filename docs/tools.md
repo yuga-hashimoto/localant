@@ -27,7 +27,8 @@ is risk 0; a `git_reset --hard` is risk 4), so ranges are shown.
 |--------|------:|------------|-------|
 | Read / Search | 7 | 0 | `read`, `read_file_range`, `grep`, `glob`, `list_files`, `get_file_info`. Never mutates. |
 | Edit | 10 | 2–3 | `write`, `edit`, `multi_edit`, `apply_patch`, `move_file`, `copy_file`, `create_directory`, `delete_file`. |
-| Asset bridge | 1 | 2 | `asset_save_image` — one tool, `source.kind` = `base64` / `url` / `latest_download`. Magic-byte + SSRF + SVG-safety checked. See [asset-bridge.md](asset-bridge.md). |
+| Asset bridge | 3 | 2 | `asset_save_image`, plus `asset_upload_chunk` / `asset_commit_upload` for large generated images. Video Studio can attach saved images with `video_studio_add_asset`. Magic-byte + SSRF + SVG-safety checked. See [asset-bridge.md](asset-bridge.md). |
+| Video Studio | 17 | 0–4 | Remotion + VOICEVOX short-video workflow. Disabled for ChatGPT by default; enable it from Dashboard → Settings → Optional ChatGPT tools. |
 | Shell | 16 | 0–3 | `bash`, background shell control, `command_exists`. Screened by CommandGuard + PathGuard. |
 | Git | 22 | 0–4 | Status/diff/log are 0; `git_commit`/`git_add` are 2–3; `git_reset`/destructive ops reach 4. |
 | Validate / Project | 8 | 0–3 | `project_run_tests`/`lint`/`typecheck`/`build`/`validation`; reads scripts at 0. |
@@ -60,3 +61,8 @@ The advertised surface is narrowed by the active **tool profile**:
 localant tools profile coding
 localant tools list
 ```
+
+Optional product surfaces are also gated by Dashboard feature toggles. LocalAnt
+Video Studio and the generated-image Asset bridge are disabled for ChatGPT by
+default; enable them in Dashboard → Settings → Optional ChatGPT tools before
+they appear in MCP `tools/list`.

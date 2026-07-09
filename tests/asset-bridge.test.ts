@@ -32,6 +32,14 @@ function save(source: unknown, destination: string, overwrite = false) {
   return gw.executeTool("asset_save_image", { source, destination, overwrite }, ctx());
 }
 
+function uploadChunk(input: Record<string, unknown>) {
+  return gw.executeTool("asset_upload_chunk", input, ctx());
+}
+
+function commitUpload(input: Record<string, unknown>) {
+  return gw.executeTool("asset_commit_upload", input, ctx());
+}
+
 beforeEach(() => {
   fs.mkdirSync(path.join(process.cwd(), ".tmp-tests"), { recursive: true });
   base = fs.mkdtempSync(path.join(process.cwd(), ".tmp-tests", "asset-home-"));
@@ -40,7 +48,10 @@ beforeEach(() => {
   // Default mode is "open": no allowlist restriction, only the sensitive
   // blocklist. The temp workdir is safely writable. Asset tools live in the
   // coding/full profiles, so switch off the minimal default.
-  gw.saveConfig({ ...gw.config(), tools: { ...gw.config().tools, profile: "coding" } });
+  gw.saveConfig({
+    ...gw.config(),
+    tools: { ...gw.config().tools, profile: "coding", features: { ...gw.config().tools.features, assetBridge: true } },
+  });
 });
 
 afterEach(() => {
@@ -147,6 +158,39 @@ describe("asset_save_image — base64 source", () => {
     const refuse = await save({ kind: "base64", data: PNG.toString("base64") }, dest, false);
     expect(refuse.ok).toBe(false);
     expect(refuse.error).toMatch(/exists/i);
+  });
+});
+
+describe("asset chunk upload", () => {
+  it("assembles multiple base64 chunks and writes through normal image validation", async () => {
+    const uploadId = "chatgpt-generated-001";
+    const b64 = PNG.toString("base64");
+    const first = b64.slice(0, 12);
+    const second = b64.slice(12);
+    const one = await uploadChunk({ uploadId, index: 0, data: first });
+    expect(one.ok).toBe(true);
+    const two = await uploadChunk({ uploadId, index: 1, data: second });
+    expect(two.ok).toBe(true);
+
+    const dest = path.join(workdir, "chunked.png");
+    const res = await commitUpload({ uploadId, chunks: 2, destination: dest, overwrite: false });
+    expect(res.ok).toBe(true);
+    const data = res.data as { path: string; mimeType: string; bytes: number; source: string };
+    expect(data.path).toBe(dest);
+    expect(data.mimeType).toBe("image/png");
+    expect(data.bytes).toBe(PNG.length);
+    expect(data.source).toBe(`chunked:${uploadId}`);
+    expect(fs.readFileSync(dest)).toEqual(PNG);
+  });
+
+  it("keeps chunk payloads out of the audit log", async () => {
+    const uploadId = "audit-chunk";
+    const b64 = PNG.toString("base64");
+    await uploadChunk({ uploadId, index: 0, data: b64 });
+    const entry = gw.audit.readAll().find((e) => e.tool === "asset_upload_chunk");
+    expect(entry).toBeDefined();
+    expect(entry!.inputSummary).not.toContain(b64.slice(0, 24));
+    expect(entry!.inputSummary).toContain("base64Len");
   });
 });
 

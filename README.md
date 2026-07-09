@@ -150,6 +150,11 @@ localant tools profile coding   # switch profile
 localant tools list             # see what's exposed
 ```
 
+Optional product surfaces such as **LocalAnt Video Studio** and the generated-image
+**Asset bridge** are disabled for ChatGPT by default. Enable them from
+Dashboard → Settings → Optional ChatGPT tools when you want those tools
+advertised over MCP.
+
 Every tool's risk level (0–4) and how each family is gated is documented in
 [docs/tools.md](docs/tools.md).
 
@@ -381,6 +386,18 @@ conversation as a real file on disk. `source.kind` selects how the bytes arrive:
 All routes share one validation path (magic-byte sniff → MIME allowlist →
 SVG-safety scan → sha256 → atomic write with backup). Risk 2 (no approval in
 `open` mode). See [docs/asset-bridge.md](docs/asset-bridge.md).
+
+For Video Studio, save the generated image first, then attach it to a scene with
+`video_studio_add_asset`. The image is copied into the project workspace and
+passed to Remotion as a scene visual, so ChatGPT-generated images can become
+animated short-video material.
+
+For large generated images, use `asset_upload_chunk` repeatedly and finish with
+`asset_commit_upload`; the committed file can then be attached with
+`video_studio_add_asset`.
+
+These tools are not advertised to ChatGPT unless the Asset bridge feature is
+enabled in Dashboard → Settings → Optional ChatGPT tools.
 
 ## Browser automation
 

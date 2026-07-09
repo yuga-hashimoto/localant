@@ -361,7 +361,8 @@ function mountDashboardApi(
   });
 
   r.get("/tools", (_q, s) => {
-    const profile = gw.config().tools.profile;
+    const toolsConfig = gw.config().tools;
+    const profile = toolsConfig.profile;
     s.json(
       gw.registry.list().map((t) => {
         const shape = (t.inputSchema as any).shape ?? {};
@@ -379,7 +380,7 @@ function mountDashboardApi(
           risk: t.risk,
           inputSchema,
           // Whether this tool is advertised to ChatGPT under the active profile.
-          active: isToolInProfile(t.name, profile),
+          active: isToolInProfile(t.name, profile, toolsConfig.features),
         };
       })
     );
@@ -392,7 +393,7 @@ function mountDashboardApi(
     if (!["minimal", "coding", "full"].includes(name)) {
       return s.status(400).json({ error: "profile must be minimal|coding|full" });
     }
-    gw.saveConfig({ ...gw.config(), tools: { profile: name as "minimal" | "coding" | "full" } });
+    gw.saveConfig({ ...gw.config(), tools: { ...gw.config().tools, profile: name as "minimal" | "coding" | "full" } });
     s.json({ profile: name, note: "Restart the gateway for the MCP surface to refresh." });
   });
 

@@ -401,8 +401,17 @@ export const ConfigSchema = z.object({
       // + control plane); `full` advertises every registered tool. See
       // tool-profiles.ts. Defaults to `minimal` to keep tool-selection sharp.
       profile: z.enum(["minimal", "coding", "full"]).default("minimal"),
+      // Optional product surfaces that behave like built-in plugins. When a
+      // feature is disabled, its tools remain available to LocalAnt internals
+      // and the dashboard, but are not advertised to ChatGPT over MCP.
+      features: z
+        .object({
+          videoStudio: z.boolean().default(false),
+          assetBridge: z.boolean().default(false),
+        })
+        .prefault({}),
     })
-    .default({ profile: "minimal" }),
+    .prefault({ profile: "minimal" }),
   mcpServers: z.record(z.string(), McpServerConfig).default({}),
   skillRegistry: z
     .object({

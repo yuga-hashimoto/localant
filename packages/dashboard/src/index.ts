@@ -653,9 +653,24 @@ const VIEWS = {
   async "Video Studio"(m){
     const [status, projectsData]=await Promise.all([api('video-studio/status'), api('video-studio/projects').catch(()=>({projects:[]}))]);
     const projects=projectsData.projects||[];
+    const vv=status.audio&&status.audio.voicevox||{};
+    const renderer=status.renderer||{};
     m.innerHTML='<div class="card"><h2>Video Studio</h2>'
-      +'<p class="muted" style="margin-top:0">Renderer: <code>builtin-ffmpeg</code> · video generation: <code>'+esc(status.policy&&status.policy.videoGeneration||'free local generation only')+'</code></p>'
-      +'<div class="row" style="gap:8px;margin-bottom:12px"><span class="tag '+(status.renderer&&status.renderer.builtinFfmpeg?'risk0':'risk4')+'">ffmpeg '+(status.renderer&&status.renderer.builtinFfmpeg?'ready':'missing')+'</span><span class="tag '+(status.renderer&&status.renderer.ffprobe?'risk0':'risk2')+'">ffprobe '+(status.renderer&&status.renderer.ffprobe?'ready':'missing')+'</span><span class="tag '+(status.audio&&status.audio.macosSay?'risk0':'risk2')+'">macOS say '+(status.audio&&status.audio.macosSay?'ready':'fallback')+'</span></div>'
+      +'<p class="muted" style="margin-top:0">Renderer: <code>'+(esc(renderer.primary||'remotion'))+'</code> · fallback: <code>'+(esc(status.policy&&status.policy.fallbackRenderer||'builtin-ffmpeg-static-slides'))+'</code> · video generation: <code>'+esc(status.policy&&status.policy.videoGeneration||'free local generation only')+'</code></p>'
+      +'<div class="row" style="gap:8px;margin-bottom:12px">'
+        +'<span class="tag '+(renderer.remotion?'risk0':'risk4')+'">Remotion '+(renderer.remotion?'ready':'missing')+'</span>'
+        +'<span class="tag '+(renderer.builtinFfmpegFallback?'risk0':'risk4')+'">ffmpeg fallback '+(renderer.builtinFfmpegFallback?'ready':'missing')+'</span>'
+        +'<span class="tag '+(renderer.ffprobe?'risk0':'risk2')+'">ffprobe '+(renderer.ffprobe?'ready':'missing')+'</span>'
+        +'<span class="tag '+(vv.available?'risk0':'risk4')+'">VOICEVOX '+(vv.available?'ready':'offline')+'</span>'
+        +'<span class="tag '+(status.audio&&status.audio.macosSayPreviewFallback?'risk2':'risk3')+'">macOS say preview '+(status.audio&&status.audio.macosSayPreviewFallback?'ready':'missing')+'</span>'
+      +'</div>'
+      +'<div class="card" style="background:var(--panel2);margin-bottom:12px"><h2>Voice / Render Status</h2>'
+        +'<table><tbody>'
+          +'<tr><td class="muted">VOICEVOX endpoint</td><td><code>'+esc(vv.endpoint||'http://127.0.0.1:50021')+'</code></td></tr>'
+          +'<tr><td class="muted">Speakers</td><td>'+esc(vv.speakerCount||0)+' · '+esc(vv.selectedSpeakerName||'not selected')+'</td></tr>'
+          +'<tr><td class="muted">Voice quality</td><td><code>'+(vv.available?'primary':'preview/silent fallback')+'</code></td></tr>'
+          +'<tr><td class="muted">Render status</td><td>Remotion '+(renderer.remotion?'ready':'missing')+' · ffmpeg fallback '+(renderer.builtinFfmpegFallback?'ready':'missing')+'</td></tr>'
+        +'</tbody></table></div>'
       +'<div class="row" style="gap:12px;align-items:flex-end">'
         +'<div class="field" style="flex:1;margin:0"><label>Topic</label><input id="vsTopic" value="LocalAntで動画制作を自動化する" /></div>'
         +'<div class="field" style="width:150px;margin:0"><label>Duration</label><input id="vsDuration" type="number" value="18" min="6" max="180" /></div>'
@@ -691,7 +706,7 @@ const VIEWS = {
       prep.onclick=action(prep,async()=>{ show(await api('video-studio/publish/prepare',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platforms:['youtube','tiktok','instagram']})})); toast('Metadata written'); },'Preparing');
       cell.appendChild(prep);
       const upload=el('<button class="btn ghost sm" style="margin-left:6px">Browser Upload Assist</button>');
-      upload.onclick=action(upload,async()=>{ show(await api('video-studio/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platform:'youtube',provider:'browser',dryRun:false,confirmBrowserPublish:false})})); toast('Upload assist opened or returned setup instructions'); },'Opening');
+      upload.onclick=action(upload,async()=>{ show(await api('video-studio/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platform:'youtube',provider:'browser',dryRun:false,confirmBrowserPublish:false,executeBrowser:false})})); toast('Upload assist opened or returned setup instructions'); },'Opening');
       cell.appendChild(upload);
       const publish=el('<button class="btn danger sm" style="margin-left:6px">Publish</button>');
       publish.onclick=action(publish,async()=>{ if(!confirm('Click the configured submit/publish button in the browser? Login, CAPTCHA and 2FA are never bypassed.')) return; show(await api('video-studio/publish',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({projectId:p.id,platform:'youtube',provider:'browser',dryRun:false,confirmBrowserPublish:true})})); },'Publishing');
@@ -708,6 +723,8 @@ const VIEWS = {
     const allowedCmds=sec.allowedCommands||[];
     const blockedTokens=sec.blockedCommandTokens||[];
     const CORE=["sudo","su","mkfs","mkfs.ext4","dd","fdisk","diskutil","shutdown","reboot"];
+    const toolsCfg=c.tools||{};
+    const toolFeatures=toolsCfg.features||{};
 
     const tun=c.tunnel||{};
 
@@ -730,11 +747,16 @@ const VIEWS = {
       +'<div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="approveRisk1"'+(sec.approveRisk1?' checked':'')+' style="width:auto"/> Require approval for Risk 1 (draft) actions</label></div>'
       +'<div class="field"><label>Tool profile</label>'
         +'<select id="toolProfile" style="width:160px">'
-          +'<option value="minimal"'+(((c.tools&&c.tools.profile)||'minimal')==='minimal'?' selected':'')+'>minimal (default)</option>'
-          +'<option value="coding"'+((c.tools&&c.tools.profile)==='coding'?' selected':'')+'>coding</option>'
-          +'<option value="full"'+((c.tools&&c.tools.profile)==='full'?' selected':'')+'>full</option>'
+          +'<option value="minimal"'+(((toolsCfg&&toolsCfg.profile)||'minimal')==='minimal'?' selected':'')+'>minimal (default)</option>'
+          +'<option value="coding"'+((toolsCfg&&toolsCfg.profile)==='coding'?' selected':'')+'>coding</option>'
+          +'<option value="full"'+((toolsCfg&&toolsCfg.profile)==='full'?' selected':'')+'>full</option>'
         +'</select>'
         +'<p class="muted" style="margin-top:6px;font-size:12px;"><b>minimal</b>: advertise only the core surface to ChatGPT — Shell, coding Agent, Skill, read-only files, and the control plane. <b>coding</b>: use ChatGPT as a local coding agent — read/edit/apply_patch, grep/glob, bash, git, project validation, todo/plan, agent delegation. <b>full</b>: advertise every tool (browser, adb, git, publishers, file writes, …).</p>'
+      +'</div>'
+      +'<div class="field"><label>Optional ChatGPT tools</label>'
+        +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;"><input type="checkbox" id="featureVideoStudio"'+(toolFeatures.videoStudio?' checked':'')+' style="width:auto"/> Enable LocalAnt Video Studio tools</label>'
+        +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;"><input type="checkbox" id="featureAssetBridge"'+(toolFeatures.assetBridge?' checked':'')+' style="width:auto"/> Enable generated-image Asset Bridge tools</label>'
+        +'<p class="muted" style="margin-top:6px;font-size:12px;">Disabled features stay available inside this dashboard, but their tools are not advertised to ChatGPT. Reconnect ChatGPT or restart LocalAnt after changing these toggles.</p>'
       +'</div>'
       +'</div>'
 
@@ -786,10 +808,13 @@ const VIEWS = {
     wirePw('tunToken','tunTokenShow');
     const saveSec = async (update) => { await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({security:update})}); };
     const saveTun = async (update) => { await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tunnel:update})}); };
+    const saveToolFeature = async (name, value) => { await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tools:{features:{[name]:value}}})}); };
 
     document.getElementById('secMode').onchange=async(e)=>{ try{ await saveSec({mode:e.target.value}); toast('Mode → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('approveRisk1').onchange=async(e)=>{ try{ await saveSec({approveRisk1:e.target.checked}); toast('Saved'); }catch(err){ toast(err.message,'err'); } };
     document.getElementById('toolProfile').onchange=async(e)=>{ try{ await api('config',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({tools:{profile:e.target.value}})}); toast('Tool profile → '+e.target.value); render(); }catch(err){ toast(err.message,'err'); } };
+    document.getElementById('featureVideoStudio').onchange=async(e)=>{ try{ await saveToolFeature('videoStudio',e.target.checked); toast('Video Studio tools '+(e.target.checked?'enabled':'disabled')+' — reconnect ChatGPT to refresh'); render(); }catch(err){ toast(err.message,'err'); } };
+    document.getElementById('featureAssetBridge').onchange=async(e)=>{ try{ await saveToolFeature('assetBridge',e.target.checked); toast('Asset Bridge tools '+(e.target.checked?'enabled':'disabled')+' — reconnect ChatGPT to refresh'); render(); }catch(err){ toast(err.message,'err'); } };
 
     document.getElementById('goAutopilot').onclick=function(){ current='Autopilot'; renderNav(); render(); };
 

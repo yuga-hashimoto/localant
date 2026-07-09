@@ -192,17 +192,17 @@ export class Gateway {
     const tool = this.registry.get(name);
     if (!tool) return { ok: false, error: `Unknown tool: ${name}` };
 
-    // Profile gate: in the `minimal` profile only the core surface is callable.
-    // Everything else should go through shell / a coding agent / a skill, or the
-    // user can switch tools.profile to `full`.
+    // Profile/feature gate applies to normal tool calls. The local dashboard
+    // can still drive built-in feature modules directly so users can configure
+    // and test a module before advertising it to ChatGPT.
     const profile = this.cfg.tools.profile;
-    if (!isToolInProfile(name, profile)) {
+    if (ctx.caller !== "dashboard" && !isToolInProfile(name, profile, this.cfg.tools.features)) {
       return {
         ok: false,
         error:
           `Tool "${name}" is not available in the "${profile}" tool profile. ` +
           `Use shell_run_allowed_command, the high-level autopilot tool, ` +
-          `or a skill (skill_run) instead — or set tools.profile to "full" in the config.`,
+          `or a skill (skill_run) instead — or enable the matching feature from the LocalAnt dashboard.`,
       };
     }
 
